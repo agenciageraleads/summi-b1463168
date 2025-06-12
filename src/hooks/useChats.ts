@@ -33,7 +33,14 @@ export const useChats = () => {
         .order('modificado_em', { ascending: false });
 
       if (error) throw error;
-      setChats(data || []);
+      
+      // Transform the data to ensure conversa is always an array
+      const transformedData = (data || []).map(chat => ({
+        ...chat,
+        conversa: Array.isArray(chat.conversa) ? chat.conversa : []
+      }));
+      
+      setChats(transformedData);
     } catch (error) {
       console.error('Error fetching chats:', error);
     } finally {
