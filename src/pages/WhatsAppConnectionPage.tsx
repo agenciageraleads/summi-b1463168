@@ -1,76 +1,203 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useProfile } from '@/hooks/useProfile';
+import { supabase } from '@/integrations/supabase/client';
+import { QrCode, Smartphone, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
 
 const WhatsAppConnectionPage = () => {
+  const { profile, updateProfile } = useProfile();
+  const { toast } = useToast();
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [qrCode, setQrCode] = useState('');
-  const { toast } = useToast();
+  const [isCreatingInstance, setIsCreatingInstance] = useState(false);
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
-  const generateQRCode = () => {
-    setConnectionStatus('connecting');
-    setQrCode('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ3aGl0ZSIvPgogIDx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjE0cHgiIGZpbGw9ImJsYWNrIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iMC4zZW0iPjxzdmcgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxODAiIHZpZXdCb3g9IjAgMCAyMDAwIDIwMDAiPjxyZWN0IHdpZHRoPSIyMDAwIiBoZWlnaHQ9IjIwMDAiIGZpbGw9IiNmZmYiLz48ZyBmaWxsPSIjMDAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIvPjxyZWN0IHg9IjQwMCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiLz48cmVjdCB4PSI4MDAiIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIi8+PHJlY3QgeD0iMTYwMCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiLz48L2c+PC9zdmc+PC90ZXh0Pgo8L3N2Zz4K');
+  // Verificar status da conexão automaticamente
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
     
-    // Simulate QR code scanning after 3 seconds
-    setTimeout(() => {
-      setConnectionStatus('connected');
-      toast({
-        title: "Conectado com sucesso! 🎉",
-        description: "Seu WhatsApp foi conectado à Summi",
-      });
-    }, 3000);
+    if (profile?.instance_name) {
+      checkConnectionStatus();
+      interval = setInterval(checkConnectionStatus, 10000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [profile?.instance_name]);
+
+  const generateInstanceName = () => {
+    if (!profile?.nome || !profile?.numero) return '';
+    
+    const nome = profile.nome.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const ultimosDigitos = profile.numero.slice(-4);
+    return `${nome}_${ultimosDigitos}`;
   };
 
-  const disconnect = () => {
-    setConnectionStatus('disconnected');
-    setQrCode('');
-    toast({
-      title: "Desconectado",
-      description: "WhatsApp foi desconectado da Summi",
-      variant: "destructive"
-    });
+  const checkConnectionStatus = async () => {
+    if (!profile?.instance_name) return;
+    
+    setIsCheckingStatus(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-get-status', {
+        body: { instanceName: profile.instance_name }
+      });
+
+      if (error) {
+        console.error('Erro ao verificar status:', error);
+        setConnectionStatus('disconnected');
+        return;
+      }
+
+      const status = data.status || 'disconnected';
+      console.log(`Status da conexão: ${status}`);
+      
+      if (status === 'open') {
+        setConnectionStatus('connected');
+        setQrCode(''); // Limpar QR Code quando conectado
+      } else if (status === 'connecting') {
+        setConnectionStatus('connecting');
+      } else {
+        setConnectionStatus('disconnected');
+      }
+    } catch (error) {
+      console.error('Erro ao verificar status:', error);
+      setConnectionStatus('disconnected');
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
+  const handleCreateInstance = async () => {
+    if (!profile?.nome || !profile?.numero) {
+      toast({
+        title: 'Informações incompletas',
+        description: 'Complete seu perfil antes de conectar o WhatsApp',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsCreatingInstance(true);
+    try {
+      const instanceName = generateInstanceName();
+      console.log(`Criando instância: ${instanceName}`);
+      
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase.functions.invoke('evolution-create-instance', {
+        body: { instanceName },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Erro ao criar instância');
+      
+      // Salvar o nome da instância no perfil
+      await updateProfile({ instance_name: instanceName });
+      
+      toast({
+        title: 'Instância criada!',
+        description: 'Agora gere o QR Code para conectar seu WhatsApp'
+      });
+      
+      setConnectionStatus('disconnected');
+    } catch (error) {
+      console.error('Erro ao criar instância:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível criar a instância do WhatsApp',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsCreatingInstance(false);
+    }
+  };
+
+  const handleGenerateQRCode = async () => {
+    if (!profile?.instance_name) return;
+
+    setIsGeneratingQR(true);
+    try {
+      console.log(`Gerando QR Code para: ${profile.instance_name}`);
+      
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase.functions.invoke('evolution-generate-qr', {
+        body: { instanceName: profile.instance_name },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Erro ao gerar QR Code');
+
+      setQrCode(data.qrCode);
+      setConnectionStatus('connecting');
+      
+      toast({
+        title: 'QR Code gerado!',
+        description: 'Escaneie o QR Code com seu WhatsApp para conectar'
+      });
+    } catch (error) {
+      console.error('Erro ao gerar QR Code:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar o QR Code',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsGeneratingQR(false);
+    }
   };
 
   const getStatusDisplay = () => {
     switch (connectionStatus) {
       case 'connected':
         return {
-          color: 'text-summi-green',
-          bg: 'bg-summi-green/10',
-          icon: '✅',
+          color: 'text-green-600',
+          bg: 'bg-green-100',
+          icon: CheckCircle,
           text: 'Conectado'
         };
       case 'connecting':
         return {
           color: 'text-yellow-600',
           bg: 'bg-yellow-100',
-          icon: '⏳',
+          icon: RotateCcw,
           text: 'Conectando...'
         };
       default:
         return {
           color: 'text-red-500',
           bg: 'bg-red-100',
-          icon: '❌',
+          icon: AlertCircle,
           text: 'Desconectado'
         };
     }
   };
 
   const status = getStatusDisplay();
+  const StatusIcon = status.icon;
 
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-summi-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             Conexão WhatsApp 📱
           </h1>
-          <p className="text-summi-gray-600">
+          <p className="text-muted-foreground">
             Conecte seu WhatsApp Business para começar a automatizar o atendimento
           </p>
         </div>
@@ -81,23 +208,22 @@ const WhatsAppConnectionPage = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div className={`w-12 h-12 rounded-full ${status.bg} flex items-center justify-center`}>
-                  <span className="text-2xl">{status.icon}</span>
+                  <StatusIcon className={`w-6 h-6 ${status.color}`} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-summi-gray-900">Status da Conexão</h3>
+                  <h3 className="font-semibold text-foreground">Status da Conexão</h3>
                   <p className={`font-medium ${status.color}`}>{status.text}</p>
                 </div>
               </div>
               
-              {connectionStatus === 'connected' && (
-                <Button 
-                  variant="outline" 
-                  onClick={disconnect}
-                  className="border-red-300 text-red-600 hover:bg-red-50"
-                >
-                  Desconectar
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={checkConnectionStatus}
+                disabled={!profile?.instance_name || isCheckingStatus}
+              >
+                <RotateCcw className={`w-4 h-4 ${isCheckingStatus ? 'animate-spin' : ''}`} />
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -113,48 +239,78 @@ const WhatsAppConnectionPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* ... keep existing code (step instructions) */}
               <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-summi-blue text-white rounded-full flex items-center justify-center text-sm font-bold">
+                <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
                   1
                 </div>
                 <div>
-                  <h4 className="font-medium text-summi-gray-900">Gerar QR Code</h4>
-                  <p className="text-sm text-summi-gray-600">
+                  <h4 className="font-medium text-foreground">Gerar QR Code</h4>
+                  <p className="text-sm text-muted-foreground">
                     Clique no botão para gerar um QR code único
                   </p>
                 </div>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-summi-blue text-white rounded-full flex items-center justify-center text-sm font-bold">
+                <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
                   2
                 </div>
                 <div>
-                  <h4 className="font-medium text-summi-gray-900">Abrir WhatsApp</h4>
-                  <p className="text-sm text-summi-gray-600">
+                  <h4 className="font-medium text-foreground">Abrir WhatsApp</h4>
+                  <p className="text-sm text-muted-foreground">
                     No seu celular, vá em Configurações → Dispositivos conectados
                   </p>
                 </div>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-summi-blue text-white rounded-full flex items-center justify-center text-sm font-bold">
+                <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
                   3
                 </div>
                 <div>
-                  <h4 className="font-medium text-summi-gray-900">Escanear QR Code</h4>
-                  <p className="text-sm text-summi-gray-600">
+                  <h4 className="font-medium text-foreground">Escanear QR Code</h4>
+                  <p className="text-sm text-muted-foreground">
                     Aponte a câmera para o QR code e aguarde a conexão
                   </p>
                 </div>
               </div>
 
-              {connectionStatus === 'disconnected' && (
+              {!profile?.instance_name ? (
                 <Button 
-                  onClick={generateQRCode}
-                  className="w-full btn-primary mt-6"
+                  onClick={handleCreateInstance}
+                  disabled={isCreatingInstance || !profile?.nome || !profile?.numero}
+                  className="w-full mt-6"
                 >
-                  🔗 Gerar QR Code
+                  {isCreatingInstance ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <Smartphone className="w-4 h-4 mr-2" />
+                      Conectar WhatsApp
+                    </>
+                  )}
+                </Button>
+              ) : connectionStatus === 'disconnected' && (
+                <Button 
+                  onClick={handleGenerateQRCode}
+                  disabled={isGeneratingQR}
+                  className="w-full mt-6"
+                >
+                  {isGeneratingQR ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Gerar QR Code
+                    </>
+                  )}
                 </Button>
               )}
             </CardContent>
@@ -170,35 +326,37 @@ const WhatsAppConnectionPage = () => {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col items-center space-y-4">
-                {connectionStatus === 'disconnected' ? (
-                  <div className="w-64 h-64 bg-summi-gray-100 rounded-lg flex items-center justify-center">
-                    <div className="text-center text-summi-gray-500">
+                {connectionStatus === 'disconnected' && !qrCode ? (
+                  <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
                       <span className="text-4xl block mb-2">📱</span>
                       <p>Clique em "Gerar QR Code" para começar</p>
                     </div>
                   </div>
-                ) : connectionStatus === 'connecting' ? (
-                  <div className="w-64 h-64 bg-white border-2 border-summi-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden">
+                ) : connectionStatus === 'connecting' || qrCode ? (
+                  <div className="w-64 h-64 bg-white border-2 border-border rounded-lg flex items-center justify-center relative overflow-hidden">
                     {qrCode && (
                       <img 
                         src={qrCode} 
                         alt="QR Code" 
-                        className="w-56 h-56 animate-pulse-slow"
+                        className="w-56 h-56"
                       />
                     )}
-                    <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue mx-auto mb-2"></div>
-                        <p className="text-sm text-summi-gray-600">Aguardando scan...</p>
+                    {connectionStatus === 'connecting' && (
+                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                          <p className="text-sm text-muted-foreground">Aguardando scan...</p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="w-64 h-64 bg-summi-green/10 rounded-lg flex items-center justify-center">
-                    <div className="text-center text-summi-green">
+                  <div className="w-64 h-64 bg-green-50 rounded-lg flex items-center justify-center">
+                    <div className="text-center text-green-600">
                       <span className="text-6xl block mb-4">✅</span>
                       <p className="font-semibold">Conectado com sucesso!</p>
-                      <p className="text-sm text-summi-gray-600 mt-2">
+                      <p className="text-sm text-muted-foreground mt-2">
                         Sua Summi está pronta para atender
                       </p>
                     </div>
@@ -220,30 +378,50 @@ const WhatsAppConnectionPage = () => {
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-3 gap-4">
-                <div className="flex items-center space-x-3 p-4 bg-summi-green/10 rounded-lg">
+                <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
                   <span className="text-2xl">🤖</span>
                   <div>
-                    <h4 className="font-medium text-summi-gray-900">Respostas Automáticas</h4>
-                    <p className="text-sm text-summi-gray-600">Ativo 24/7</p>
+                    <h4 className="font-medium text-foreground">Respostas Automáticas</h4>
+                    <p className="text-sm text-muted-foreground">Ativo 24/7</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-3 p-4 bg-summi-green/10 rounded-lg">
+                <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
                   <span className="text-2xl">📊</span>
                   <div>
-                    <h4 className="font-medium text-summi-gray-900">Coleta de Dados</h4>
-                    <p className="text-sm text-summi-gray-600">Qualificação ativa</p>
+                    <h4 className="font-medium text-foreground">Coleta de Dados</h4>
+                    <p className="text-sm text-muted-foreground">Qualificação ativa</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-3 p-4 bg-summi-green/10 rounded-lg">
+                <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
                   <span className="text-2xl">🔄</span>
                   <div>
-                    <h4 className="font-medium text-summi-gray-900">Sincronização</h4>
-                    <p className="text-sm text-summi-gray-600">Tempo real</p>
+                    <h4 className="font-medium text-foreground">Sincronização</h4>
+                    <p className="text-sm text-muted-foreground">Tempo real</p>
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Informações do Perfil Incompleto */}
+        {(!profile?.nome || !profile?.numero) && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 text-orange-800">
+                <AlertCircle className="w-5 h-5" />
+                <span>Complete seu perfil</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-orange-700 mb-4">
+                Para conectar o WhatsApp, você precisa completar as informações do seu perfil.
+              </p>
+              <Button variant="outline" className="border-orange-300 text-orange-800 hover:bg-orange-100">
+                Ir para Configurações
+              </Button>
             </CardContent>
           </Card>
         )}
