@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,8 +27,25 @@ const SettingsPage = () => {
     temas_importantes: profile?.temas_importantes || ''
   });
 
+  // Add missing state variables for notifications and webhooks
+  const [notifications, setNotifications] = useState({
+    email: true,
+    newLeads: true,
+    reports: false,
+    webhooks: false
+  });
+
+  const [webhooks] = useState([
+    {
+      id: 1,
+      name: 'Webhook Principal',
+      url: 'https://example.com/webhook',
+      status: 'Ativo'
+    }
+  ]);
+
   // Update form when profile loads
-  useState(() => {
+  useEffect(() => {
     if (profile) {
       setProfileData({
         nome: profile.nome,
@@ -40,7 +58,7 @@ const SettingsPage = () => {
         temas_importantes: profile.temas_importantes
       });
     }
-  });
+  }, [profile]);
 
   const handleProfileSave = async () => {
     setIsUpdating(true);
