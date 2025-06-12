@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +14,7 @@ import FeedbackPage from "./pages/FeedbackPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +34,11 @@ const App = () => (
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/whatsapp" element={
+                <ProtectedRoute>
+                  <WhatsAppConnectionPage />
                 </ProtectedRoute>
               } />
               <Route path="/settings" element={

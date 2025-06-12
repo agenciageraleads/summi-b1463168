@@ -1,35 +1,37 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
-import { supabase } from '@/integrations/supabase/client';
 import { QrCode, Smartphone, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import { 
+  checkInstanceExists, 
+  connectInstance, 
+  getConnectionState, 
+  restartInstance,
+  createInstance 
+} from '@/services/evolutionApi';
 
 const WhatsAppConnectionPage = () => {
   const { profile, updateProfile } = useProfile();
   const { toast } = useToast();
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [qrCode, setQrCode] = useState('');
-  const [isCreatingInstance, setIsCreatingInstance] = useState(false);
-  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [connectionTimer, setConnectionTimer] = useState(0);
+  
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Verificar status da conexão automaticamente
+  // Limpar intervalos ao desmontar o componente
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (profile?.instance_name) {
-      checkConnectionStatus();
-      interval = setInterval(checkConnectionStatus, 10000);
-    }
-
     return () => {
-      if (interval) clearInterval(interval);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [profile?.instance_name]);
+  }, []);
 
   const generateInstanceName = () => {
     if (!profile?.nome || !profile?.numero) return '';
@@ -39,44 +41,121 @@ const WhatsAppConnectionPage = () => {
     return `${nome}_${ultimosDigitos}`;
   };
 
-  const checkConnectionStatus = async () => {
-    if (!profile?.instance_name) return;
+  const startConnectionTimer = () => {
+    setConnectionTimer(0);
+    if (timerRef.current) clearInterval(timerRef.current);
     
-    setIsCheckingStatus(true);
+    timerRef.current = setInterval(() => {
+      setConnectionTimer(prev => prev + 1);
+    }, 1000);
+  };
+
+  const stopConnectionTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setConnectionTimer(0);
+  };
+
+  const checkConnectionStatus = async (instanceName: string): Promise<boolean> => {
     try {
-      console.log(`Verificando status da instância: ${profile.instance_name}`);
+      const state = await getConnectionState(instanceName);
+      console.log(`Estado da conexão: ${state}`);
       
-      const { data, error } = await supabase.functions.invoke('evolution-get-status', {
-        body: { instanceName: profile.instance_name }
-      });
-
-      if (error) {
-        console.error('Erro ao verificar status:', error);
-        setConnectionStatus('disconnected');
-        return;
-      }
-
-      const status = data.status || 'disconnected';
-      console.log(`Status da conexão: ${status}`);
-      
-      // Mapear os status da Evolution API para os status da nossa UI
-      if (status === 'open') {
+      if (state === 'open') {
         setConnectionStatus('connected');
-        setQrCode(''); // Limpar QR Code quando conectado
-      } else if (status === 'connecting') {
-        setConnectionStatus('connecting');
-      } else {
-        setConnectionStatus('disconnected');
+        setQrCode('');
+        stopConnectionTimer();
+        return true;
       }
+      
+      return false;
     } catch (error) {
-      console.error('Erro ao verificar status:', error);
-      setConnectionStatus('disconnected');
-    } finally {
-      setIsCheckingStatus(false);
+      console.error('Erro ao verificar estado da conexão:', error);
+      return false;
     }
   };
 
-  const handleCreateInstance = async () => {
+  const startConnectionMonitoring = (instanceName: string) => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    
+    intervalRef.current = setInterval(async () => {
+      const isConnected = await checkConnectionStatus(instanceName);
+      
+      if (isConnected) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        toast({
+          title: 'WhatsApp Conectado!',
+          description: 'Sua Summi está pronta para atender'
+        });
+        return;
+      }
+
+      // Se passou 40 segundos, reiniciar a instância
+      if (connectionTimer >= 40) {
+        console.log('Timeout de 40s atingido, reiniciando instância...');
+        await handleRestartAndReconnect(instanceName);
+      }
+    }, 10000); // A cada 10 segundos
+  };
+
+  const handleRestartAndReconnect = async (instanceName: string) => {
+    try {
+      console.log('Reiniciando instância...');
+      await restartInstance(instanceName);
+      
+      toast({
+        title: 'Instância reiniciada',
+        description: 'Gerando novo QR Code...'
+      });
+
+      // Aguardar um pouco antes de gerar novo QR Code
+      setTimeout(async () => {
+        await handleConnect(instanceName);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Erro ao reiniciar instância:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível reiniciar a instância',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleConnect = async (instanceName?: string) => {
+    const targetInstanceName = instanceName || generateInstanceName();
+    
+    try {
+      console.log(`Conectando à instância: ${targetInstanceName}`);
+      const qrCodeData = await connectInstance(targetInstanceName);
+      
+      setQrCode(qrCodeData);
+      setConnectionStatus('connecting');
+      startConnectionTimer();
+      startConnectionMonitoring(targetInstanceName);
+      
+      toast({
+        title: 'QR Code gerado!',
+        description: 'Escaneie o QR Code com seu WhatsApp para conectar'
+      });
+      
+    } catch (error) {
+      console.error('Erro ao conectar instância:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar o QR Code',
+        variant: 'destructive'
+      });
+      setConnectionStatus('disconnected');
+      stopConnectionTimer();
+    }
+  };
+
+  const handleConnectWhatsApp = async () => {
+    // Verificar se os dados do usuário estão preenchidos
     if (!profile?.nome || !profile?.numero) {
       toast({
         title: 'Informações incompletas',
@@ -86,108 +165,62 @@ const WhatsAppConnectionPage = () => {
       return;
     }
 
-    setIsCreatingInstance(true);
+    setIsLoading(true);
+    const instanceName = generateInstanceName();
+
     try {
-      const instanceName = generateInstanceName();
-      console.log(`Criando instância: ${instanceName}`);
+      console.log(`Verificando se a instância ${instanceName} já existe...`);
       
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) throw new Error('Usuário não autenticado');
-
-      const { data, error } = await supabase.functions.invoke('evolution-create-instance', {
-        body: { instanceName },
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-
-      if (error) {
-        console.error('Erro na Edge Function:', error);
-        throw error;
-      }
+      // Primeiro, verificar se a instância já existe
+      const instanceCheck = await checkInstanceExists(instanceName);
       
-      if (!data.success) {
-        console.error('Erro na criação:', data.error);
-        throw new Error(data.error || 'Erro ao criar instância');
-      }
-      
-      // Salvar o nome da instância no perfil
-      await updateProfile({ instance_name: instanceName });
-      
-      toast({
-        title: 'Instância criada!',
-        description: 'Agora gere o QR Code para conectar seu WhatsApp'
-      });
-      
-      setConnectionStatus('disconnected');
-    } catch (error) {
-      console.error('Erro ao criar instância:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível criar a instância do WhatsApp',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsCreatingInstance(false);
-    }
-  };
-
-  const handleGenerateQRCode = async () => {
-    if (!profile?.instance_name) return;
-
-    setIsGeneratingQR(true);
-    try {
-      console.log(`Gerando QR Code para: ${profile.instance_name}`);
-      
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) throw new Error('Usuário não autenticado');
-
-      const { data, error } = await supabase.functions.invoke('evolution-generate-qr', {
-        body: { instanceName: profile.instance_name },
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-
-      if (error) {
-        console.error('Erro na Edge Function:', error);
-        throw error;
-      }
-      
-      // CORREÇÃO: Tratar o caso onde a instância já está conectada
-      if (!data.success && data.alreadyConnected) {
-        console.log('Instância já conectada, atualizando status');
-        setConnectionStatus('connected');
-        setQrCode('');
+      if (instanceCheck.exists) {
+        console.log('Instância encontrada, verificando status...');
+        
+        // Se existe, verificar o status
+        if (instanceCheck.status === 'open') {
+          console.log('Instância já está conectada');
+          setConnectionStatus('connected');
+          setQrCode('');
+          toast({
+            title: 'WhatsApp já conectado!',
+            description: 'Sua instância já está conectada e funcionando'
+          });
+          return;
+        } else {
+          // Se não está conectada, tentar conectar
+          console.log('Instância existe mas não está conectada, gerando QR Code...');
+          await handleConnect(instanceName);
+        }
+      } else {
+        // Se não existe, criar a instância primeiro
+        console.log('Instância não encontrada, criando nova instância...');
+        
+        await createInstance(instanceName);
+        await updateProfile({ instance_name: instanceName });
+        
+        // Aguardar um pouco e então conectar
+        setTimeout(async () => {
+          await handleConnect(instanceName);
+        }, 2000);
+        
         toast({
-          title: 'WhatsApp já conectado!',
-          description: 'Sua instância já está conectada e funcionando'
+          title: 'Instância criada!',
+          description: 'Gerando QR Code para conexão...'
         });
-        return;
       }
       
-      if (!data.success) {
-        console.error('Erro na geração do QR:', data.error);
-        throw new Error(data.error || 'Erro ao gerar QR Code');
-      }
-
-      console.log('QR Code gerado com sucesso:', data.qrCode);
-      setQrCode(data.qrCode);
-      setConnectionStatus('connecting');
-      
-      toast({
-        title: 'QR Code gerado!',
-        description: 'Escaneie o QR Code com seu WhatsApp para conectar'
-      });
     } catch (error) {
-      console.error('Erro ao gerar QR Code:', error);
+      console.error('Erro no processo de conexão:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível gerar o QR Code',
+        description: 'Não foi possível conectar o WhatsApp',
         variant: 'destructive'
       });
+      setConnectionStatus('disconnected');
+      stopConnectionTimer();
     } finally {
-      setIsGeneratingQR(false);
+      setIsLoading(false);
     }
   };
 
@@ -205,7 +238,7 @@ const WhatsAppConnectionPage = () => {
           color: 'text-yellow-600',
           bg: 'bg-yellow-100',
           icon: RotateCcw,
-          text: 'Conectando...'
+          text: `Conectando... (${connectionTimer}s)`
         };
       default:
         return {
@@ -239,22 +272,18 @@ const WhatsAppConnectionPage = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div className={`w-12 h-12 rounded-full ${status.bg} flex items-center justify-center`}>
-                  <StatusIcon className={`w-6 h-6 ${status.color}`} />
+                  <StatusIcon className={`w-6 h-6 ${status.color} ${connectionStatus === 'connecting' ? 'animate-spin' : ''}`} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">Status da Conexão</h3>
+                  <h3 className="font-semibold text-fore">Status da Conexão</h3>
                   <p className={`font-medium ${status.color}`}>{status.text}</p>
+                  {connectionTimer > 30 && connectionStatus === 'connecting' && (
+                    <p className="text-sm text-muted-foreground">
+                      Reiniciará automaticamente em {40 - connectionTimer}s
+                    </p>
+                  )}
                 </div>
               </div>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={checkConnectionStatus}
-                disabled={!profile?.instance_name || isCheckingStatus}
-              >
-                <RotateCcw className={`w-4 h-4 ${isCheckingStatus ? 'animate-spin' : ''}`} />
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -306,43 +335,28 @@ const WhatsAppConnectionPage = () => {
                 </div>
               </div>
 
-              {!profile?.instance_name ? (
-                <Button 
-                  onClick={handleCreateInstance}
-                  disabled={isCreatingInstance || !profile?.nome || !profile?.numero}
-                  className="w-full mt-6"
-                >
-                  {isCreatingInstance ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Criando...
-                    </>
-                  ) : (
-                    <>
-                      <Smartphone className="w-4 h-4 mr-2" />
-                      Conectar WhatsApp
-                    </>
-                  )}
-                </Button>
-              ) : connectionStatus === 'disconnected' && (
-                <Button 
-                  onClick={handleGenerateQRCode}
-                  disabled={isGeneratingQR}
-                  className="w-full mt-6"
-                >
-                  {isGeneratingQR ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Gerando...
-                    </>
-                  ) : (
-                    <>
-                      <QrCode className="w-4 h-4 mr-2" />
-                      Gerar QR Code
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button 
+                onClick={handleConnectWhatsApp}
+                disabled={isLoading || !profile?.nome || !profile?.numero || connectionStatus === 'connecting'}
+                className="w-full mt-6"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Processando...
+                  </>
+                ) : connectionStatus === 'connecting' ? (
+                  <>
+                    <RotateCcw className="w-4 h-4 mr-2 animate-spin" />
+                    Conectando...
+                  </>
+                ) : (
+                  <>
+                    <Smartphone className="w-4 h-4 mr-2" />
+                    Conectar WhatsApp
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
 
@@ -360,7 +374,7 @@ const WhatsAppConnectionPage = () => {
                   <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
                     <div className="text-center text-muted-foreground">
                       <span className="text-4xl block mb-2">📱</span>
-                      <p>Clique em "Gerar QR Code" para começar</p>
+                      <p>Clique em "Conectar WhatsApp" para começar</p>
                     </div>
                   </div>
                 ) : connectionStatus === 'connecting' || qrCode ? (
@@ -379,14 +393,6 @@ const WhatsAppConnectionPage = () => {
                           });
                         }}
                       />
-                    )}
-                    {connectionStatus === 'connecting' && (
-                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                          <p className="text-sm text-muted-foreground">Aguardando scan...</p>
-                        </div>
-                      </div>
                     )}
                   </div>
                 ) : (
