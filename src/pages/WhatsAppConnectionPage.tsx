@@ -59,6 +59,7 @@ const WhatsAppConnectionPage = () => {
       const status = data.status || 'disconnected';
       console.log(`Status da conexão: ${status}`);
       
+      // Mapear os status da Evolution API para os status da nossa UI
       if (status === 'open') {
         setConnectionStatus('connected');
         setQrCode(''); // Limpar QR Code quando conectado
@@ -151,6 +152,18 @@ const WhatsAppConnectionPage = () => {
       if (error) {
         console.error('Erro na Edge Function:', error);
         throw error;
+      }
+      
+      // CORREÇÃO: Tratar o caso onde a instância já está conectada
+      if (!data.success && data.alreadyConnected) {
+        console.log('Instância já conectada, atualizando status');
+        setConnectionStatus('connected');
+        setQrCode('');
+        toast({
+          title: 'WhatsApp já conectado!',
+          description: 'Sua instância já está conectada e funcionando'
+        });
+        return;
       }
       
       if (!data.success) {

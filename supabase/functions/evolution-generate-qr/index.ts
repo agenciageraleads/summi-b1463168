@@ -50,6 +50,38 @@ serve(async (req) => {
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
+    // CORREÇÃO: Primeiro verificar o status da instância antes de gerar QR Code
+    logStep("Checking instance status first", { instanceName });
+    
+    const statusResponse = await fetch(`${cleanApiUrl}/instance/status/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'apikey': evolutionApiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      const currentStatus = statusData.instance?.state || statusData.state;
+      
+      logStep("Current instance status", { status: currentStatus });
+      
+      // Se a instância já está conectada (open), não gerar QR Code
+      if (currentStatus === 'open' || currentStatus === 'connected') {
+        logStep("Instance already connected, no QR needed");
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Instance is already connected. No QR Code needed.',
+          alreadyConnected: true
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+    }
+
+    // Se chegou até aqui, a instância precisa de QR Code
     logStep("Generating QR Code", { instanceName, url: `${cleanApiUrl}/instance/connect/${instanceName}` });
 
     const response = await fetch(`${cleanApiUrl}/instance/connect/${instanceName}`, {
@@ -71,6 +103,19 @@ serve(async (req) => {
     const data = await response.json();
     logStep("QR Code response", data);
 
+    // Verificar se a resposta indica que a instância já está conectada
+    if (data.instance?.state === 'open') {
+      logStep("Instance became connected during request");
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Instance is already connected. No QR Code needed.',
+        alreadyConnected: true
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     let qrCodeData = null;
     if (data.qrcode?.base64) {
       qrCodeData = data.qrcode.base64;
@@ -84,7 +129,7 @@ serve(async (req) => {
 
     if (!qrCodeData) {
       logStep("QR Code data not found", { availableKeys: Object.keys(data) });
-      throw new Error('QR Code not found in API response');
+      throw new Error('QR Code not found in API response - instance may already be connected');
     }
 
     // Ensure the QR code data is properly formatted

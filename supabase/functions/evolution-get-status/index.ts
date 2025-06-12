@@ -33,9 +33,10 @@ serve(async (req) => {
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
-    logStep("Checking status", { instanceName, url: `${cleanApiUrl}/instance/fetchInstances/${instanceName}` });
+    // CORREÇÃO: Usar o endpoint correto /instance/status/ em vez de /instance/fetchInstances/
+    logStep("Checking status", { instanceName, url: `${cleanApiUrl}/instance/status/${instanceName}` });
 
-    const response = await fetch(`${cleanApiUrl}/instance/fetchInstances/${instanceName}`, {
+    const response = await fetch(`${cleanApiUrl}/instance/status/${instanceName}`, {
       method: 'GET',
       headers: {
         'apikey': evolutionApiKey,
@@ -61,7 +62,8 @@ serve(async (req) => {
     const data = await response.json();
     logStep("Status response", data);
 
-    const status = data.instance?.status || data.status || 'disconnected';
+    // A resposta da API Evolution para /status/ tem uma estrutura diferente
+    const status = data.instance?.state || data.state || 'disconnected';
 
     return new Response(JSON.stringify({
       success: true,
