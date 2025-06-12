@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/AuthContext';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
   { name: 'WhatsApp', href: '/whatsapp', icon: '📱' },
-  { name: 'Relatórios', href: '/reports', icon: '📈' },
   { name: 'Configurações', href: '/settings', icon: '⚙️' },
 ];
 

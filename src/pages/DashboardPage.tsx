@@ -1,184 +1,162 @@
 
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Button } from '@/components/ui/button';
+import { useChats } from '@/hooks/useChats';
+import { useAuth } from '@/contexts/AuthContext';
+import { EvolutionApiService } from '@/services/evolutionApi';
 
 const DashboardPage = () => {
-  // Mock data for the chart
-  const chartData = [
-    { day: 'Dom', messages: 45 },
-    { day: 'Seg', messages: 92 },
-    { day: 'Ter', messages: 156 },
-    { day: 'Qua', messages: 178 },
-    { day: 'Qui', messages: 134 },
-    { day: 'Sex', messages: 189 },
-    { day: 'Sáb', messages: 67 },
-  ];
+  const { user } = useAuth();
+  const { chats, isLoading: chatsLoading } = useChats();
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading');
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [instanceName, setInstanceName] = useState<string>('');
 
-  const metrics = [
-    {
-      title: 'Conversas Ativas',
-      value: '23',
-      change: '+15%',
-      changeType: 'positive',
-      icon: '💬'
-    },
-    {
-      title: 'Leads Qualificados',
-      value: '47',
-      change: '+23%',
-      changeType: 'positive',
-      icon: '🎯'
-    },
-    {
-      title: 'Tempo Médio de Resposta',
-      value: '1.2s',
-      change: '-12%',
-      changeType: 'positive',
-      icon: '⚡'
-    },
-    {
-      title: 'NPS Score',
-      value: '8.7',
-      change: '+0.3',
-      changeType: 'positive',
-      icon: '⭐'
+  useEffect(() => {
+    if (user) {
+      const userInstanceName = `summi_${user.id.replace(/-/g, '_')}`;
+      setInstanceName(userInstanceName);
+      checkConnectionStatus(userInstanceName);
     }
-  ];
+  }, [user]);
 
-  const recentConversations = [
-    {
-      id: 1,
-      name: 'Carlos Silva',
-      phone: '(11) 99999-1234',
-      status: 'qualificada',
-      lastMessage: 'Tenho interesse no plano Pro',
-      time: '2 min',
-      score: 85
-    },
-    {
-      id: 2,
-      name: 'Marina Santos',
-      phone: '(21) 98888-5678',
-      status: 'aberta',
-      lastMessage: 'Qual o preço do serviço?',
-      time: '5 min',
-      score: 72
-    },
-    {
-      id: 3,
-      name: 'João Oliveira',
-      phone: '(31) 97777-9012',
-      status: 'encerrada',
-      lastMessage: 'Obrigado pelo atendimento!',
-      time: '1h',
-      score: 45
-    },
-    {
-      id: 4,
-      name: 'Ana Costa',
-      phone: '(41) 96666-3456',
-      status: 'qualificada',
-      lastMessage: 'Posso agendar uma demonstração?',
-      time: '2h',
-      score: 91
-    },
-    {
-      id: 5,
-      name: 'Pedro Lima',
-      phone: '(51) 95555-7890',
-      status: 'aberta',
-      lastMessage: 'Preciso de mais informações',
-      time: '3h',
-      score: 68
+  const checkConnectionStatus = async (instanceName: string) => {
+    try {
+      const status = await EvolutionApiService.getInstanceStatus(instanceName);
+      if (status && status.instance.status === 'open') {
+        setConnectionStatus('connected');
+        setQrCode(null);
+      } else {
+        setConnectionStatus('disconnected');
+      }
+    } catch (error) {
+      setConnectionStatus('disconnected');
     }
-  ];
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'qualificada':
-        return 'bg-summi-green text-white';
-      case 'aberta':
+  const handleConnect = async () => {
+    setConnectionStatus('loading');
+    try {
+      if (connectionStatus === 'disconnected') {
+        // Create instance first
+        await EvolutionApiService.createInstance(instanceName);
+        // Then generate QR code
+        const qrCodeData = await EvolutionApiService.generateQRCode(instanceName);
+        if (qrCodeData) {
+          setQrCode(qrCodeData);
+        }
+      }
+    } catch (error) {
+      console.error('Error connecting:', error);
+      setConnectionStatus('disconnected');
+    }
+  };
+
+  const getStatusColor = (prioridade: string) => {
+    switch (prioridade) {
+      case 'urgente':
+        return 'bg-red-500 text-white';
+      case 'importante':
         return 'bg-yellow-500 text-white';
-      case 'encerrada':
+      case 'normal':
         return 'bg-summi-gray-500 text-white';
       default:
         return 'bg-summi-gray-300 text-summi-gray-700';
     }
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-summi-green font-semibold';
-    if (score >= 60) return 'text-yellow-600 font-semibold';
-    return 'text-red-500 font-semibold';
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} min`;
+    } else if (diffInMinutes < 1440) {
+      return `${Math.floor(diffInMinutes / 60)}h`;
+    } else {
+      return `${Math.floor(diffInMinutes / 1440)}d`;
+    }
   };
 
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {metrics.map((metric, index) => (
-            <Card key={metric.title} className="card-hover" style={{ animationDelay: `${index * 100}ms` }}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-summi-gray-600">{metric.title}</p>
-                    <p className="text-2xl font-bold text-summi-gray-900">{metric.value}</p>
-                    <p className={`text-sm ${
-                      metric.changeType === 'positive' ? 'text-summi-green' : 'text-red-500'
-                    }`}>
-                      {metric.change} vs. semana passada
-                    </p>
-                  </div>
-                  <div className="text-3xl">{metric.icon}</div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Chart */}
+        {/* Connection Status Card */}
         <Card className="card-hover">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <span>📈</span>
-              <span>Volume de Mensagens - Últimos 7 dias</span>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span>📱</span>
+                <span>Status da Conexão WhatsApp</span>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                connectionStatus === 'connected' 
+                  ? 'bg-summi-green text-white' 
+                  : connectionStatus === 'loading'
+                  ? 'bg-yellow-500 text-white'
+                  : 'bg-red-500 text-white'
+              }`}>
+                {connectionStatus === 'connected' ? 'Conectado' : 
+                 connectionStatus === 'loading' ? 'Conectando...' : 'Desconectado'}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis 
-                    dataKey="day" 
-                    stroke="#64748b"
-                    fontSize={12}
+            {connectionStatus === 'disconnected' && (
+              <div className="text-center space-y-4">
+                <p className="text-summi-gray-600">
+                  Sua instância do WhatsApp não está conectada. Clique no botão abaixo para conectar.
+                </p>
+                <Button 
+                  onClick={handleConnect}
+                  className="bg-summi-green hover:bg-summi-green/90"
+                >
+                  Conectar WhatsApp
+                </Button>
+              </div>
+            )}
+            
+            {connectionStatus === 'loading' && (
+              <div className="text-center space-y-4">
+                <p className="text-summi-gray-600">Conectando ao WhatsApp...</p>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue mx-auto"></div>
+              </div>
+            )}
+
+            {qrCode && (
+              <div className="text-center space-y-4">
+                <p className="text-summi-gray-600">
+                  Escaneie o QR Code abaixo com seu WhatsApp para conectar:
+                </p>
+                <div className="flex justify-center">
+                  <img 
+                    src={`data:image/png;base64,${qrCode}`} 
+                    alt="QR Code WhatsApp" 
+                    className="max-w-xs border rounded-lg"
                   />
-                  <YAxis 
-                    stroke="#64748b"
-                    fontSize={12}
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="messages" 
-                    stroke="#004AAD" 
-                    strokeWidth={3}
-                    dot={{ fill: '#004AAD', strokeWidth: 2, r: 6 }}
-                    activeDot={{ r: 8, fill: '#00B074' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+                </div>
+                <Button 
+                  onClick={() => checkConnectionStatus(instanceName)}
+                  variant="outline"
+                >
+                  Verificar Conexão
+                </Button>
+              </div>
+            )}
+
+            {connectionStatus === 'connected' && (
+              <div className="text-center space-y-4">
+                <p className="text-summi-green font-medium">
+                  ✅ WhatsApp conectado com sucesso!
+                </p>
+                <p className="text-summi-gray-600">
+                  Sua instância está ativa e pronta para receber mensagens.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -188,47 +166,77 @@ const DashboardPage = () => {
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <span>💬</span>
-                <span>Conversas Recentes</span>
+                <span>Conversas Pendentes</span>
               </div>
-              <button className="text-summi-blue hover:text-summi-blue-dark text-sm font-medium">
-                Ver todas →
-              </button>
+              <span className="text-sm text-summi-gray-500">
+                {chats.length} {chats.length === 1 ? 'conversa' : 'conversas'}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentConversations.map((conversation, index) => (
-                <div 
-                  key={conversation.id}
-                  className="flex items-center justify-between p-4 bg-summi-gray-50 rounded-lg hover:bg-summi-gray-100 transition-colors cursor-pointer"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-center space-x-4 flex-1">
-                    <div className="w-10 h-10 bg-summi-blue rounded-full flex items-center justify-center">
-                      <span className="text-white font-medium text-sm">
-                        {conversation.name.charAt(0)}
-                      </span>
+            {chatsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="flex items-center space-x-4 p-4 bg-summi-gray-50 rounded-lg">
+                      <div className="w-10 h-10 bg-summi-gray-300 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-summi-gray-300 rounded w-1/4 mb-2"></div>
+                        <div className="h-3 bg-summi-gray-300 rounded w-3/4"></div>
+                      </div>
+                      <div className="h-6 bg-summi-gray-300 rounded w-16"></div>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-medium text-summi-gray-900">{conversation.name}</h4>
-                        <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(conversation.status)}`}>
-                          {conversation.status}
+                  </div>
+                ))}
+              </div>
+            ) : chats.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-summi-gray-500">Nenhuma conversa encontrada.</p>
+                <p className="text-sm text-summi-gray-400 mt-2">
+                  As conversas aparecerão aqui quando você receber mensagens.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {chats.slice(0, 10).map((chat, index) => (
+                  <div 
+                    key={chat.id}
+                    className="flex items-center justify-between p-4 bg-summi-gray-50 rounded-lg hover:bg-summi-gray-100 transition-colors cursor-pointer"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div className="w-10 h-10 bg-summi-blue rounded-full flex items-center justify-center">
+                        <span className="text-white font-medium text-sm">
+                          {chat.nome.charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <p className="text-sm text-summi-gray-600">{conversation.phone}</p>
-                      <p className="text-sm text-summi-gray-700 mt-1">{conversation.lastMessage}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-medium text-summi-gray-900">{chat.nome}</h4>
+                          <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(chat.prioridade)}`}>
+                            {chat.prioridade}
+                          </span>
+                        </div>
+                        <p className="text-sm text-summi-gray-600">{chat.remote_jid}</p>
+                        {chat.contexto && (
+                          <p className="text-sm text-summi-gray-700 mt-1 truncate">
+                            {chat.contexto}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-summi-gray-500">
+                        {formatDate(chat.modificado_em)}
+                      </p>
+                      <p className="text-xs text-summi-gray-400">
+                        {chat.conversa.length} {chat.conversa.length === 1 ? 'mensagem' : 'mensagens'}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-summi-gray-500">{conversation.time}</p>
-                    <p className={`text-sm font-medium ${getScoreColor(conversation.score)}`}>
-                      Score: {conversation.score}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
