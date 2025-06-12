@@ -14,10 +14,12 @@ import {
   createInstance 
 } from '@/services/evolutionApi';
 
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
+
 const WhatsAppConnectionPage = () => {
   const { profile, updateProfile } = useProfile();
   const { toast } = useToast();
-  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [qrCode, setQrCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [connectionTimer, setConnectionTimer] = useState(0);
@@ -25,7 +27,7 @@ const WhatsAppConnectionPage = () => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Limpar intervalos ao desmontar o componente
+  // CORREÇÃO: Limpar intervalos ao desmontar o componente
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -33,6 +35,7 @@ const WhatsAppConnectionPage = () => {
     };
   }, []);
 
+  // CORREÇÃO: Função para gerar nome da instância
   const generateInstanceName = () => {
     if (!profile?.nome || !profile?.numero) return '';
     
@@ -41,6 +44,7 @@ const WhatsAppConnectionPage = () => {
     return `${nome}_${ultimosDigitos}`;
   };
 
+  // CORREÇÃO: Função para iniciar timer de conexão
   const startConnectionTimer = () => {
     setConnectionTimer(0);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -50,6 +54,7 @@ const WhatsAppConnectionPage = () => {
     }, 1000);
   };
 
+  // CORREÇÃO: Função para parar timer de conexão
   const stopConnectionTimer = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -58,10 +63,11 @@ const WhatsAppConnectionPage = () => {
     setConnectionTimer(0);
   };
 
+  // CORREÇÃO: Função para verificar status da conexão
   const checkConnectionStatus = async (instanceName: string): Promise<boolean> => {
     try {
       const state = await getConnectionState(instanceName);
-      console.log(`Estado da conexão: ${state}`);
+      console.log(`[WhatsApp] Estado da conexão: ${state}`);
       
       if (state === 'open') {
         setConnectionStatus('connected');
@@ -72,11 +78,12 @@ const WhatsAppConnectionPage = () => {
       
       return false;
     } catch (error) {
-      console.error('Erro ao verificar estado da conexão:', error);
+      console.error('[WhatsApp] Erro ao verificar estado da conexão:', error);
       return false;
     }
   };
 
+  // CORREÇÃO: Função para monitorar conexão a cada 10 segundos
   const startConnectionMonitoring = (instanceName: string) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     
@@ -92,17 +99,18 @@ const WhatsAppConnectionPage = () => {
         return;
       }
 
-      // Se passou 40 segundos, reiniciar a instância
+      // CORREÇÃO: Se passou 40 segundos, reiniciar a instância
       if (connectionTimer >= 40) {
-        console.log('Timeout de 40s atingido, reiniciando instância...');
+        console.log('[WhatsApp] Timeout de 40s atingido, reiniciando instância...');
         await handleRestartAndReconnect(instanceName);
       }
     }, 10000); // A cada 10 segundos
   };
 
+  // CORREÇÃO: Função para reiniciar e reconectar
   const handleRestartAndReconnect = async (instanceName: string) => {
     try {
-      console.log('Reiniciando instância...');
+      console.log('[WhatsApp] Reiniciando instância...');
       await restartInstance(instanceName);
       
       toast({
@@ -110,13 +118,13 @@ const WhatsAppConnectionPage = () => {
         description: 'Gerando novo QR Code...'
       });
 
-      // Aguardar um pouco antes de gerar novo QR Code
+      // CORREÇÃO: Aguardar 3 segundos antes de gerar novo QR Code
       setTimeout(async () => {
         await handleConnect(instanceName);
       }, 3000);
       
     } catch (error) {
-      console.error('Erro ao reiniciar instância:', error);
+      console.error('[WhatsApp] Erro ao reiniciar instância:', error);
       toast({
         title: 'Erro',
         description: 'Não foi possível reiniciar a instância',
@@ -125,11 +133,12 @@ const WhatsAppConnectionPage = () => {
     }
   };
 
+  // CORREÇÃO: Função para conectar e gerar QR Code
   const handleConnect = async (instanceName?: string) => {
     const targetInstanceName = instanceName || generateInstanceName();
     
     try {
-      console.log(`Conectando à instância: ${targetInstanceName}`);
+      console.log(`[WhatsApp] Conectando à instância: ${targetInstanceName}`);
       const qrCodeData = await connectInstance(targetInstanceName);
       
       setQrCode(qrCodeData);
@@ -143,7 +152,19 @@ const WhatsAppConnectionPage = () => {
       });
       
     } catch (error) {
-      console.error('Erro ao conectar instância:', error);
+      console.error('[WhatsApp] Erro ao conectar instância:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      if (errorMessage.includes('já está conectada')) {
+        setConnectionStatus('connected');
+        setQrCode('');
+        toast({
+          title: 'WhatsApp já conectado!',
+          description: 'Sua instância já está ativa'
+        });
+        return;
+      }
+      
       toast({
         title: 'Erro',
         description: 'Não foi possível gerar o QR Code',
@@ -154,8 +175,9 @@ const WhatsAppConnectionPage = () => {
     }
   };
 
+  // CORREÇÃO: Função principal para conectar WhatsApp seguindo o fluxo completo
   const handleConnectWhatsApp = async () => {
-    // Verificar se os dados do usuário estão preenchidos
+    // 1. Verificar se os dados do usuário estão preenchidos
     if (!profile?.nome || !profile?.numero) {
       toast({
         title: 'Informações incompletas',
@@ -169,17 +191,18 @@ const WhatsAppConnectionPage = () => {
     const instanceName = generateInstanceName();
 
     try {
-      console.log(`Verificando se a instância ${instanceName} já existe...`);
+      console.log(`[WhatsApp] Iniciando fluxo de conexão para: ${instanceName}`);
       
-      // Primeiro, verificar se a instância já existe
+      // 2. Verificar se já não existe uma instância
+      console.log('[WhatsApp] Verificando se a instância já existe...');
       const instanceCheck = await checkInstanceExists(instanceName);
       
       if (instanceCheck.exists) {
-        console.log('Instância encontrada, verificando status...');
+        console.log('[WhatsApp] Instância encontrada, verificando status...');
         
-        // Se existe, verificar o status
+        // 3. Se existe, verificar o status da instância
         if (instanceCheck.status === 'open') {
-          console.log('Instância já está conectada');
+          console.log('[WhatsApp] Instância já está conectada');
           setConnectionStatus('connected');
           setQrCode('');
           toast({
@@ -188,18 +211,18 @@ const WhatsAppConnectionPage = () => {
           });
           return;
         } else {
-          // Se não está conectada, tentar conectar
-          console.log('Instância existe mas não está conectada, gerando QR Code...');
+          // 4. Se não está conectada, gerar QR Code
+          console.log('[WhatsApp] Instância existe mas não está conectada, gerando QR Code...');
           await handleConnect(instanceName);
         }
       } else {
-        // Se não existe, criar a instância primeiro
-        console.log('Instância não encontrada, criando nova instância...');
+        // 5. Se não existe, criar a instância primeiro
+        console.log('[WhatsApp] Instância não encontrada, criando nova instância...');
         
         await createInstance(instanceName);
         await updateProfile({ instance_name: instanceName });
         
-        // Aguardar um pouco e então conectar
+        // 6. Aguardar 2 segundos e então conectar
         setTimeout(async () => {
           await handleConnect(instanceName);
         }, 2000);
@@ -211,7 +234,7 @@ const WhatsAppConnectionPage = () => {
       }
       
     } catch (error) {
-      console.error('Erro no processo de conexão:', error);
+      console.error('[WhatsApp] Erro no processo de conexão:', error);
       toast({
         title: 'Erro',
         description: 'Não foi possível conectar o WhatsApp',
@@ -224,6 +247,7 @@ const WhatsAppConnectionPage = () => {
     }
   };
 
+  // CORREÇÃO: Função para obter informações de display do status
   const getStatusDisplay = () => {
     switch (connectionStatus) {
       case 'connected':
@@ -275,7 +299,7 @@ const WhatsAppConnectionPage = () => {
                   <StatusIcon className={`w-6 h-6 ${status.color} ${connectionStatus === 'connecting' ? 'animate-spin' : ''}`} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-fore">Status da Conexão</h3>
+                  <h3 className="font-semibold text-foreground">Status da Conexão</h3>
                   <p className={`font-medium ${status.color}`}>{status.text}</p>
                   {connectionTimer > 30 && connectionStatus === 'connecting' && (
                     <p className="text-sm text-muted-foreground">
@@ -377,25 +401,23 @@ const WhatsAppConnectionPage = () => {
                       <p>Clique em "Conectar WhatsApp" para começar</p>
                     </div>
                   </div>
-                ) : connectionStatus === 'connecting' || qrCode ? (
+                ) : connectionStatus === 'connecting' && qrCode ? (
                   <div className="w-64 h-64 bg-white border-2 border-border rounded-lg flex items-center justify-center relative overflow-hidden">
-                    {qrCode && (
-                      <img 
-                        src={qrCode} 
-                        alt="QR Code" 
-                        className="w-56 h-56 object-contain"
-                        onError={(e) => {
-                          console.error('Erro ao carregar imagem do QR Code:', e);
-                          toast({
-                            title: 'Erro no QR Code',
-                            description: 'Não foi possível carregar a imagem do QR Code',
-                            variant: 'destructive'
-                          });
-                        }}
-                      />
-                    )}
+                    <img 
+                      src={qrCode} 
+                      alt="QR Code" 
+                      className="w-56 h-56 object-contain"
+                      onError={(e) => {
+                        console.error('[WhatsApp] Erro ao carregar imagem do QR Code:', e);
+                        toast({
+                          title: 'Erro no QR Code',
+                          description: 'Não foi possível carregar a imagem do QR Code',
+                          variant: 'destructive'
+                        });
+                      }}
+                    />
                   </div>
-                ) : (
+                ) : connectionStatus === 'connected' ? (
                   <div className="w-64 h-64 bg-green-50 rounded-lg flex items-center justify-center">
                     <div className="text-center text-green-600">
                       <span className="text-6xl block mb-4">✅</span>
@@ -403,6 +425,13 @@ const WhatsAppConnectionPage = () => {
                       <p className="text-sm text-muted-foreground mt-2">
                         Sua Summi está pronta para atender
                       </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      <span className="text-4xl block mb-2">⏳</span>
+                      <p>Processando...</p>
                     </div>
                   </div>
                 )}

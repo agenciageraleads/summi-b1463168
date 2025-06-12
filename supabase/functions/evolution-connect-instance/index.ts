@@ -39,14 +39,40 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    
-    const user = userData.user;
-    if (!user) throw new Error("User not authenticated");
+    if (userError || !userData.user) throw new Error("User not authenticated");
 
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
+    // CORREÇÃO: Primeiro verificar se a instância já está conectada
+    logStep("Checking current instance status", { instanceName });
+    
+    const statusResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'apikey': evolutionApiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      const currentState = statusData.instance?.state || statusData.state;
+      
+      if (currentState === 'open') {
+        logStep("Instance already connected");
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Instance is already connected',
+          alreadyConnected: true
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+    }
+
+    // CORREÇÃO: Gerar QR Code apenas se não estiver conectado
     logStep("Connecting to instance", { instanceName, url: `${cleanApiUrl}/instance/connect/${instanceName}` });
 
     const response = await fetch(`${cleanApiUrl}/instance/connect/${instanceName}`, {
@@ -68,7 +94,7 @@ serve(async (req) => {
     const data = await response.json();
     logStep("Connect response", data);
 
-    // Extrair o QR Code base64
+    // CORREÇÃO: Extrair o QR Code corretamente
     let qrCodeData = null;
     if (data.qrcode?.base64) {
       qrCodeData = data.qrcode.base64;
@@ -85,7 +111,7 @@ serve(async (req) => {
       throw new Error('QR Code not found in API response');
     }
 
-    // Ensure the QR code data is properly formatted
+    // CORREÇÃO: Garantir formato correto do QR Code
     if (!qrCodeData.startsWith('data:image/')) {
       qrCodeData = `data:image/png;base64,${qrCodeData}`;
     }

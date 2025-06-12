@@ -39,14 +39,12 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    
-    const user = userData.user;
-    if (!user) throw new Error("User not authenticated");
+    if (userError || !userData.user) throw new Error("User not authenticated");
 
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
+    // CORREÇÃO: Usar endpoint correto para restart
     logStep("Restarting instance", { instanceName, url: `${cleanApiUrl}/instance/restart/${instanceName}` });
 
     const response = await fetch(`${cleanApiUrl}/instance/restart/${instanceName}`, {
