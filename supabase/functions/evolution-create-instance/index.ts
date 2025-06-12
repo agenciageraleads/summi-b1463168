@@ -33,6 +33,9 @@ serve(async (req) => {
       throw new Error("Evolution API credentials not configured");
     }
 
+    // Remove trailing slash if present
+    const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
 
@@ -46,7 +49,7 @@ serve(async (req) => {
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
-    logStep("Creating instance", { instanceName });
+    logStep("Creating instance", { instanceName, url: `${cleanApiUrl}/instance/create` });
 
     const payload = {
       instanceName,
@@ -69,7 +72,9 @@ serve(async (req) => {
       }
     };
 
-    const response = await fetch(`${evolutionApiUrl}/instance/create`, {
+    logStep("Payload prepared", payload);
+
+    const response = await fetch(`${cleanApiUrl}/instance/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,6 +82,8 @@ serve(async (req) => {
       },
       body: JSON.stringify(payload)
     });
+
+    logStep("API Response", { status: response.status, ok: response.ok });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -109,7 +116,10 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in evolution-create-instance", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: errorMessage 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

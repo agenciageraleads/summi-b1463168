@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +44,8 @@ const WhatsAppConnectionPage = () => {
     
     setIsCheckingStatus(true);
     try {
+      console.log(`Verificando status da instância: ${profile.instance_name}`);
+      
       const { data, error } = await supabase.functions.invoke('evolution-get-status', {
         body: { instanceName: profile.instance_name }
       });
@@ -97,8 +100,15 @@ const WhatsAppConnectionPage = () => {
         },
       });
 
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Erro ao criar instância');
+      if (error) {
+        console.error('Erro na Edge Function:', error);
+        throw error;
+      }
+      
+      if (!data.success) {
+        console.error('Erro na criação:', data.error);
+        throw new Error(data.error || 'Erro ao criar instância');
+      }
       
       // Salvar o nome da instância no perfil
       await updateProfile({ instance_name: instanceName });
@@ -138,9 +148,17 @@ const WhatsAppConnectionPage = () => {
         },
       });
 
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Erro ao gerar QR Code');
+      if (error) {
+        console.error('Erro na Edge Function:', error);
+        throw error;
+      }
+      
+      if (!data.success) {
+        console.error('Erro na geração do QR:', data.error);
+        throw new Error(data.error || 'Erro ao gerar QR Code');
+      }
 
+      console.log('QR Code gerado com sucesso:', data.qrCode);
       setQrCode(data.qrCode);
       setConnectionStatus('connecting');
       
@@ -239,7 +257,6 @@ const WhatsAppConnectionPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* ... keep existing code (step instructions) */}
               <div className="flex items-start space-x-3">
                 <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
                   1
@@ -339,7 +356,15 @@ const WhatsAppConnectionPage = () => {
                       <img 
                         src={qrCode} 
                         alt="QR Code" 
-                        className="w-56 h-56"
+                        className="w-56 h-56 object-contain"
+                        onError={(e) => {
+                          console.error('Erro ao carregar imagem do QR Code:', e);
+                          toast({
+                            title: 'Erro no QR Code',
+                            description: 'Não foi possível carregar a imagem do QR Code',
+                            variant: 'destructive'
+                          });
+                        }}
                       />
                     )}
                     {connectionStatus === 'connecting' && (

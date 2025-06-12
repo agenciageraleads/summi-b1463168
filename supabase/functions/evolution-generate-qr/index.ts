@@ -33,6 +33,10 @@ serve(async (req) => {
       throw new Error("Evolution API credentials not configured");
     }
 
+    // Remove trailing slash if present
+    const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
+    logStep("API URL configured", { url: cleanApiUrl });
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
 
@@ -46,14 +50,17 @@ serve(async (req) => {
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
-    logStep("Generating QR Code", { instanceName });
+    logStep("Generating QR Code", { instanceName, url: `${cleanApiUrl}/instance/connect/${instanceName}` });
 
-    const response = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}`, {
+    const response = await fetch(`${cleanApiUrl}/instance/connect/${instanceName}`, {
       method: 'GET',
       headers: {
-        'apikey': evolutionApiKey
+        'apikey': evolutionApiKey,
+        'Content-Type': 'application/json'
       }
     });
+
+    logStep("API Response", { status: response.status, ok: response.ok });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -69,10 +76,20 @@ serve(async (req) => {
       qrCodeData = data.qrcode.base64;
     } else if (data.qrcode?.code) {
       qrCodeData = data.qrcode.code;
+    } else if (data.base64) {
+      qrCodeData = data.base64;
+    } else if (data.code) {
+      qrCodeData = data.code;
     }
 
     if (!qrCodeData) {
+      logStep("QR Code data not found", { availableKeys: Object.keys(data) });
       throw new Error('QR Code not found in API response');
+    }
+
+    // Ensure the QR code data is properly formatted
+    if (!qrCodeData.startsWith('data:image/')) {
+      qrCodeData = `data:image/png;base64,${qrCodeData}`;
     }
 
     return new Response(JSON.stringify({
@@ -86,7 +103,10 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in evolution-generate-qr", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: errorMessage 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

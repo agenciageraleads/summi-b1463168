@@ -27,17 +27,23 @@ serve(async (req) => {
       throw new Error("Evolution API credentials not configured");
     }
 
+    // Remove trailing slash if present
+    const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
+
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
-    logStep("Checking status", { instanceName });
+    logStep("Checking status", { instanceName, url: `${cleanApiUrl}/instance/fetchInstances/${instanceName}` });
 
-    const response = await fetch(`${evolutionApiUrl}/instance/fetchInstances/${instanceName}`, {
+    const response = await fetch(`${cleanApiUrl}/instance/fetchInstances/${instanceName}`, {
       method: 'GET',
       headers: {
-        'apikey': evolutionApiKey
+        'apikey': evolutionApiKey,
+        'Content-Type': 'application/json'
       }
     });
+
+    logStep("API Response", { status: response.status, ok: response.ok });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -55,7 +61,7 @@ serve(async (req) => {
     const data = await response.json();
     logStep("Status response", data);
 
-    const status = data.instance?.status || 'disconnected';
+    const status = data.instance?.status || data.status || 'disconnected';
 
     return new Response(JSON.stringify({
       success: true,
