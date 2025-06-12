@@ -1,245 +1,163 @@
 
-const EVOLUTION_API_URL = 'https://evo.borgesai.com';
-const GLOBAL_API_KEY = '1f8edf0c2c8a18d3c224a4d802dd53b5';
+const API_URL = 'https://api.gera-leads.com/instance';
+const API_KEY = 'B6D711FCDE4D4FD5936544120E713976';
 
-export interface InstanceStatus {
-  instance: {
-    instanceName: string;
-    state: 'open' | 'close' | 'connecting';
-  };
+export interface InstanceData {
+  instanceName: string;
+  token: string;
+  phoneNumber?: string;
+  displayName?: string;
+  profilePicUrl?: string;
+  status?: string;
+  serverUrl?: string;
+  apiKey?: string;
 }
 
 export interface QRCodeResponse {
-  base64?: string;
-  code?: string;
-  pairingCode?: string;
+  qrcode?: {
+    code?: string;
+    base64?: string;
+  };
 }
 
-export class EvolutionApiService {
-  private static headers = {
-    'Content-Type': 'application/json',
-    'apikey': GLOBAL_API_KEY
+export interface ConnectionStatus {
+  instance: {
+    instanceName: string;
+    status: string;
+  };
+}
+
+const headers = {
+  'Content-Type': 'application/json',
+  'apikey': API_KEY
+};
+
+export const createInstance = async (instanceName: string): Promise<InstanceData> => {
+  console.log(`[Evolution API] Criando instância: ${instanceName}`);
+  
+  const payload = {
+    instanceName,
+    token: API_KEY,
+    qrcode: true,
+    instanceSettings: {
+      settings: {
+        groupsIgnore: true,
+        syncFullHistory: true
+      }
+    },
+    webhook: {
+      webhookSettings: {
+        webhookUrl: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
+        webhookBase64: true,
+        webhookEvents: [
+          "MESSAGES_UPSERT"
+        ]
+      }
+    }
   };
 
-  // Gerar nome da instância padronizado
-  static generateInstanceName(nome: string, numero: string): string {
-    const cleanNome = nome.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    const last4Digits = numero.slice(-4);
-    return `${cleanNome}_${last4Digits}`;
-  }
+  try {
+    const response = await fetch(`${API_URL}/create`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
 
-  // 1. Verificar se há instância
-  static async checkInstance(instanceName: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances?instanceName=${instanceName}`, {
-        method: 'GET',
-        headers: this.headers
-      });
-      
-      if (!response.ok) {
-        return false;
-      }
-      
-      const data = await response.json();
-      console.log('Check instance response:', data);
-      return data && data.length > 0;
-    } catch (error) {
-      console.error('Error checking instance:', error);
-      return false;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Evolution API] Erro ao criar instância:`, errorText);
+      throw new Error(`Erro ao criar instância: ${response.status} - ${errorText}`);
     }
-  }
 
-  // 2. Criar uma instância
-  static async createInstance(instanceName: string, phoneNumber: string): Promise<boolean> {
-    try {
-      const payload = {
-        instanceName: instanceName,
-        qrcode: true,
-        integration: "WHATSAPP-BAILEYS",
-        token: instanceName,
-        number: phoneNumber,
-        businessId: "",
-        webhookUrl: "",
-        webhookByEvents: false,
-        events: [],
-        rejectCall: false,
-        msgCall: "",
-        groups: true,
-        always_online: false,
-        read_messages: false,
-        read_status: false,
-        sync_full_history: true
-      };
-
-      console.log('Creating instance with payload:', payload);
-
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(payload)
-      });
-
-      const responseData = await response.json();
-      console.log('Create instance response:', responseData);
-
-      if (!response.ok) {
-        console.error('Error creating instance:', responseData);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error creating instance:', error);
-      return false;
-    }
-  }
-
-  // 3. Reiniciar o socket da instância
-  static async restartInstance(instanceName: string): Promise<boolean> {
-    try {
-      console.log('Restarting instance:', instanceName);
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/restart/${instanceName}`, {
-        method: 'PUT',
-        headers: this.headers
-      });
-
-      const responseData = await response.json();
-      console.log('Restart instance response:', responseData);
-
-      return response.ok;
-    } catch (error) {
-      console.error('Error restarting instance:', error);
-      return false;
-    }
-  }
-
-  // 4. Gerar QR Code
-  static async generateQRCode(instanceName: string): Promise<string | null> {
-    try {
-      console.log('Generating QR code for instance:', instanceName);
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/connect/${instanceName}`, {
-        method: 'GET',
-        headers: this.headers
-      });
-
-      const responseData: QRCodeResponse = await response.json();
-      console.log('QR Code response:', responseData);
-
-      if (!response.ok) {
-        console.error('QR Code request failed:', responseData);
-        return null;
-      }
-
-      // Verificar diferentes possíveis campos de retorno
-      const qrCode = responseData.base64 || responseData.code || responseData.pairingCode;
-      
-      if (!qrCode) {
-        console.error('No QR code found in response:', responseData);
-        return null;
-      }
-
-      console.log('QR Code generated successfully, length:', qrCode.length);
-      return qrCode;
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      return null;
-    }
-  }
-
-  // Verificar status da instância
-  static async getInstanceStatus(instanceName: string): Promise<InstanceStatus | null> {
-    try {
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`, {
-        method: 'GET',
-        headers: this.headers
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      console.log('Instance status:', data);
-      return data;
-    } catch (error) {
-      console.error('Error getting instance status:', error);
-      return null;
-    }
-  }
-
-  // Deletar instância
-  static async deleteInstance(instanceName: string): Promise<boolean> {
-    try {
-      console.log('Deleting instance:', instanceName);
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/delete/${instanceName}`, {
-        method: 'DELETE',
-        headers: this.headers
-      });
-
-      const responseData = await response.json();
-      console.log('Delete instance response:', responseData);
-
-      return response.ok;
-    } catch (error) {
-      console.error('Error deleting instance:', error);
-      return false;
-    }
-  }
-
-  // Fluxo completo de conexão
-  static async connectWhatsApp(instanceName: string, phoneNumber: string): Promise<{ success: boolean; qrCode?: string; message?: string }> {
-    try {
-      console.log('1. Verificando se instância existe...');
-      const instanceExists = await this.checkInstance(instanceName);
-      
-      if (instanceExists) {
-        console.log('2. Instância existe, reiniciando socket...');
-        await this.restartInstance(instanceName);
-      } else {
-        console.log('2. Criando nova instância...');
-        const created = await this.createInstance(instanceName, phoneNumber);
-        if (!created) {
-          return { success: false, message: 'Erro ao criar instância' };
-        }
-      }
-
-      // Aguardar um pouco antes de gerar o QR Code
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      console.log('3. Gerando QR Code...');
-      const qrCode = await this.generateQRCode(instanceName);
-      
-      if (!qrCode) {
-        return { success: false, message: 'Erro ao gerar QR Code' };
-      }
-
-      return { success: true, qrCode };
-    } catch (error) {
-      console.error('Error in connect flow:', error);
-      return { success: false, message: 'Erro no processo de conexão' };
-    }
-  }
-
-  // Verificação automática de status com polling
-  static startStatusPolling(instanceName: string, onStatusChange: (connected: boolean) => void, intervalMs: number = 10000): () => void {
-    const checkStatus = async () => {
-      try {
-        const status = await this.getInstanceStatus(instanceName);
-        const isConnected = status?.instance?.state === 'open';
-        onStatusChange(isConnected);
-      } catch (error) {
-        console.error('Error in status polling:', error);
-        onStatusChange(false);
-      }
+    const data = await response.json();
+    console.log(`[Evolution API] Instância criada com sucesso:`, data);
+    
+    return {
+      instanceName: data.instance?.instanceName || instanceName,
+      token: data.hash || API_KEY,
+      status: data.instance?.status || 'disconnected'
     };
-
-    // Verificar imediatamente
-    checkStatus();
-    
-    // Configurar intervalo
-    const interval = setInterval(checkStatus, intervalMs);
-    
-    // Retornar função para parar o polling
-    return () => clearInterval(interval);
+  } catch (error) {
+    console.error(`[Evolution API] Erro na criação da instância:`, error);
+    throw error;
   }
-}
+};
+
+export const generateQRCode = async (instanceName: string): Promise<string> => {
+  console.log(`[Evolution API] Gerando QR Code para: ${instanceName}`);
+  
+  try {
+    const response = await fetch(`${API_URL}/connect/${instanceName}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Evolution API] Erro ao gerar QR Code:`, errorText);
+      throw new Error(`Erro ao gerar QR Code: ${response.status} - ${errorText}`);
+    }
+
+    const data: QRCodeResponse = await response.json();
+    console.log(`[Evolution API] Resposta do QR Code:`, data);
+    
+    // Verifica se temos um QR code válido na resposta
+    if (data.qrcode?.base64) {
+      return data.qrcode.base64;
+    } else if (data.qrcode?.code) {
+      return data.qrcode.code;
+    } else {
+      throw new Error('QR Code não encontrado na resposta da API');
+    }
+  } catch (error) {
+    console.error(`[Evolution API] Erro ao gerar QR Code:`, error);
+    throw error;
+  }
+};
+
+export const getInstanceStatus = async (instanceName: string): Promise<string> => {
+  console.log(`[Evolution API] Verificando status da instância: ${instanceName}`);
+  
+  try {
+    const response = await fetch(`${API_URL}/fetchInstances/${instanceName}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Evolution API] Erro ao buscar status:`, errorText);
+      throw new Error(`Erro ao buscar status: ${response.status} - ${errorText}`);
+    }
+
+    const data: ConnectionStatus = await response.json();
+    console.log(`[Evolution API] Status da instância:`, data);
+    
+    return data.instance?.status || 'disconnected';
+  } catch (error) {
+    console.error(`[Evolution API] Erro ao verificar status:`, error);
+    return 'disconnected';
+  }
+};
+
+export const deleteInstance = async (instanceName: string): Promise<void> => {
+  console.log(`[Evolution API] Deletando instância: ${instanceName}`);
+  
+  try {
+    const response = await fetch(`${API_URL}/delete/${instanceName}`, {
+      method: 'DELETE',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Evolution API] Erro ao deletar instância:`, errorText);
+      throw new Error(`Erro ao deletar instância: ${response.status} - ${errorText}`);
+    }
+
+    console.log(`[Evolution API] Instância deletada com sucesso`);
+  } catch (error) {
+    console.error(`[Evolution API] Erro ao deletar instância:`, error);
+    throw error;
+  }
+};

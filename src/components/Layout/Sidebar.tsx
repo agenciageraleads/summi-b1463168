@@ -8,6 +8,8 @@ import { Menu, X } from 'lucide-react';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
   { name: 'Configurações', href: '/settings', icon: '⚙️' },
+  { name: 'Assinatura', href: '/subscription', icon: '💳' },
+  { name: 'Feedback', href: '/feedback', icon: '💬' },
 ];
 
 export const Sidebar = () => {
@@ -50,10 +52,10 @@ export const Sidebar = () => {
         {/* Logo */}
         <div className="flex items-center justify-center h-16 px-4 border-b border-summi-gray-200">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-summi-blue rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-summi-green rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">S</span>
             </div>
-            <span className="text-xl font-bold text-summi-blue">Summi</span>
+            <span className="text-xl font-bold text-summi-green">Summi</span>
           </div>
         </div>
 
@@ -67,8 +69,8 @@ export const Sidebar = () => {
               className={cn(
                 "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                 location.pathname === item.href
-                  ? "bg-summi-blue text-white"
-                  : "text-summi-gray-600 hover:bg-summi-gray-100 hover:text-summi-blue"
+                  ? "bg-summi-green text-white"
+                  : "text-summi-gray-600 hover:bg-summi-gray-100 hover:text-summi-green"
               )}
             >
               <span className="mr-3 text-lg">{item.icon}</span>
