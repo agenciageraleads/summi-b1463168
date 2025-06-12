@@ -9,7 +9,6 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
-import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -33,11 +32,6 @@ const App = () => (
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <DashboardPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/whatsapp" element={
-                <ProtectedRoute>
-                  <WhatsAppConnectionPage />
                 </ProtectedRoute>
               } />
               <Route path="/settings" element={

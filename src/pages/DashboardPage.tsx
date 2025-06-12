@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const DashboardPage = () => {
   const { user } = useAuth();
-  const { profile } = useProfile();
+  const { profile, updateProfile } = useProfile();
   const { chats, isLoading: chatsLoading } = useChats();
   const { toast } = useToast();
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'loading' | 'need_number'>('loading');
@@ -21,17 +22,38 @@ const DashboardPage = () => {
     if (profile && profile.nome && profile.numero) {
       const generatedInstanceName = EvolutionApiService.generateInstanceName(profile.nome, profile.numero);
       setInstanceName(generatedInstanceName);
+      
+      // Salvar instance_name no profile se não existir
+      if (!profile.instance_name || profile.instance_name !== generatedInstanceName) {
+        updateProfile({ instance_name: generatedInstanceName });
+      }
+      
       checkConnectionStatus(generatedInstanceName);
     } else if (profile && (!profile.nome || !profile.numero)) {
       setConnectionStatus('need_number');
     }
   }, [profile]);
 
+  // Auto-verificação de status a cada 30 segundos quando conectado
+  useEffect(() => {
+    if (connectionStatus === 'connected' && instanceName) {
+      const stopPolling = EvolutionApiService.startStatusPolling(
+        instanceName,
+        (isConnected) => {
+          setConnectionStatus(isConnected ? 'connected' : 'disconnected');
+        },
+        30000 // 30 segundos
+      );
+      
+      return stopPolling;
+    }
+  }, [connectionStatus, instanceName]);
+
   const checkConnectionStatus = async (instanceName: string) => {
     try {
       console.log('Verificando status da instância:', instanceName);
       const status = await EvolutionApiService.getInstanceStatus(instanceName);
-      if (status && status.instance.status === 'open') {
+      if (status && status.instance.state === 'open') {
         setConnectionStatus('connected');
         setQrCode(null);
       } else {
@@ -129,7 +151,7 @@ const DashboardPage = () => {
               </div>
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                 connectionStatus === 'connected' 
-                  ? 'bg-primary text-primary-foreground' 
+                  ? 'bg-summi-green text-white' 
                   : connectionStatus === 'loading'
                   ? 'bg-yellow-500 text-white'
                   : connectionStatus === 'need_number'
@@ -163,12 +185,14 @@ const DashboardPage = () => {
                 <p className="text-muted-foreground">
                   Sua instância do WhatsApp não está conectada. Clique no botão abaixo para conectar.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Instância: {instanceName}
-                </p>
+                {profile.instance_name && (
+                  <p className="text-sm text-muted-foreground">
+                    Instância: {profile.instance_name}
+                  </p>
+                )}
                 <Button 
                   onClick={handleConnect}
-                  className="bg-primary hover:bg-primary/90"
+                  className="bg-summi-green hover:bg-summi-green-dark text-white"
                 >
                   Conectar WhatsApp
                 </Button>
@@ -178,7 +202,7 @@ const DashboardPage = () => {
             {connectionStatus === 'loading' && (
               <div className="text-center space-y-4">
                 <p className="text-muted-foreground">Conectando ao WhatsApp...</p>
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue mx-auto"></div>
               </div>
             )}
 
@@ -205,15 +229,17 @@ const DashboardPage = () => {
 
             {connectionStatus === 'connected' && (
               <div className="text-center space-y-4">
-                <p className="text-primary font-medium">
+                <p className="text-summi-green font-medium">
                   ✅ WhatsApp conectado com sucesso!
                 </p>
                 <p className="text-muted-foreground">
                   Sua instância está ativa e pronta para receber mensagens.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Instância: {instanceName}
-                </p>
+                {profile?.instance_name && (
+                  <p className="text-sm text-muted-foreground">
+                    Instância: {profile.instance_name}
+                  </p>
+                )}
               </div>
             )}
           </CardContent>
@@ -264,8 +290,8 @@ const DashboardPage = () => {
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="flex items-center space-x-4 flex-1">
-                      <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                        <span className="text-primary-foreground font-medium text-sm">
+                      <div className="w-10 h-10 bg-summi-blue rounded-full flex items-center justify-center">
+                        <span className="text-white font-medium text-sm">
                           {chat.nome.charAt(0).toUpperCase()}
                         </span>
                       </div>

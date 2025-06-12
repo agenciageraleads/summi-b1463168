@@ -1,13 +1,12 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { useAuth } from '@/contexts/AuthContext';
-import { useProfile, Profile } from '@/hooks/useProfile';
+import { Textarea } from '@/components/ui/textarea';
+import { Profile } from '@/hooks/useProfile';
 
 interface ProfileFormProps {
   profile: Profile;
@@ -16,180 +15,195 @@ interface ProfileFormProps {
 }
 
 export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) => {
-  const { user } = useAuth();
-  const [profileData, setProfileData] = useState({
-    nome: profile?.nome || '',
-    numero: profile?.numero || '',
-    transcreve_audio_recebido: profile?.transcreve_audio_recebido ?? true,
-    transcreve_audio_enviado: profile?.transcreve_audio_enviado ?? true,
-    resume_audio: profile?.resume_audio ?? false,
-    segundos_para_resumir: profile?.segundos_para_resumir ?? 45,
-    temas_urgentes: profile?.temas_urgentes || '',
-    temas_importantes: profile?.temas_importantes || ''
+  const [formData, setFormData] = useState({
+    nome: profile.nome || '',
+    numero: profile.numero || '',
+    transcreve_audio_recebido: profile.transcreve_audio_recebido,
+    transcreve_audio_enviado: profile.transcreve_audio_enviado,
+    resume_audio: profile.resume_audio,
+    segundos_para_resumir: profile.segundos_para_resumir,
+    temas_urgentes: profile.temas_urgentes || '',
+    temas_importantes: profile.temas_importantes || '',
   });
 
-  useEffect(() => {
-    if (profile) {
-      setProfileData({
-        nome: profile.nome,
-        numero: profile.numero || '',
-        transcreve_audio_recebido: profile.transcreve_audio_recebido,
-        transcreve_audio_enviado: profile.transcreve_audio_enviado,
-        resume_audio: profile.resume_audio,
-        segundos_para_resumir: profile.segundos_para_resumir,
-        temas_urgentes: profile.temas_urgentes,
-        temas_importantes: profile.temas_importantes
-      });
-    }
-  }, [profile]);
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
-  const handleSave = async () => {
-    await onSave(profileData);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onSave(formData);
   };
 
   return (
-    <Card className="border-border shadow-sm">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <span>👤</span>
-          <span>Informações do Usuário</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="id">ID do Usuário (não editável)</Label>
-            <Input
-              id="id"
-              value={user?.id || ''}
-              disabled
-              className="mt-1 bg-muted"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="instance_name">Nome da Instância (não editável)</Label>
-            <Input
-              id="instance_name"
-              value={profile?.instance_name || 'Será gerado automaticamente'}
-              disabled
-              className="mt-1 bg-muted"
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="nome">Nome</Label>
-            <Input
-              id="nome"
-              value={profileData.nome}
-              onChange={(e) => setProfileData({...profileData, nome: e.target.value})}
-              className="mt-1"
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="numero">Número WhatsApp</Label>
-            <Input
-              id="numero"
-              value={profileData.numero}
-              onChange={(e) => setProfileData({...profileData, numero: e.target.value})}
-              placeholder="556282435286"
-              className="mt-1"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Digite apenas números (incluindo código do país)
-            </p>
-          </div>
-
-          <div>
-            <Label htmlFor="segundos">Segundos para Resumir</Label>
-            <Input
-              id="segundos"
-              type="number"
-              min="10"
-              max="300"
-              value={profileData.segundos_para_resumir}
-              onChange={(e) => setProfileData({...profileData, segundos_para_resumir: parseInt(e.target.value) || 45})}
-              className="mt-1"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-foreground">Transcrever Áudio Recebido</h4>
-              <p className="text-sm text-muted-foreground">Converter áudios recebidos em texto</p>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Informações Básicas */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <span>👤</span>
+            <span>Informações Básicas</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="nome">Nome Completo</Label>
+              <Input
+                id="nome"
+                value={formData.nome}
+                onChange={(e) => handleInputChange('nome', e.target.value)}
+                placeholder="Seu nome completo"
+                required
+              />
             </div>
-            <Switch 
-              checked={profileData.transcreve_audio_recebido}
-              onCheckedChange={(checked) => setProfileData({...profileData, transcreve_audio_recebido: checked})}
+            
+            <div className="space-y-2">
+              <Label htmlFor="numero">Número do WhatsApp</Label>
+              <Input
+                id="numero"
+                value={formData.numero}
+                onChange={(e) => handleInputChange('numero', e.target.value)}
+                placeholder="Ex: 5511999999999"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Formato: código do país + DDD + número (sem espaços ou símbolos)
+              </p>
+            </div>
+          </div>
+
+          {profile.instance_name && (
+            <div className="space-y-2">
+              <Label>ID da Instância</Label>
+              <Input
+                value={profile.instance_name}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">
+                Este é o identificador único da sua instância no WhatsApp
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Configurações de Áudio */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <span>🎵</span>
+            <span>Configurações de Áudio</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label>Transcrever áudios recebidos</Label>
+              <p className="text-sm text-muted-foreground">
+                Converte áudios dos clientes em texto automaticamente
+              </p>
+            </div>
+            <Switch
+              checked={formData.transcreve_audio_recebido}
+              onCheckedChange={(checked) => handleInputChange('transcreve_audio_recebido', checked)}
             />
           </div>
 
           <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-foreground">Transcrever Áudio Enviado</h4>
-              <p className="text-sm text-muted-foreground">Converter áudios enviados em texto</p>
+            <div className="space-y-1">
+              <Label>Transcrever áudios enviados</Label>
+              <p className="text-sm text-muted-foreground">
+                Converte seus áudios em texto para histórico
+              </p>
             </div>
-            <Switch 
-              checked={profileData.transcreve_audio_enviado}
-              onCheckedChange={(checked) => setProfileData({...profileData, transcreve_audio_enviado: checked})}
+            <Switch
+              checked={formData.transcreve_audio_enviado}
+              onCheckedChange={(checked) => handleInputChange('transcreve_audio_enviado', checked)}
             />
           </div>
 
           <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-foreground">Resumir Áudio</h4>
-              <p className="text-sm text-muted-foreground">Gerar resumos automáticos dos áudios</p>
+            <div className="space-y-1">
+              <Label>Resumir áudios longos</Label>
+              <p className="text-sm text-muted-foreground">
+                Cria resumos automáticos de áudios longos
+              </p>
             </div>
-            <Switch 
-              checked={profileData.resume_audio}
-              onCheckedChange={(checked) => setProfileData({...profileData, resume_audio: checked})}
+            <Switch
+              checked={formData.resume_audio}
+              onCheckedChange={(checked) => handleInputChange('resume_audio', checked)}
             />
           </div>
-        </div>
 
-        <div className="grid md:grid-cols-1 gap-4">
-          <div>
+          {formData.resume_audio && (
+            <div className="space-y-2">
+              <Label htmlFor="segundos_para_resumir">
+                Resumir áudios com mais de (segundos)
+              </Label>
+              <Input
+                id="segundos_para_resumir"
+                type="number"
+                min="10"
+                max="300"
+                value={formData.segundos_para_resumir}
+                onChange={(e) => handleInputChange('segundos_para_resumir', parseInt(e.target.value))}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Configurações de Prioridade */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <span>⚡</span>
+            <span>Classificação de Mensagens</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
             <Label htmlFor="temas_urgentes">Temas Urgentes</Label>
             <Textarea
               id="temas_urgentes"
-              value={profileData.temas_urgentes}
-              onChange={(e) => setProfileData({...profileData, temas_urgentes: e.target.value})}
-              placeholder="urgente, amor, falar com voce, me liga, ligar, ligacao, retorna"
-              className="mt-1"
+              value={formData.temas_urgentes}
+              onChange={(e) => handleInputChange('temas_urgentes', e.target.value)}
+              placeholder="Palavras-chave que indicam urgência (separadas por vírgula)"
               rows={3}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Palavras-chave que indicam urgência, separadas por vírgula
+            <p className="text-xs text-muted-foreground">
+              Mensagens com essas palavras serão marcadas como urgentes
             </p>
           </div>
-          
-          <div>
+
+          <div className="space-y-2">
             <Label htmlFor="temas_importantes">Temas Importantes</Label>
             <Textarea
               id="temas_importantes"
-              value={profileData.temas_importantes}
-              onChange={(e) => setProfileData({...profileData, temas_importantes: e.target.value})}
-              placeholder="orcamentos, material eletrico, material, comprar"
-              className="mt-1"
+              value={formData.temas_importantes}
+              onChange={(e) => handleInputChange('temas_importantes', e.target.value)}
+              placeholder="Palavras-chave que indicam importância (separadas por vírgula)"
               rows={3}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Palavras-chave que indicam assuntos importantes, separadas por vírgula
+            <p className="text-xs text-muted-foreground">
+              Mensagens com essas palavras serão marcadas como importantes
             </p>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
+      {/* Botão Salvar */}
+      <div className="flex justify-end">
         <Button 
-          onClick={handleSave}
-          className="w-full"
+          type="submit" 
           disabled={isUpdating}
+          className="bg-summi-blue hover:bg-summi-blue-dark"
         >
           {isUpdating ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </form>
   );
 };

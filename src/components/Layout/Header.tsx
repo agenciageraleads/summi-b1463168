@@ -1,13 +1,16 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useChats } from '@/hooks/useChats';
 
 export const Header = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { chats } = useChats();
 
   const displayName = profile?.nome || user?.email || 'Usuário';
   const firstName = displayName.split(' ')[0];
+  const pendingChats = chats.length;
 
   return (
     <header className="bg-white border-b border-summi-gray-200 px-6 py-4">
@@ -17,7 +20,7 @@ export const Header = () => {
             Olá, {firstName}! 👋
           </h1>
           <p className="text-summi-gray-600">
-            Vamos verificar como está o atendimento hoje
+            Sua assistente de IA para WhatsApp Business está pronta para automatizar vendas
           </p>
         </div>
         
@@ -25,7 +28,11 @@ export const Header = () => {
           {/* Notifications */}
           <button className="relative p-2 text-summi-gray-600 hover:text-summi-blue transition-colors">
             <span className="text-xl">🔔</span>
-            <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+            {pendingChats > 0 && (
+              <span className="absolute -top-1 -right-1 bg-summi-green text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                {pendingChats > 99 ? '99+' : pendingChats}
+              </span>
+            )}
           </button>
           
           {/* User Avatar */}

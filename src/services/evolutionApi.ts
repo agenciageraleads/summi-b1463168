@@ -5,7 +5,7 @@ const GLOBAL_API_KEY = '1f8edf0c2c8a18d3c224a4d802dd53b5';
 export interface InstanceStatus {
   instance: {
     instanceName: string;
-    status: 'open' | 'close' | 'connecting';
+    state: 'open' | 'close' | 'connecting';
   };
 }
 
@@ -218,5 +218,28 @@ export class EvolutionApiService {
       console.error('Error in connect flow:', error);
       return { success: false, message: 'Erro no processo de conexão' };
     }
+  }
+
+  // Verificação automática de status com polling
+  static startStatusPolling(instanceName: string, onStatusChange: (connected: boolean) => void, intervalMs: number = 10000): () => void {
+    const checkStatus = async () => {
+      try {
+        const status = await this.getInstanceStatus(instanceName);
+        const isConnected = status?.instance?.state === 'open';
+        onStatusChange(isConnected);
+      } catch (error) {
+        console.error('Error in status polling:', error);
+        onStatusChange(false);
+      }
+    };
+
+    // Verificar imediatamente
+    checkStatus();
+    
+    // Configurar intervalo
+    const interval = setInterval(checkStatus, intervalMs);
+    
+    // Retornar função para parar o polling
+    return () => clearInterval(interval);
   }
 }
