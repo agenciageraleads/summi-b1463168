@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { EvolutionApiService } from '@/services/evolutionApi';
+import { deleteInstance } from '@/services/evolutionApi';
 
 export interface Profile {
   id: string;
@@ -19,6 +19,12 @@ export interface Profile {
   created_at: string;
   updated_at: string;
 }
+
+const generateInstanceName = (nome: string, numero: string): string => {
+  const cleanNome = nome.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const lastFourDigits = numero.slice(-4);
+  return `${cleanNome}_${lastFourDigits}`;
+};
 
 export const useProfile = () => {
   const { user } = useAuth();
@@ -67,7 +73,7 @@ export const useProfile = () => {
         const numero = updates.numero || profile.numero;
         
         if (nome && numero && numero.length >= 4) {
-          updates.instance_name = EvolutionApiService.generateInstanceName(nome, numero);
+          updates.instance_name = generateInstanceName(nome, numero);
         }
       }
 
@@ -107,7 +113,7 @@ export const useProfile = () => {
       // Deletar instância do WhatsApp se existir
       if (profile.instance_name) {
         console.log('Deletando instância:', profile.instance_name);
-        await EvolutionApiService.deleteInstance(profile.instance_name);
+        await deleteInstance(profile.instance_name);
       }
 
       // Deletar chats do usuário
