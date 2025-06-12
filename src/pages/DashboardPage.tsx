@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useProfile } from '@/hooks/useProfile';
 import { useChats } from '@/hooks/useChats';
-import { createInstance, generateQRCode, getInstanceStatus } from '@/services/evolutionApi';
+import { createInstance, connectInstance, getConnectionState } from '@/services/evolutionApi';
 import { useToast } from '@/hooks/use-toast';
 import { QrCode, Smartphone, MessageCircle, Clock, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
 
@@ -40,7 +39,7 @@ const DashboardPage = () => {
     if (!profile?.instance_name) return;
     
     try {
-      const status = await getInstanceStatus(profile.instance_name);
+      const status = await getConnectionState(profile.instance_name);
       console.log(`Status da conexão: ${status}`);
       setConnectionStatus(status);
       
@@ -105,7 +104,7 @@ const DashboardPage = () => {
     setIsGeneratingQR(true);
     try {
       console.log(`Gerando QR Code para: ${profile.instance_name}`);
-      const qrCodeData = await generateQRCode(profile.instance_name);
+      const qrCodeData = await connectInstance(profile.instance_name);
       setQrCode(qrCodeData);
       
       toast({
