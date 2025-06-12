@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
+import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,11 @@ const App = () => (
               <Route path="/whatsapp" element={
                 <ProtectedRoute>
                   <WhatsAppConnectionPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/whatsapp-v2" element={
+                <ProtectedRoute>
+                  <WhatsAppConnectionV2Page />
                 </ProtectedRoute>
               } />
               <Route path="/settings" element={
