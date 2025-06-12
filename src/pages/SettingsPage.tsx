@@ -1,81 +1,65 @@
-
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { useProfile } from '@/hooks/useProfile';
 
 const SettingsPage = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const { profile, isLoading, updateProfile } = useProfile();
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: '',
-    company: ''
+    nome: profile?.nome || '',
+    numero: profile?.numero || '',
+    transcreve_audio_recebido: profile?.transcreve_audio_recebido ?? true,
+    transcreve_audio_enviado: profile?.transcreve_audio_enviado ?? true,
+    resume_audio: profile?.resume_audio ?? false,
+    segundos_para_resumir: profile?.segundos_para_resumir ?? 45,
+    temas_urgentes: profile?.temas_urgentes || '',
+    temas_importantes: profile?.temas_importantes || ''
   });
 
-  const [notifications, setNotifications] = useState({
-    email: true,
-    webhooks: false,
-    newLeads: true,
-    reports: true
+  // Update form when profile loads
+  useState(() => {
+    if (profile) {
+      setProfileData({
+        nome: profile.nome,
+        numero: profile.numero || '',
+        transcreve_audio_recebido: profile.transcreve_audio_recebido,
+        transcreve_audio_enviado: profile.transcreve_audio_enviado,
+        resume_audio: profile.resume_audio,
+        segundos_para_resumir: profile.segundos_para_resumir,
+        temas_urgentes: profile.temas_urgentes,
+        temas_importantes: profile.temas_importantes
+      });
+    }
   });
 
   const handleProfileSave = async () => {
-    setIsLoading(true);
+    setIsUpdating(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast({
-        title: "Perfil atualizado!",
-        description: "Suas informações foram salvas com sucesso",
-      });
+      await updateProfile(profileData);
     } finally {
-      setIsLoading(false);
+      setIsUpdating(false);
     }
   };
 
-  const teamMembers = [
-    {
-      id: 1,
-      name: 'Ana Silva',
-      email: 'ana@empresa.com',
-      role: 'Admin',
-      status: 'Ativo',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b4e0?w=150'
-    },
-    {
-      id: 2,
-      name: 'Carlos Santos',
-      email: 'carlos@empresa.com',
-      role: 'Operador',
-      status: 'Ativo',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
-    }
-  ];
-
-  const webhooks = [
-    {
-      id: 1,
-      name: 'Novo Lead Qualificado',
-      url: 'https://api.empresa.com/webhooks/leads',
-      status: 'Ativo'
-    },
-    {
-      id: 2,
-      name: 'Atualização de Status',
-      url: 'https://api.empresa.com/webhooks/status',
-      status: 'Inativo'
-    }
-  ];
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -86,140 +70,153 @@ const SettingsPage = () => {
             Configurações ⚙️
           </h1>
           <p className="text-summi-gray-600">
-            Gerencie seu perfil, equipe e integrações
+            Gerencie seu perfil, configurações da Summi e integrações
           </p>
         </div>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="profile">Perfil</TabsTrigger>
-            <TabsTrigger value="team">Equipe</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="profile">Perfil & Summi</TabsTrigger>
             <TabsTrigger value="notifications">Notificações</TabsTrigger>
             <TabsTrigger value="integrations">Integrações</TabsTrigger>
           </TabsList>
 
-          {/* Profile Tab */}
+          {/* Profile & Summi Settings Tab */}
           <TabsContent value="profile" className="space-y-6">
             <Card className="card-hover">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <span>👤</span>
-                  <span>Informações Pessoais</span>
+                  <span>Informações do Usuário</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-6">
-                  <div className="w-20 h-20 bg-summi-blue rounded-full flex items-center justify-center">
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.name}
-                        className="w-20 h-20 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-white font-bold text-2xl">
-                        {user?.name.charAt(0)}
-                      </span>
-                    )}
-                  </div>
-                  <Button variant="outline">Alterar foto</Button>
-                </div>
-
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name">Nome completo</Label>
+                    <Label htmlFor="id">ID do Usuário (não editável)</Label>
                     <Input
-                      id="name"
-                      value={profileData.name}
-                      onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                      id="id"
+                      value={user?.id || ''}
+                      disabled
+                      className="mt-1 bg-gray-100"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="nome">Nome</Label>
+                    <Input
+                      id="nome"
+                      value={profileData.nome}
+                      onChange={(e) => setProfileData({...profileData, nome: e.target.value})}
                       className="mt-1"
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="email">E-mail</Label>
+                    <Label htmlFor="numero">Número WhatsApp</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      value={profileData.email}
-                      onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                      id="numero"
+                      value={profileData.numero}
+                      onChange={(e) => setProfileData({...profileData, numero: e.target.value})}
+                      placeholder="556282435286"
+                      className="mt-1"
+                      disabled={!!profileData.numero}
+                    />
+                    {profileData.numero && (
+                      <p className="text-xs text-summi-gray-500 mt-1">
+                        Número não pode ser alterado quando conectado
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="segundos">Segundos para Resumir</Label>
+                    <Input
+                      id="segundos"
+                      type="number"
+                      min="10"
+                      max="300"
+                      value={profileData.segundos_para_resumir}
+                      onChange={(e) => setProfileData({...profileData, segundos_para_resumir: parseInt(e.target.value) || 45})}
                       className="mt-1"
                     />
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="phone">Telefone</Label>
-                    <Input
-                      id="phone"
-                      value={profileData.phone}
-                      onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
-                      placeholder="(11) 99999-9999"
-                      className="mt-1"
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-summi-gray-900">Transcrever Áudio Recebido</h4>
+                      <p className="text-sm text-summi-gray-600">Converter áudios recebidos em texto</p>
+                    </div>
+                    <Switch 
+                      checked={profileData.transcreve_audio_recebido}
+                      onCheckedChange={(checked) => setProfileData({...profileData, transcreve_audio_recebido: checked})}
                     />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-summi-gray-900">Transcrever Áudio Enviado</h4>
+                      <p className="text-sm text-summi-gray-600">Converter áudios enviados em texto</p>
+                    </div>
+                    <Switch 
+                      checked={profileData.transcreve_audio_enviado}
+                      onCheckedChange={(checked) => setProfileData({...profileData, transcreve_audio_enviado: checked})}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-summi-gray-900">Resumir Áudio</h4>
+                      <p className="text-sm text-summi-gray-600">Gerar resumos automáticos dos áudios</p>
+                    </div>
+                    <Switch 
+                      checked={profileData.resume_audio}
+                      onCheckedChange={(checked) => setProfileData({...profileData, resume_audio: checked})}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-1 gap-4">
+                  <div>
+                    <Label htmlFor="temas_urgentes">Temas Urgentes</Label>
+                    <Textarea
+                      id="temas_urgentes"
+                      value={profileData.temas_urgentes}
+                      onChange={(e) => setProfileData({...profileData, temas_urgentes: e.target.value})}
+                      placeholder="urgente, amor, falar com voce, me liga, ligar, ligacao, retorna"
+                      className="mt-1"
+                      rows={3}
+                    />
+                    <p className="text-xs text-summi-gray-500 mt-1">
+                      Palavras-chave que indicam urgência, separadas por vírgula
+                    </p>
                   </div>
                   
                   <div>
-                    <Label htmlFor="company">Empresa</Label>
-                    <Input
-                      id="company"
-                      value={profileData.company}
-                      onChange={(e) => setProfileData({...profileData, company: e.target.value})}
-                      placeholder="Sua Empresa Ltda"
+                    <Label htmlFor="temas_importantes">Temas Importantes</Label>
+                    <Textarea
+                      id="temas_importantes"
+                      value={profileData.temas_importantes}
+                      onChange={(e) => setProfileData({...profileData, temas_importantes: e.target.value})}
+                      placeholder="orcamentos, material eletrico, material, comprar"
                       className="mt-1"
+                      rows={3}
                     />
+                    <p className="text-xs text-summi-gray-500 mt-1">
+                      Palavras-chave que indicam assuntos importantes, separadas por vírgula
+                    </p>
                   </div>
                 </div>
 
                 <Button 
                   onClick={handleProfileSave}
                   className="btn-primary"
-                  disabled={isLoading}
+                  disabled={isUpdating}
                 >
-                  {isLoading ? 'Salvando...' : 'Salvar alterações'}
+                  {isUpdating ? 'Salvando...' : 'Salvar Configurações'}
                 </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Team Tab */}
-          <TabsContent value="team" className="space-y-6">
-            <Card className="card-hover">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <span>👥</span>
-                  <span>Membros da Equipe</span>
-                </CardTitle>
-                <Button className="btn-primary">+ Convidar membro</Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {teamMembers.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between p-4 bg-summi-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <img
-                          src={member.avatar}
-                          alt={member.name}
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
-                        <div>
-                          <h4 className="font-medium text-summi-gray-900">{member.name}</h4>
-                          <p className="text-sm text-summi-gray-600">{member.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <span className={`px-3 py-1 text-xs rounded-full ${
-                          member.role === 'Admin' 
-                            ? 'bg-summi-blue text-white' 
-                            : 'bg-summi-gray-200 text-summi-gray-700'
-                        }`}>
-                          {member.role}
-                        </span>
-                        <span className="text-sm text-summi-green font-medium">{member.status}</span>
-                        <Button variant="outline" size="sm">Editar</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </CardContent>
             </Card>
           </TabsContent>

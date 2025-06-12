@@ -9,7 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string | null
+          id: string
+          nome: string
+          numero: string | null
+          resume_audio: boolean | null
+          segundos_para_resumir: number | null
+          temas_importantes: string | null
+          temas_urgentes: string | null
+          transcreve_audio_enviado: boolean | null
+          transcreve_audio_recebido: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          nome: string
+          numero?: string | null
+          resume_audio?: boolean | null
+          segundos_para_resumir?: number | null
+          temas_importantes?: string | null
+          temas_urgentes?: string | null
+          transcreve_audio_enviado?: boolean | null
+          transcreve_audio_recebido?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          nome?: string
+          numero?: string | null
+          resume_audio?: boolean | null
+          segundos_para_resumir?: number | null
+          temas_importantes?: string | null
+          temas_urgentes?: string | null
+          transcreve_audio_enviado?: boolean | null
+          transcreve_audio_recebido?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

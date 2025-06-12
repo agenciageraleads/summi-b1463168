@@ -1,156 +1,182 @@
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEffect } from 'react';
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { login, resetPassword, user, isLoading } = useAuth();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !isLoading) {
+      navigate('/dashboard');
+    }
+  }, [user, isLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    if (!email || !password) {
-      toast({
-        title: "Erro",
-        description: "Por favor, preencha todos os campos",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await login(email, password);
-      toast({
-        title: "Sucesso!",
-        description: "Login realizado com sucesso",
-      });
+    const result = await login(formData.email, formData.password);
+    
+    if (!result.error) {
       navigate('/dashboard');
-    } catch (error) {
-      toast({
-        title: "Erro no login",
-        description: "Verifique suas credenciais e tente novamente",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsSubmitting(false);
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    const result = await resetPassword(resetEmail);
+    
+    if (!result.error) {
+      setShowResetPassword(false);
+      setResetEmail('');
+    }
+    
+    setIsSubmitting(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-summi-gray-50 px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-summi-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center space-x-2">
-            <div className="w-10 h-10 bg-summi-blue rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">S</span>
+        <div className="text-center">
+          <Link to="/" className="flex items-center justify-center space-x-2">
+            <div className="w-12 h-12 bg-summi-blue rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-xl">S</span>
             </div>
             <span className="text-2xl font-bold text-summi-blue">Summi</span>
           </Link>
+          <h2 className="mt-6 text-3xl font-bold text-summi-gray-900">
+            {showResetPassword ? 'Redefinir Senha' : 'Entre na sua conta'}
+          </h2>
+          <p className="mt-2 text-sm text-summi-gray-600">
+            {showResetPassword 
+              ? 'Digite seu e-mail para receber instruções'
+              : 'Ou '}
+            {!showResetPassword && (
+              <Link to="/register" className="font-medium text-summi-blue hover:underline">
+                cadastre-se gratuitamente
+              </Link>
+            )}
+          </p>
         </div>
 
-        <Card className="shadow-lg border-0">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-summi-gray-900">
-              Bem-vindo de volta! 👋
+        {/* Form */}
+        <Card className="card-hover">
+          <CardHeader>
+            <CardTitle className="text-center">
+              {showResetPassword ? 'Recuperar Acesso' : 'Fazer Login'}
             </CardTitle>
-            <p className="text-summi-gray-600">
-              Faça login para acessar sua conta
-            </p>
           </CardHeader>
-          
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1"
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1"
-                  required
-                />
-              </div>
+            {showResetPassword ? (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div>
+                  <Label htmlFor="resetEmail">E-mail</Label>
+                  <Input
+                    id="resetEmail"
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div className="flex space-x-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowResetPassword(false)}
+                  >
+                    Voltar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="btn-primary flex-1"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? 'Enviando...' : 'Enviar'}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    placeholder="seu@email.com"
+                    className="mt-1"
+                  />
+                </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center space-x-2">
-                  <input type="checkbox" className="rounded border-summi-gray-300" />
-                  <span className="text-summi-gray-600">Lembrar de mim</span>
-                </label>
-                <a href="#" className="text-summi-blue hover:text-summi-blue-dark">
-                  Esqueci minha senha
-                </a>
-              </div>
+                <div>
+                  <Label htmlFor="password">Senha</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    required
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    placeholder="••••••••"
+                    className="mt-1"
+                  />
+                </div>
 
-              <Button 
-                type="submit" 
-                className="w-full btn-primary"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Entrando...</span>
-                  </div>
-                ) : (
-                  'Entrar'
-                )}
-              </Button>
-            </form>
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(true)}
+                    className="text-sm text-summi-blue hover:underline"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
 
-            <div className="mt-6 text-center">
-              <p className="text-summi-gray-600">
-                Não tem uma conta?{' '}
-                <Link to="/register" className="text-summi-blue hover:text-summi-blue-dark font-medium">
-                  Registre-se grátis
-                </Link>
-              </p>
-            </div>
-
-            {/* Magic Link Option */}
-            <div className="mt-4 pt-4 border-t border-summi-gray-200">
-              <Button 
-                variant="outline" 
-                className="w-full border-summi-gray-300 text-summi-gray-700 hover:bg-summi-gray-50"
-              >
-                ✨ Entrar com link mágico
-              </Button>
-            </div>
+                <Button
+                  type="submit"
+                  className="btn-primary w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Entrando...' : 'Entrar'}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
-
-        <div className="mt-6 text-center text-sm text-summi-gray-600">
-          Ao continuar, você concorda com nossos{' '}
-          <a href="#" className="text-summi-blue hover:underline">Termos de Uso</a>
-          {' '}e{' '}
-          <a href="#" className="text-summi-blue hover:underline">Política de Privacidade</a>
-        </div>
       </div>
     </div>
   );

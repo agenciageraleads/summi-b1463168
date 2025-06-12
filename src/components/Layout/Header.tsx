@@ -1,15 +1,20 @@
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 
 export const Header = () => {
   const { user } = useAuth();
+  const { profile } = useProfile();
+
+  const displayName = profile?.nome || user?.email || 'Usuário';
+  const firstName = displayName.split(' ')[0];
 
   return (
     <header className="bg-white border-b border-summi-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-summi-gray-900">
-            Olá, {user?.name}! 👋
+            Olá, {firstName}! 👋
           </h1>
           <p className="text-summi-gray-600">
             Vamos verificar como está o atendimento hoje
@@ -26,21 +31,13 @@ export const Header = () => {
           {/* User Avatar */}
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-summi-blue rounded-full flex items-center justify-center">
-              {user?.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-              ) : (
-                <span className="text-white font-medium">
-                  {user?.name.charAt(0)}
-                </span>
-              )}
+              <span className="text-white font-medium">
+                {displayName.charAt(0).toUpperCase()}
+              </span>
             </div>
             <div className="text-sm">
-              <p className="font-medium text-summi-gray-900">{user?.name}</p>
-              <p className="text-summi-gray-600 capitalize">{user?.role}</p>
+              <p className="font-medium text-summi-gray-900">{displayName}</p>
+              <p className="text-summi-gray-600">{user?.email}</p>
             </div>
           </div>
         </div>

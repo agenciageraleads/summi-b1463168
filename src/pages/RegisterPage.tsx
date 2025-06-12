@@ -1,247 +1,182 @@
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEffect } from 'react';
 
 const RegisterPage = () => {
-  const [step, setStep] = useState(1);
+  const navigate = useNavigate();
+  const { register, user, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    confirmPassword: '',
-    company: '',
-    phone: ''
+    confirmPassword: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const { register } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !isLoading) {
+      navigate('/dashboard');
+    }
+  }, [user, isLoading, navigate]);
 
-  const handleStep1Submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.name || !formData.email || !formData.password) {
-      toast({
-        title: "Erro",
-        description: "Por favor, preencha todos os campos obrigatórios",
-        variant: "destructive"
-      });
-      return;
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (formData.name.trim().length < 2) {
+      newErrors.name = 'Nome deve ter pelo menos 2 caracteres';
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Erro",
-        description: "As senhas não coincidem",
-        variant: "destructive"
-      });
-      return;
+    if (!formData.email.includes('@')) {
+      newErrors.email = 'E-mail inválido';
     }
 
     if (formData.password.length < 6) {
-      toast({
-        title: "Erro",
-        description: "A senha deve ter pelo menos 6 caracteres",
-        variant: "destructive"
-      });
-      return;
+      newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
     }
 
-    setStep(2);
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Senhas não coincidem';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleFinalSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      await register(formData.name, formData.email, formData.password);
-      toast({
-        title: "Conta criada com sucesso! 🎉",
-        description: "Bem-vindo à Summi!",
-      });
-      navigate('/dashboard');
-    } catch (error) {
-      toast({
-        title: "Erro no registro",
-        description: "Ocorreu um erro ao criar sua conta. Tente novamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+    
+    if (!validateForm()) return;
+    
+    setIsSubmitting(true);
+    
+    const result = await register(formData.name, formData.email, formData.password);
+    
+    if (!result.error) {
+      navigate('/login');
     }
+    
+    setIsSubmitting(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-summi-gray-50 px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-summi-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center space-x-2">
-            <div className="w-10 h-10 bg-summi-blue rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">S</span>
+        <div className="text-center">
+          <Link to="/" className="flex items-center justify-center space-x-2">
+            <div className="w-12 h-12 bg-summi-blue rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-xl">S</span>
             </div>
             <span className="text-2xl font-bold text-summi-blue">Summi</span>
           </Link>
+          <h2 className="mt-6 text-3xl font-bold text-summi-gray-900">
+            Crie sua conta
+          </h2>
+          <p className="mt-2 text-sm text-summi-gray-600">
+            Ou{' '}
+            <Link to="/login" className="font-medium text-summi-blue hover:underline">
+              faça login na sua conta existente
+            </Link>
+          </p>
         </div>
 
-        <Card className="shadow-lg border-0">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-summi-gray-900">
-              {step === 1 ? 'Crie sua conta 🚀' : 'Quase pronto! ✨'}
-            </CardTitle>
-            <p className="text-summi-gray-600">
-              {step === 1 
-                ? 'Comece seu teste grátis de 14 dias' 
-                : 'Informações adicionais (opcional)'
-              }
-            </p>
-            
-            {/* Progress Indicator */}
-            <div className="flex justify-center mt-4">
-              <div className="flex space-x-2">
-                <div className={`w-3 h-3 rounded-full ${step >= 1 ? 'bg-summi-blue' : 'bg-summi-gray-300'}`} />
-                <div className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-summi-blue' : 'bg-summi-gray-300'}`} />
-              </div>
-            </div>
+        {/* Form */}
+        <Card className="card-hover">
+          <CardHeader>
+            <CardTitle className="text-center">Cadastro Gratuito</CardTitle>
           </CardHeader>
-          
           <CardContent>
-            {step === 1 ? (
-              <form onSubmit={handleStep1Submit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Nome completo *</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Ana Silva"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="mt-1"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="email">E-mail corporativo *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="ana@empresa.com"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="mt-1"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="password">Senha *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    className="mt-1"
-                    required
-                  />
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="name">Nome completo</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  placeholder="Seu nome"
+                  className={`mt-1 ${errors.name ? 'border-red-500' : ''}`}
+                />
+                {errors.name && (
+                  <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+                )}
+              </div>
 
-                <div>
-                  <Label htmlFor="confirmPassword">Confirmar senha *</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Digite a senha novamente"
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    className="mt-1"
-                    required
-                  />
-                </div>
+              <div>
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  placeholder="seu@email.com"
+                  className={`mt-1 ${errors.email ? 'border-red-500' : ''}`}
+                />
+                {errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                )}
+              </div>
 
-                <Button type="submit" className="w-full btn-primary">
-                  Continuar →
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={handleFinalSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="company">Nome da empresa</Label>
-                  <Input
-                    id="company"
-                    type="text"
-                    placeholder="Sua Empresa Ltda"
-                    value={formData.company}
-                    onChange={(e) => handleInputChange('company', e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="(11) 99999-9999"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
+              <div>
+                <Label htmlFor="password">Senha</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  placeholder="••••••••"
+                  className={`mt-1 ${errors.password ? 'border-red-500' : ''}`}
+                />
+                {errors.password && (
+                  <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+                )}
+              </div>
 
-                <div className="flex space-x-3">
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => setStep(1)}
-                    className="flex-1"
-                  >
-                    ← Voltar
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    className="flex-1 btn-success"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>Criando...</span>
-                      </div>
-                    ) : (
-                      'Criar conta 🎉'
-                    )}
-                  </Button>
-                </div>
-              </form>
-            )}
+              <div>
+                <Label htmlFor="confirmPassword">Confirmar senha</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                  placeholder="••••••••"
+                  className={`mt-1 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                />
+                {errors.confirmPassword && (
+                  <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
+                )}
+              </div>
 
-            <div className="mt-6 text-center">
-              <p className="text-summi-gray-600">
-                Já tem uma conta?{' '}
-                <Link to="/login" className="text-summi-blue hover:text-summi-blue-dark font-medium">
-                  Faça login
-                </Link>
-              </p>
-            </div>
+              <Button
+                type="submit"
+                className="btn-primary w-full"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Criando conta...' : 'Criar conta'}
+              </Button>
+            </form>
           </CardContent>
         </Card>
-
-        <div className="mt-6 text-center text-sm text-summi-gray-600">
-          ✅ Teste grátis por 14 dias • ✅ Sem cartão de crédito • ✅ Cancele quando quiser
-        </div>
       </div>
     </div>
   );
