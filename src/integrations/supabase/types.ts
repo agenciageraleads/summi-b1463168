@@ -52,6 +52,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          instance_name: string | null
           nome: string
           numero: string | null
           resume_audio: boolean | null
@@ -65,6 +66,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id: string
+          instance_name?: string | null
           nome: string
           numero?: string | null
           resume_audio?: boolean | null
@@ -78,6 +80,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          instance_name?: string | null
           nome?: string
           numero?: string | null
           resume_audio?: boolean | null

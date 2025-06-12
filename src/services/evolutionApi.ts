@@ -10,7 +10,9 @@ export interface InstanceStatus {
 }
 
 export interface QRCodeResponse {
-  base64: string;
+  base64?: string;
+  code?: string;
+  pairingCode?: string;
 }
 
 export class EvolutionApiService {
@@ -18,6 +20,13 @@ export class EvolutionApiService {
     'Content-Type': 'application/json',
     'apikey': GLOBAL_API_KEY
   };
+
+  // Gerar nome da instância padronizado
+  static generateInstanceName(nome: string, numero: string): string {
+    const cleanNome = nome.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const last4Digits = numero.slice(-4);
+    return `${cleanNome}_${last4Digits}`;
+  }
 
   // 1. Verificar se há instância
   static async checkInstance(instanceName: string): Promise<boolean> {
@@ -32,6 +41,7 @@ export class EvolutionApiService {
       }
       
       const data = await response.json();
+      console.log('Check instance response:', data);
       return data && data.length > 0;
     } catch (error) {
       console.error('Error checking instance:', error);
@@ -61,15 +71,19 @@ export class EvolutionApiService {
         sync_full_history: true
       };
 
+      console.log('Creating instance with payload:', payload);
+
       const response = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
         method: 'POST',
         headers: this.headers,
         body: JSON.stringify(payload)
       });
 
+      const responseData = await response.json();
+      console.log('Create instance response:', responseData);
+
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error creating instance:', errorText);
+        console.error('Error creating instance:', responseData);
         return false;
       }
 
@@ -83,10 +97,14 @@ export class EvolutionApiService {
   // 3. Reiniciar o socket da instância
   static async restartInstance(instanceName: string): Promise<boolean> {
     try {
+      console.log('Restarting instance:', instanceName);
       const response = await fetch(`${EVOLUTION_API_URL}/instance/restart/${instanceName}`, {
         method: 'PUT',
         headers: this.headers
       });
+
+      const responseData = await response.json();
+      console.log('Restart instance response:', responseData);
 
       return response.ok;
     } catch (error) {
@@ -98,17 +116,30 @@ export class EvolutionApiService {
   // 4. Gerar QR Code
   static async generateQRCode(instanceName: string): Promise<string | null> {
     try {
+      console.log('Generating QR code for instance:', instanceName);
       const response = await fetch(`${EVOLUTION_API_URL}/instance/connect/${instanceName}`, {
         method: 'GET',
         headers: this.headers
       });
 
+      const responseData: QRCodeResponse = await response.json();
+      console.log('QR Code response:', responseData);
+
       if (!response.ok) {
+        console.error('QR Code request failed:', responseData);
         return null;
       }
 
-      const data: QRCodeResponse = await response.json();
-      return data.base64;
+      // Verificar diferentes possíveis campos de retorno
+      const qrCode = responseData.base64 || responseData.code || responseData.pairingCode;
+      
+      if (!qrCode) {
+        console.error('No QR code found in response:', responseData);
+        return null;
+      }
+
+      console.log('QR Code generated successfully, length:', qrCode.length);
+      return qrCode;
     } catch (error) {
       console.error('Error generating QR code:', error);
       return null;
@@ -127,10 +158,31 @@ export class EvolutionApiService {
         return null;
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log('Instance status:', data);
+      return data;
     } catch (error) {
       console.error('Error getting instance status:', error);
       return null;
+    }
+  }
+
+  // Deletar instância
+  static async deleteInstance(instanceName: string): Promise<boolean> {
+    try {
+      console.log('Deleting instance:', instanceName);
+      const response = await fetch(`${EVOLUTION_API_URL}/instance/delete/${instanceName}`, {
+        method: 'DELETE',
+        headers: this.headers
+      });
+
+      const responseData = await response.json();
+      console.log('Delete instance response:', responseData);
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error deleting instance:', error);
+      return false;
     }
   }
 
@@ -152,7 +204,7 @@ export class EvolutionApiService {
       }
 
       // Aguardar um pouco antes de gerar o QR Code
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       console.log('3. Gerando QR Code...');
       const qrCode = await this.generateQRCode(instanceName);

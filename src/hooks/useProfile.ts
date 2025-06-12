@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { EvolutionApiService } from '@/services/evolutionApi';
 
 export interface Profile {
   id: string;
   nome: string;
   numero: string | null;
+  instance_name: string | null;
   transcreve_audio_recebido: boolean;
   transcreve_audio_enviado: boolean;
   resume_audio: boolean;
@@ -59,6 +61,16 @@ export const useProfile = () => {
     if (!user || !profile) return { error: 'Usuário não autenticado' };
 
     try {
+      // Se nome ou número foram atualizados, gerar novo instance_name
+      if (updates.nome || updates.numero) {
+        const nome = updates.nome || profile.nome;
+        const numero = updates.numero || profile.numero;
+        
+        if (nome && numero && numero.length >= 4) {
+          updates.instance_name = EvolutionApiService.generateInstanceName(nome, numero);
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update(updates)
@@ -88,6 +100,61 @@ export const useProfile = () => {
     }
   };
 
+  const deleteAccount = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!user || !profile) return { success: false, error: 'Usuário não autenticado' };
+
+    try {
+      // Deletar instância do WhatsApp se existir
+      if (profile.instance_name) {
+        console.log('Deletando instância:', profile.instance_name);
+        await EvolutionApiService.deleteInstance(profile.instance_name);
+      }
+
+      // Deletar chats do usuário
+      const { error: chatsError } = await supabase
+        .from('chats')
+        .delete()
+        .eq('id_usuario', user.id);
+
+      if (chatsError) {
+        console.error('Erro ao deletar chats:', chatsError);
+      }
+
+      // Deletar perfil
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+
+      if (profileError) {
+        console.error('Erro ao deletar perfil:', profileError);
+        return { success: false, error: profileError.message };
+      }
+
+      // Deletar usuário da autenticação
+      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+
+      if (authError) {
+        console.error('Erro ao deletar usuário:', authError);
+        // Mesmo com erro na exclusão do auth, consideramos sucesso se o perfil foi deletado
+      }
+
+      // Fazer logout
+      await supabase.auth.signOut();
+
+      toast({
+        title: "Conta deletada",
+        description: "Sua conta foi deletada com sucesso",
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao deletar conta:', error);
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      return { success: false, error: message };
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
   }, [user]);
@@ -96,6 +163,7 @@ export const useProfile = () => {
     profile,
     isLoading,
     updateProfile,
+    deleteAccount,
     refetch: fetchProfile,
   };
 };

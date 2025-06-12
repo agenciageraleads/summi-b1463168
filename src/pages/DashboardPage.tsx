@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,15 +18,18 @@ const DashboardPage = () => {
   const [instanceName, setInstanceName] = useState<string>('');
 
   useEffect(() => {
-    if (user) {
-      const userInstanceName = `summi_${user.id.replace(/-/g, '_')}`;
-      setInstanceName(userInstanceName);
-      checkConnectionStatus(userInstanceName);
+    if (profile && profile.nome && profile.numero) {
+      const generatedInstanceName = EvolutionApiService.generateInstanceName(profile.nome, profile.numero);
+      setInstanceName(generatedInstanceName);
+      checkConnectionStatus(generatedInstanceName);
+    } else if (profile && (!profile.nome || !profile.numero)) {
+      setConnectionStatus('need_number');
     }
-  }, [user]);
+  }, [profile]);
 
   const checkConnectionStatus = async (instanceName: string) => {
     try {
+      console.log('Verificando status da instância:', instanceName);
       const status = await EvolutionApiService.getInstanceStatus(instanceName);
       if (status && status.instance.status === 'open') {
         setConnectionStatus('connected');
@@ -36,17 +38,18 @@ const DashboardPage = () => {
         setConnectionStatus('disconnected');
       }
     } catch (error) {
+      console.error('Erro ao verificar status:', error);
       setConnectionStatus('disconnected');
     }
   };
 
   const handleConnect = async () => {
-    // Verificar se o usuário tem número cadastrado
-    if (!profile?.numero || profile.numero.trim() === '') {
+    // Verificar se o usuário tem nome e número cadastrados
+    if (!profile?.nome || !profile?.numero || profile.numero.trim() === '') {
       setConnectionStatus('need_number');
       toast({
-        title: "Número necessário",
-        description: "Por favor, cadastre seu número do WhatsApp nas configurações antes de conectar.",
+        title: "Informações necessárias",
+        description: "Por favor, cadastre seu nome e número do WhatsApp nas configurações antes de conectar.",
         variant: "destructive",
       });
       return;
@@ -55,8 +58,11 @@ const DashboardPage = () => {
     setConnectionStatus('loading');
     setQrCode(null);
     
+    const currentInstanceName = EvolutionApiService.generateInstanceName(profile.nome, profile.numero);
+    
     try {
-      const result = await EvolutionApiService.connectWhatsApp(instanceName, profile.numero);
+      console.log('Iniciando conexão para instância:', currentInstanceName);
+      const result = await EvolutionApiService.connectWhatsApp(currentInstanceName, profile.numero);
       
       if (result.success && result.qrCode) {
         setQrCode(result.qrCode);
@@ -132,7 +138,7 @@ const DashboardPage = () => {
               }`}>
                 {connectionStatus === 'connected' ? 'Conectado' : 
                  connectionStatus === 'loading' ? 'Conectando...' : 
-                 connectionStatus === 'need_number' ? 'Número necessário' :
+                 connectionStatus === 'need_number' ? 'Informações necessárias' :
                  'Desconectado'}
               </div>
             </CardTitle>
@@ -141,7 +147,7 @@ const DashboardPage = () => {
             {connectionStatus === 'need_number' && (
               <div className="text-center space-y-4">
                 <p className="text-muted-foreground">
-                  Para conectar seu WhatsApp, você precisa cadastrar seu número nas configurações.
+                  Para conectar seu WhatsApp, você precisa cadastrar seu nome e número nas configurações.
                 </p>
                 <Button 
                   onClick={() => window.location.href = '/settings'}
@@ -152,10 +158,13 @@ const DashboardPage = () => {
               </div>
             )}
 
-            {connectionStatus === 'disconnected' && profile?.numero && (
+            {connectionStatus === 'disconnected' && profile?.nome && profile?.numero && (
               <div className="text-center space-y-4">
                 <p className="text-muted-foreground">
                   Sua instância do WhatsApp não está conectada. Clique no botão abaixo para conectar.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Instância: {instanceName}
                 </p>
                 <Button 
                   onClick={handleConnect}
@@ -180,7 +189,7 @@ const DashboardPage = () => {
                 </p>
                 <div className="flex justify-center">
                   <img 
-                    src={`data:image/png;base64,${qrCode}`} 
+                    src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`} 
                     alt="QR Code WhatsApp" 
                     className="max-w-xs border rounded-lg"
                   />
@@ -201,6 +210,9 @@ const DashboardPage = () => {
                 </p>
                 <p className="text-muted-foreground">
                   Sua instância está ativa e pronta para receber mensagens.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Instância: {instanceName}
                 </p>
               </div>
             )}
