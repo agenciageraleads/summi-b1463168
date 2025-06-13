@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -151,14 +150,24 @@ async function createInstanceAtomically(apiUrl: string, apiKey: string, userData
   let createdInstanceName = null;
 
   try {
-    // 1. Criar a instância
-    logStep("Step 1: Creating instance", { instanceName });
+    // 1. Criar a instância com webhook incluído no payload
+    logStep("Step 1: Creating instance with webhook", { instanceName });
     
     const createPayload = {
       instanceName,
       token: apiKey,
       qrcode: true,
-      integration: "WHATSAPP-BAILEYS"
+      integration: "WHATSAPP-BAILEYS",
+      webhook: {
+        url: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
+        byEvents: true,
+        base64: true,
+        headers: {
+          authorization: apiKey,
+          "Content-Type": "application/json"
+        },
+        events: ["MESSAGES_UPSERT"]
+      }
     };
 
     const createResponse = await fetch(`${apiUrl}/instance/create`, {
@@ -178,50 +187,9 @@ async function createInstanceAtomically(apiUrl: string, apiKey: string, userData
 
     const createData = await createResponse.json();
     createdInstanceName = createData.instance?.instanceName || instanceName;
-    logStep("Step 1: Instance created successfully", { createdInstanceName });
+    logStep("Step 1: Instance created successfully with webhook", { createdInstanceName });
 
-    // 2. Configurar webhook
-    logStep("Step 2: Configuring webhook", { instanceName: createdInstanceName });
-    
-    const webhookPayload = {
-      enabled: true,
-      url: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
-      webhookByEvents: true,
-      webhookBase64: true,
-      events: ["MESSAGES_UPSERT"]
-    };
-
-    const webhookResponse = await fetch(`${apiUrl}/webhook/set/${createdInstanceName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': apiKey
-      },
-      body: JSON.stringify(webhookPayload)
-    });
-
-    if (!webhookResponse.ok) {
-      const errorText = await webhookResponse.text();
-      logStep("ERROR: Webhook configuration failed", { status: webhookResponse.status, error: errorText });
-      
-      // ROLLBACK: Deletar a instância criada
-      logStep("Step 3: Rolling back - deleting created instance", { instanceName: createdInstanceName });
-      try {
-        await fetch(`${apiUrl}/instance/delete/${createdInstanceName}`, {
-          method: 'DELETE',
-          headers: { 'apikey': apiKey }
-        });
-        logStep("Rollback completed successfully");
-      } catch (rollbackError) {
-        logStep("WARNING: Rollback failed", { error: rollbackError });
-      }
-      
-      throw new Error(`Failed to configure webhook: ${webhookResponse.status} - ${errorText}`);
-    }
-
-    logStep("Step 2: Webhook configured successfully");
-
-    // 3. Atualizar o perfil do usuário
+    // 2. Atualizar o perfil do usuário
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ 
@@ -240,7 +208,7 @@ async function createInstanceAtomically(apiUrl: string, apiKey: string, userData
       success: true,
       state: 'needs_qr_code',
       instanceName: createdInstanceName,
-      message: 'Instância criada. Gere o QR Code para conectar.'
+      message: 'Instância criada com webhook configurado. Gere o QR Code para conectar.'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -249,6 +217,20 @@ async function createInstanceAtomically(apiUrl: string, apiKey: string, userData
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("FATAL ERROR in atomic creation", { message: errorMessage, instanceName: createdInstanceName });
+    
+    // ROLLBACK: Deletar a instância criada se algo deu errado
+    if (createdInstanceName) {
+      logStep("Step 3: Rolling back - deleting created instance", { instanceName: createdInstanceName });
+      try {
+        await fetch(`${apiUrl}/instance/delete/${createdInstanceName}`, {
+          method: 'DELETE',
+          headers: { 'apikey': apiKey }
+        });
+        logStep("Rollback completed successfully");
+      } catch (rollbackError) {
+        logStep("WARNING: Rollback failed", { error: rollbackError });
+      }
+    }
     
     return new Response(JSON.stringify({
       success: false,
