@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -35,7 +36,7 @@ serve(async (req) => {
     const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
     const authHeader = req.headers.get("Authorization");
     
-    // Verificar autenticação para algumas ações
+    // Verificar autenticação para todas as ações
     let userData = null;
     if (authHeader) {
       const token = authHeader.replace("Bearer ", "");
@@ -45,24 +46,22 @@ serve(async (req) => {
       }
     }
 
+    if (!userData) {
+      throw new Error("User not authenticated");
+    }
+
     const { action, instanceName, ...params } = await req.json();
     logStep("Action requested", { action, instanceName });
 
     switch (action) {
-      case 'create':
-        return await handleCreateInstanceWithWebhook(cleanApiUrl, evolutionApiKey, instanceName, userData, supabaseClient);
+      case 'initialize-connection':
+        return await handleInitializeConnection(cleanApiUrl, evolutionApiKey, userData, supabaseClient);
       
       case 'get-qrcode':
         return await handleGetQRCode(cleanApiUrl, evolutionApiKey, instanceName);
       
-      case 'get-status':
-        return await handleGetStatus(cleanApiUrl, evolutionApiKey, instanceName);
-      
-      case 'logout':
-        return await handleLogout(cleanApiUrl, evolutionApiKey, instanceName, userData, supabaseClient);
-      
-      case 'delete':
-        return await handleDeleteInstance(cleanApiUrl, evolutionApiKey, instanceName, userData, supabaseClient);
+      case 'disconnect':
+        return await handleDisconnect(cleanApiUrl, evolutionApiKey, userData, supabaseClient);
       
       default:
         throw new Error(`Unknown action: ${action}`);
@@ -81,15 +80,79 @@ serve(async (req) => {
   }
 });
 
-// TAREFA 1: Função atômica para criar instância E configurar webhook
-async function handleCreateInstanceWithWebhook(apiUrl: string, apiKey: string, instanceName: string, userData: any, supabase: any) {
-  logStep("Starting atomic instance creation with webhook", { instanceName });
+// FUNÇÃO PRINCIPAL: Inicializar conexão com lógica de estados inteligente
+async function handleInitializeConnection(apiUrl: string, apiKey: string, userData: any, supabase: any) {
+  logStep("Starting initialize-connection flow", { userId: userData.id });
 
+  try {
+    // Passo 1.0: Verificar estado atual do usuário no banco
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userData.id)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      throw new Error(`Failed to get user profile: ${profileError.message}`);
+    }
+
+    if (!profile) {
+      throw new Error("User profile not found");
+    }
+
+    const hasInstanceName = profile.instance_name && profile.instance_name.trim() !== '';
+    logStep("Profile state analyzed", { 
+      hasInstanceName, 
+      instanceName: profile.instance_name,
+      numero: profile.numero 
+    });
+
+    // Verificar se tem número de telefone configurado
+    if (!profile.numero) {
+      return new Response(JSON.stringify({
+        success: true,
+        state: 'needs_phone_number',
+        message: 'Configure seu número de telefone primeiro'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // CENÁRIO A: Nenhuma instância registrada (novo usuário)
+    if (!hasInstanceName) {
+      logStep("SCENARIO A: New user - creating instance atomically");
+      return await createInstanceAtomically(apiUrl, apiKey, userData, supabase);
+    }
+
+    // CENÁRIO B: Instância já registrada - verificar estado
+    logStep("SCENARIO B: Existing instance - checking state", { instanceName: profile.instance_name });
+    return await checkExistingInstanceState(apiUrl, apiKey, profile.instance_name, userData, supabase);
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR in initialize-connection", { message: errorMessage });
+    return new Response(JSON.stringify({
+      success: false,
+      error: errorMessage,
+      state: 'error'
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+}
+
+// CENÁRIO A: Criar instância atomicamente (nova)
+async function createInstanceAtomically(apiUrl: string, apiKey: string, userData: any, supabase: any) {
+  logStep("Creating instance atomically for new user");
+
+  const instanceName = `${userData.email?.split('@')[0] || 'user'}_${Date.now()}`.replace(/[^a-zA-Z0-9_]/g, '');
   let createdInstanceName = null;
 
   try {
-    // ETAPA 1.1: Criar a instância
-    logStep("Step 1.1: Creating instance", { instanceName });
+    // 1. Criar a instância
+    logStep("Step 1: Creating instance", { instanceName });
     
     const createPayload = {
       instanceName,
@@ -109,16 +172,16 @@ async function handleCreateInstanceWithWebhook(apiUrl: string, apiKey: string, i
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
-      logStep("ERROR in Step 1.1: Instance creation failed", { status: createResponse.status, error: errorText });
+      logStep("ERROR: Instance creation failed", { status: createResponse.status, error: errorText });
       throw new Error(`Failed to create instance: ${createResponse.status} - ${errorText}`);
     }
 
     const createData = await createResponse.json();
     createdInstanceName = createData.instance?.instanceName || instanceName;
-    logStep("Step 1.1: Instance created successfully", { createdInstanceName });
+    logStep("Step 1: Instance created successfully", { createdInstanceName });
 
-    // ETAPA 1.2: Configurar webhook (usando o endpoint exato especificado)
-    logStep("Step 1.2: Configuring webhook", { instanceName: createdInstanceName });
+    // 2. Configurar webhook
+    logStep("Step 2: Configuring webhook", { instanceName: createdInstanceName });
     
     const webhookPayload = {
       enabled: true,
@@ -139,10 +202,10 @@ async function handleCreateInstanceWithWebhook(apiUrl: string, apiKey: string, i
 
     if (!webhookResponse.ok) {
       const errorText = await webhookResponse.text();
-      logStep("ERROR in Step 1.2: Webhook configuration failed", { status: webhookResponse.status, error: errorText });
+      logStep("ERROR: Webhook configuration failed", { status: webhookResponse.status, error: errorText });
       
-      // ETAPA 1.3: Rollback - deletar a instância criada
-      logStep("Step 1.3: Rolling back - deleting created instance", { instanceName: createdInstanceName });
+      // ROLLBACK: Deletar a instância criada
+      logStep("Step 3: Rolling back - deleting created instance", { instanceName: createdInstanceName });
       try {
         await fetch(`${apiUrl}/instance/delete/${createdInstanceName}`, {
           method: 'DELETE',
@@ -156,33 +219,28 @@ async function handleCreateInstanceWithWebhook(apiUrl: string, apiKey: string, i
       throw new Error(`Failed to configure webhook: ${webhookResponse.status} - ${errorText}`);
     }
 
-    const webhookData = await webhookResponse.json();
-    logStep("Step 1.2: Webhook configured successfully", webhookData);
+    logStep("Step 2: Webhook configured successfully");
 
-    // Atualizar o perfil do usuário com o nome da instância
-    if (userData) {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          instance_name: createdInstanceName,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userData.id);
+    // 3. Atualizar o perfil do usuário
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ 
+        instance_name: createdInstanceName,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userData.id);
 
-      if (updateError) {
-        logStep("WARNING: Failed to update user profile", updateError);
-      } else {
-        logStep("User profile updated successfully");
-      }
+    if (updateError) {
+      logStep("WARNING: Failed to update user profile", updateError);
+    } else {
+      logStep("User profile updated successfully");
     }
-
-    logStep("Atomic operation completed successfully", { instanceName: createdInstanceName });
 
     return new Response(JSON.stringify({
       success: true,
+      state: 'needs_qr_code',
       instanceName: createdInstanceName,
-      status: createData.instance?.status || 'created',
-      webhookConfigured: true
+      message: 'Instância criada. Gere o QR Code para conectar.'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -190,12 +248,12 @@ async function handleCreateInstanceWithWebhook(apiUrl: string, apiKey: string, i
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("FATAL ERROR in atomic operation", { message: errorMessage, instanceName: createdInstanceName });
+    logStep("FATAL ERROR in atomic creation", { message: errorMessage, instanceName: createdInstanceName });
     
     return new Response(JSON.stringify({
       success: false,
       error: errorMessage,
-      instanceName: createdInstanceName
+      state: 'error'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
@@ -203,155 +261,223 @@ async function handleCreateInstanceWithWebhook(apiUrl: string, apiKey: string, i
   }
 }
 
+// CENÁRIO B: Verificar estado de instância existente
+async function checkExistingInstanceState(apiUrl: string, apiKey: string, instanceName: string, userData: any, supabase: any) {
+  logStep("Checking existing instance state", { instanceName });
+
+  try {
+    // 1. Verificar estado na Evolution API
+    const statusResponse = await fetch(`${apiUrl}/instance/connectionState/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    let connectionState = 'DISCONNECTED';
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      connectionState = statusData.instance?.state || statusData.state || 'DISCONNECTED';
+      logStep("Instance state retrieved", { connectionState });
+    } else {
+      logStep("Failed to get instance state, assuming DISCONNECTED", { status: statusResponse.status });
+    }
+
+    // 2. Verificar e corrigir webhook se necessário
+    await ensureWebhookConfigured(apiUrl, apiKey, instanceName);
+
+    // 3. Retornar estado baseado na conexão
+    switch (connectionState.toUpperCase()) {
+      case 'OPEN':
+      case 'CONNECTED':
+        return new Response(JSON.stringify({
+          success: true,
+          state: 'already_connected',
+          instanceName,
+          message: 'WhatsApp já está conectado'
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+
+      case 'CONNECTING':
+        return new Response(JSON.stringify({
+          success: true,
+          state: 'is_connecting',
+          instanceName,
+          message: 'WhatsApp está conectando...'
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+
+      default:
+        return new Response(JSON.stringify({
+          success: true,
+          state: 'needs_qr_code',
+          instanceName,
+          message: 'Instância existe. Gere o QR Code para reconectar.'
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+    }
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR checking existing instance", { message: errorMessage });
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: errorMessage,
+      state: 'error'
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+}
+
+// Garantir que o webhook está configurado corretamente
+async function ensureWebhookConfigured(apiUrl: string, apiKey: string, instanceName: string) {
+  logStep("Ensuring webhook is configured", { instanceName });
+
+  try {
+    const webhookPayload = {
+      enabled: true,
+      url: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
+      webhookByEvents: true,
+      webhookBase64: true,
+      events: ["MESSAGES_UPSERT"]
+    };
+
+    const webhookResponse = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': apiKey
+      },
+      body: JSON.stringify(webhookPayload)
+    });
+
+    if (webhookResponse.ok) {
+      logStep("Webhook configured/verified successfully");
+    } else {
+      logStep("WARNING: Failed to configure webhook", { status: webhookResponse.status });
+    }
+  } catch (error) {
+    logStep("WARNING: Error configuring webhook", { error });
+  }
+}
+
 // Função para obter QR Code
 async function handleGetQRCode(apiUrl: string, apiKey: string, instanceName: string) {
   logStep("Getting QR Code", { instanceName });
 
-  const response = await fetch(`${apiUrl}/instance/connect/${instanceName}`, {
-    method: 'GET',
-    headers: {
-      'apikey': apiKey,
-      'Content-Type': 'application/json'
+  try {
+    const response = await fetch(`${apiUrl}/instance/connect/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logStep("Error getting QR Code", { status: response.status, error: errorText });
+      throw new Error(`Failed to get QR Code: ${response.status} - ${errorText}`);
     }
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    logStep("Error getting QR Code", { status: response.status, error: errorText });
-    throw new Error(`Failed to get QR Code: ${response.status} - ${errorText}`);
-  }
+    const data = await response.json();
+    logStep("QR Code response received");
 
-  const data = await response.json();
-  logStep("QR Code response", data);
-
-  // Extrair QR Code corretamente
-  let qrCodeData = null;
-  if (data.qrcode?.base64) {
-    qrCodeData = data.qrcode.base64;
-  } else if (data.qrcode?.code) {
-    qrCodeData = data.qrcode.code;
-  } else if (data.base64) {
-    qrCodeData = data.base64;
-  } else if (data.code) {
-    qrCodeData = data.code;
-  }
-
-  if (!qrCodeData) {
-    throw new Error('QR Code not found in API response');
-  }
-
-  // Garantir formato correto do QR Code
-  if (!qrCodeData.startsWith('data:image/')) {
-    qrCodeData = `data:image/png;base64,${qrCodeData}`;
-  }
-
-  return new Response(JSON.stringify({
-    success: true,
-    qrCode: qrCodeData
-  }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200,
-  });
-}
-
-// Função para verificar status da conexão
-async function handleGetStatus(apiUrl: string, apiKey: string, instanceName: string) {
-  logStep("Checking connection status", { instanceName });
-
-  const response = await fetch(`${apiUrl}/instance/connectionState/${instanceName}`, {
-    method: 'GET',
-    headers: {
-      'apikey': apiKey,
-      'Content-Type': 'application/json'
+    // Extrair QR Code corretamente
+    let qrCodeData = null;
+    if (data.qrcode?.base64) {
+      qrCodeData = data.qrcode.base64;
+    } else if (data.qrcode?.code) {
+      qrCodeData = data.qrcode.code;
+    } else if (data.base64) {
+      qrCodeData = data.base64;
+    } else if (data.code) {
+      qrCodeData = data.code;
     }
-  });
 
-  if (!response.ok) {
-    logStep("Error checking status, returning disconnected", { status: response.status });
+    if (!qrCodeData) {
+      throw new Error('QR Code not found in API response');
+    }
+
+    // Garantir formato correto do QR Code
+    if (!qrCodeData.startsWith('data:image/')) {
+      qrCodeData = `data:image/png;base64,${qrCodeData}`;
+    }
+
     return new Response(JSON.stringify({
       success: true,
-      status: 'DISCONNECTED'
+      qrCode: qrCodeData
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR getting QR Code", { message: errorMessage });
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: errorMessage 
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
-
-  const data = await response.json();
-  logStep("Status response", data);
-
-  const status = data.instance?.state || data.state || 'DISCONNECTED';
-  const normalizedStatus = status.toUpperCase();
-
-  return new Response(JSON.stringify({
-    success: true,
-    status: normalizedStatus
-  }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200,
-  });
 }
 
-// Função para fazer logout/desconectar
-async function handleLogout(apiUrl: string, apiKey: string, instanceName: string, userData: any, supabase: any) {
-  logStep("Logging out instance", { instanceName });
+// Função para desconectar e remover instância
+async function handleDisconnect(apiUrl: string, apiKey: string, userData: any, supabase: any) {
+  logStep("Starting disconnect flow", { userId: userData.id });
 
-  const response = await fetch(`${apiUrl}/instance/logout/${instanceName}`, {
-    method: 'DELETE',
-    headers: {
-      'apikey': apiKey,
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    logStep("Error during logout", { status: response.status, error: errorText });
-    // Não falhar se o logout der erro, pode ser que já esteja desconectado
-  }
-
-  // Atualizar status no banco
-  if (userData) {
-    const { error: updateError } = await supabase
+  try {
+    // 1. Obter dados do usuário
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .update({ 
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userData.id);
+      .select('instance_name')
+      .eq('id', userData.id)
+      .single();
 
-    if (updateError) {
-      logStep("Error updating user profile after logout", updateError);
+    if (profileError || !profile?.instance_name) {
+      logStep("No instance to disconnect");
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Nenhuma instância para desconectar'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
-  }
 
-  return new Response(JSON.stringify({
-    success: true,
-    message: 'Instance logged out successfully'
-  }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200,
-  });
-}
+    const instanceName = profile.instance_name;
+    logStep("Disconnecting instance", { instanceName });
 
-// Função para deletar instância
-async function handleDeleteInstance(apiUrl: string, apiKey: string, instanceName: string, userData: any, supabase: any) {
-  logStep("Deleting instance", { instanceName });
+    // 2. Deletar instância na Evolution API
+    const response = await fetch(`${apiUrl}/instance/delete/${instanceName}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': apiKey
+      }
+    });
 
-  const response = await fetch(`${apiUrl}/instance/delete/${instanceName}`, {
-    method: 'DELETE',
-    headers: {
-      'apikey': apiKey
+    if (!response.ok) {
+      const errorText = await response.text();
+      logStep("WARNING: Failed to delete instance", { status: response.status, error: errorText });
+      // Continuar mesmo assim para limpar os dados locais
+    } else {
+      logStep("Instance deleted successfully");
     }
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    logStep("Error deleting instance", { status: response.status, error: errorText });
-    // Não falhar se a deleção der erro
-  }
-
-  // Limpar dados do usuário
-  if (userData) {
+    // 3. Limpar dados no Supabase
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ 
@@ -361,15 +487,29 @@ async function handleDeleteInstance(apiUrl: string, apiKey: string, instanceName
       .eq('id', userData.id);
 
     if (updateError) {
-      logStep("Error updating user profile after delete", updateError);
+      logStep("ERROR updating profile after disconnect", updateError);
+      throw new Error(`Failed to update profile: ${updateError.message}`);
     }
-  }
 
-  return new Response(JSON.stringify({
-    success: true,
-    message: 'Instance deleted successfully'
-  }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200,
-  });
+    logStep("Disconnect completed successfully");
+
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'WhatsApp desconectado com sucesso'
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR in disconnect flow", { message: errorMessage });
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: errorMessage 
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
 }
