@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,20 +34,59 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
   const hasConnectedInstance = Boolean(profile?.instance_name);
   const isPhoneFieldLocked = hasConnectedInstance;
 
-  // Função para formatar número de telefone
+  // Função para formatar número de telefone corrigida
   const formatPhoneNumber = (value: string) => {
+    // Remove todos os caracteres não numéricos
     const numbers = value.replace(/\D/g, '');
     
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 4) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    if (numbers.length <= 9) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 3)} ${numbers.slice(3)}`;
+    // Se não há números, retorna vazio
+    if (!numbers) return '';
     
-    const hasNinthDigit = numbers.length === 13 || numbers.length === 14;
-    if (hasNinthDigit) {
-      return `(${numbers.slice(2, 4)}) ${numbers.slice(4, 5)} ${numbers.slice(5, 9)}-${numbers.slice(9, 13)}`;
-    } else {
-      return `(${numbers.slice(2, 4)}) ${numbers.slice(4, 8)}-${numbers.slice(8, 12)}`;
+    // Remove o código do país 55 se presente para formatação visual
+    const localNumbers = numbers.startsWith('55') ? numbers.slice(2) : numbers;
+    
+    // Aplica a formatação baseada na quantidade de dígitos locais
+    if (localNumbers.length <= 2) {
+      return `(${localNumbers}`;
     }
+    
+    if (localNumbers.length <= 3) {
+      return `(${localNumbers.slice(0, 2)}) ${localNumbers.slice(2)}`;
+    }
+    
+    if (localNumbers.length <= 7) {
+      return `(${localNumbers.slice(0, 2)}) ${localNumbers.slice(2)}`;
+    }
+    
+    // Para números com 8 dígitos (sem 9º dígito)
+    if (localNumbers.length === 10 && localNumbers[2] !== '9') {
+      return `(${localNumbers.slice(0, 2)}) ${localNumbers.slice(2, 6)}-${localNumbers.slice(6)}`;
+    }
+    
+    // Para números com 9 dígitos (com 9º dígito)
+    if (localNumbers.length >= 8) {
+      const ddd = localNumbers.slice(0, 2);
+      const firstDigit = localNumbers.slice(2, 3);
+      const remainingDigits = localNumbers.slice(3);
+      
+      if (firstDigit === '9' && remainingDigits.length >= 4) {
+        // Formato: (XX) 9 XXXX-XXXX
+        if (remainingDigits.length <= 4) {
+          return `(${ddd}) 9 ${remainingDigits}`;
+        } else {
+          return `(${ddd}) 9 ${remainingDigits.slice(0, 4)}-${remainingDigits.slice(4, 8)}`;
+        }
+      } else {
+        // Formato: (XX) XXXX-XXXX (sem 9º dígito)
+        if (remainingDigits.length <= 3) {
+          return `(${ddd}) ${firstDigit}${remainingDigits}`;
+        } else {
+          return `(${ddd}) ${firstDigit}${remainingDigits.slice(0, 3)}-${remainingDigits.slice(3, 7)}`;
+        }
+      }
+    }
+    
+    return `(${localNumbers.slice(0, 2)}) ${localNumbers.slice(2)}`;
   };
 
   // Função para normalizar número (sempre salvar com 55)
@@ -67,8 +105,8 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
     const value = e.target.value;
     const numbers = value.replace(/\D/g, '');
     
-    // Permitir até 14 dígitos (55 + 11 dígitos do celular com 9º dígito)
-    if (numbers.length <= 14) {
+    // Permitir até 13 dígitos (55 + 11 dígitos do celular com 9º dígito)
+    if (numbers.length <= 13) {
       setFormData(prev => ({ ...prev, numero: numbers }));
     }
   };
@@ -76,10 +114,10 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
   const handleSave = async () => {
     // Validar número de telefone
     const phoneNumbers = formData.numero.replace(/\D/g, '');
-    if (phoneNumbers.length < 12 || phoneNumbers.length > 14) {
+    if (phoneNumbers.length < 12 || phoneNumbers.length > 13) {
       toast({
         title: "Erro",
-        description: "Número de telefone deve ter entre 12 e 14 dígitos (incluindo código do país)",
+        description: "Número de telefone deve ter entre 10 e 11 dígitos (sem contar código do país)",
         variant: "destructive",
       });
       return;
