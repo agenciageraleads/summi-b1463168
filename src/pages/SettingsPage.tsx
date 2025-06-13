@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useProfile } from '@/hooks/useProfile';
@@ -51,7 +52,11 @@ const SettingsPage = () => {
         </div>
 
         <div className="grid gap-6">
-          <ProfileForm />
+          <ProfileForm 
+            profile={profile}
+            onSave={handleProfileSave}
+            isUpdating={isUpdating}
+          />
           <PhoneSettingsSection />
           <AccountDeletion />
         </div>

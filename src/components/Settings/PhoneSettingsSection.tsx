@@ -16,7 +16,7 @@ export const PhoneSettingsSection = () => {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   // Verificar se há uma instância conectada
-  const hasConnectedInstance = profile?.instance_name;
+  const hasConnectedInstance = Boolean(profile?.instance_name);
   const isPhoneFieldLocked = hasConnectedInstance;
 
   const handleSavePhone = async () => {
