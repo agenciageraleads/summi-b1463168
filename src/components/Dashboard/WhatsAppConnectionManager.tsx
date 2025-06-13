@@ -50,6 +50,9 @@ export const WhatsAppConnectionManager: React.FC = () => {
     isPolling: false
   });
 
+  // Timer para restart do QR Code
+  const [qrTimer, setQrTimer] = useState<NodeJS.Timeout | null>(null);
+
   // Inicializar conexão automaticamente ao carregar
   useEffect(() => {
     initializeConnectionFlow();
@@ -72,6 +75,12 @@ export const WhatsAppConnectionManager: React.FC = () => {
             message: 'WhatsApp conectado com sucesso!'
           }));
           
+          // Limpar timer se existe
+          if (qrTimer) {
+            clearTimeout(qrTimer);
+            setQrTimer(null);
+          }
+          
           await refreshProfile();
           
           toast({
@@ -85,7 +94,16 @@ export const WhatsAppConnectionManager: React.FC = () => {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [state.isPolling, state.instanceName, state.connectionState, refreshProfile, toast]);
+  }, [state.isPolling, state.instanceName, state.connectionState, refreshProfile, toast, qrTimer]);
+
+  // Limpar timer ao desmontar
+  useEffect(() => {
+    return () => {
+      if (qrTimer) {
+        clearTimeout(qrTimer);
+      }
+    };
+  }, [qrTimer]);
 
   // Função principal: inicializar conexão
   const initializeConnectionFlow = async () => {
@@ -125,7 +143,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
     }
   };
 
-  // Obter QR Code
+  // Obter QR Code com timer de restart
   const handleGetQRCode = async (instanceName: string) => {
     setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
     
@@ -140,6 +158,43 @@ export const WhatsAppConnectionManager: React.FC = () => {
           isPolling: true,
           message: 'Escaneie o QR Code com seu WhatsApp'
         }));
+
+        // Iniciar timer de 30 segundos para restart
+        const timer = setTimeout(async () => {
+          console.log('[WhatsApp Manager] Timer de 30s atingido, verificando se ainda está conectando...');
+          
+          // Verificar se ainda está no estado de conectando
+          if (state.connectionState === 'needs_qr_code') {
+            console.log('[WhatsApp Manager] Ainda conectando, fazendo restart da instância...');
+            
+            try {
+              // Chamar endpoint de restart
+              const restartResponse = await fetch('/api/supabase/functions/evolution-restart-instance', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${(await import('@/integrations/supabase/client')).supabase.auth.getSession().then(s => s.data.session?.access_token)}`,
+                },
+                body: JSON.stringify({ instanceName })
+              });
+
+              if (restartResponse.ok) {
+                console.log('[WhatsApp Manager] Restart realizado com sucesso, gerando novo QR Code...');
+                
+                // Aguardar um pouco e gerar novo QR Code
+                setTimeout(() => {
+                  handleGetQRCode(instanceName);
+                }, 2000);
+              } else {
+                console.error('[WhatsApp Manager] Erro no restart:', restartResponse.status);
+              }
+            } catch (error) {
+              console.error('[WhatsApp Manager] Erro ao fazer restart:', error);
+            }
+          }
+        }, 30000); // 30 segundos
+
+        setQrTimer(timer);
       } else {
         setState(prev => ({
           ...prev,

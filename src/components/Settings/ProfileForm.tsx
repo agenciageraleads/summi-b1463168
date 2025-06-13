@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { disconnectWhatsApp } from '@/services/whatsappService';
-import { AlertCircle, Phone, Unlink, User } from 'lucide-react';
+import { disconnectWhatsApp, checkConnectionStatus } from '@/services/whatsappService';
+import { AlertCircle, Phone, Unlink, User, Loader2 } from 'lucide-react';
 import type { Profile } from '@/hooks/useProfile';
+import { useEffect } from 'react';
 
 interface ProfileFormProps {
   profile: Profile;
@@ -29,10 +30,37 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
     segundos_para_resumir: profile.segundos_para_resumir || 45,
   });
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
 
   // Verificar se há uma instância conectada
   const hasConnectedInstance = Boolean(profile?.instance_name);
-  const isPhoneFieldLocked = hasConnectedInstance;
+  const isConnecting = connectionStatus === 'connecting';
+  const isPhoneFieldLocked = hasConnectedInstance || isConnecting;
+
+  // Verificar status da conexão periodicamente
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (profile?.instance_name) {
+        const status = await checkConnectionStatus(profile.instance_name);
+        if (status === 'open') {
+          setConnectionStatus('connected');
+        } else if (status === 'connecting') {
+          setConnectionStatus('connecting');
+        } else {
+          setConnectionStatus('disconnected');
+        }
+      }
+    };
+
+    checkStatus();
+    
+    // Verificar a cada 4 segundos se tem instância
+    const interval = profile?.instance_name ? setInterval(checkStatus, 4000) : null;
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [profile?.instance_name]);
 
   // Função para formatar número de telefone - corrigida
   const formatPhoneNumber = (value: string) => {
@@ -191,38 +219,54 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
             />
             {isPhoneFieldLocked && (
               <p className="text-sm text-amber-600 mt-1 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                Campo bloqueado: WhatsApp conectado
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    Conectando...
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    Campo bloqueado: WhatsApp conectado
+                  </>
+                )}
               </p>
             )}
           </div>
         </div>
 
         {/* Desconectar WhatsApp se conectado */}
-        {isPhoneFieldLocked && (
+        {(hasConnectedInstance || isConnecting) && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <h4 className="font-medium text-amber-800 mb-1">WhatsApp Conectado</h4>
+            <h4 className="font-medium text-amber-800 mb-1">
+              {isConnecting ? 'WhatsApp Conectando' : 'WhatsApp Conectado'}
+            </h4>
             <p className="text-sm text-amber-700 mb-3">
-              Para alterar o número de telefone, é necessário desconectar o WhatsApp primeiro.
+              {isConnecting 
+                ? 'Conexão em andamento. Para alterar o número, aguarde ou desconecte.'
+                : 'Para alterar o número de telefone, é necessário desconectar o WhatsApp primeiro.'
+              }
             </p>
-            <Button 
-              onClick={handleDisconnectInstance}
-              disabled={isDisconnecting}
-              variant="destructive"
-              size="sm"
-            >
-              {isDisconnecting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Desconectando...
-                </>
-              ) : (
-                <>
-                  <Unlink className="w-4 h-4 mr-2" />
-                  Desconectar WhatsApp
-                </>
-              )}
-            </Button>
+            {!isConnecting && (
+              <Button 
+                onClick={handleDisconnectInstance}
+                disabled={isDisconnecting}
+                variant="destructive"
+                size="sm"
+              >
+                {isDisconnecting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Desconectando...
+                  </>
+                ) : (
+                  <>
+                    <Unlink className="w-4 h-4 mr-2" />
+                    Desconectar WhatsApp
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
 
