@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
-import { PhoneSettingsSection } from '@/components/Settings/PhoneSettingsSection';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 
 const SettingsPage = () => {
@@ -57,7 +56,6 @@ const SettingsPage = () => {
             onSave={handleProfileSave}
             isUpdating={isUpdating}
           />
-          <PhoneSettingsSection />
           <AccountDeletion />
         </div>
       </div>

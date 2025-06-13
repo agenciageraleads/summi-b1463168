@@ -121,7 +121,7 @@ async function handleInitializeConnection(apiUrl: string, apiKey: string, userDa
     // CENÁRIO A: Nenhuma instância registrada (novo usuário)
     if (!hasInstanceName) {
       logStep("SCENARIO A: New user - creating instance atomically");
-      return await createInstanceAtomically(apiUrl, apiKey, userData, supabase);
+      return await createInstanceAtomically(apiUrl, apiKey, userData, supabase, profile);
     }
 
     // CENÁRIO B: Instância já registrada - verificar estado
@@ -142,11 +142,15 @@ async function handleInitializeConnection(apiUrl: string, apiKey: string, userDa
   }
 }
 
-// CENÁRIO A: Criar instância atomicamente (nova)
-async function createInstanceAtomically(apiUrl: string, apiKey: string, userData: any, supabase: any) {
+// CENÁRIO A: Criar instância atomicamente (nova) - Alteração: usar nome + últimos dígitos do telefone
+async function createInstanceAtomically(apiUrl: string, apiKey: string, userData: any, supabase: any, profile: any) {
   logStep("Creating instance atomically for new user");
 
-  const instanceName = `${userData.email?.split('@')[0] || 'user'}_${Date.now()}`.replace(/[^a-zA-Z0-9_]/g, '');
+  // Gerar instanceName usando nome + últimos 4 dígitos do telefone
+  const nome = profile.nome?.toLowerCase().replace(/[^a-zA-Z0-9]/g, '') || 'user';
+  const ultimosDigitos = profile.numero?.slice(-4) || '0000';
+  const instanceName = `${nome}_${ultimosDigitos}`;
+  
   let createdInstanceName = null;
 
   try {

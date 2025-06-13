@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
+import { useNavigate } from 'react-router-dom';
 import { 
   initializeConnection, 
   getQRCode, 
@@ -22,7 +22,8 @@ import {
   Phone,
   CheckCircle,
   AlertCircle,
-  Unlink 
+  Unlink,
+  Settings 
 } from 'lucide-react';
 
 // Estados visuais do componente
@@ -38,6 +39,7 @@ interface ComponentState {
 export const WhatsAppConnectionManager: React.FC = () => {
   const { toast } = useToast();
   const { profile, refreshProfile } = useProfile();
+  const navigate = useNavigate();
   
   const [state, setState] = useState<ComponentState>({
     connectionState: 'needs_phone_number',
@@ -262,9 +264,13 @@ export const WhatsAppConnectionManager: React.FC = () => {
     switch (state.connectionState) {
       case 'needs_phone_number':
         return (
-          <Button variant="outline" size="sm" disabled>
-            <Phone className="w-4 h-4 mr-2" />
-            Configure o telefone primeiro
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate('/settings')}
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Configurar Telefone
           </Button>
         );
 
@@ -332,7 +338,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Phone className="w-4 h-4 text-green-600" />
               <span className="text-sm font-medium text-green-800">
-                Telefone: {profile.numero}
+                Telefone: ({profile.numero.slice(2, 4)}) {profile.numero.length === 13 ? profile.numero.slice(4, 5) + ' ' : ''}{profile.numero.slice(-8)}
               </span>
             </div>
           </div>
