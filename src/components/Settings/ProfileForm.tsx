@@ -34,7 +34,7 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
   const hasConnectedInstance = Boolean(profile?.instance_name);
   const isPhoneFieldLocked = hasConnectedInstance;
 
-  // Função para formatar número de telefone corrigida
+  // Função para formatar número de telefone - corrigida
   const formatPhoneNumber = (value: string) => {
     // Remove todos os caracteres não numéricos
     const numbers = value.replace(/\D/g, '');
@@ -54,34 +54,34 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
       return `(${localNumbers.slice(0, 2)}) ${localNumbers.slice(2)}`;
     }
     
-    if (localNumbers.length <= 7) {
+    if (localNumbers.length <= 6) {
       return `(${localNumbers.slice(0, 2)}) ${localNumbers.slice(2)}`;
     }
     
-    // Para números com 8 dígitos (sem 9º dígito)
+    // Para números com 8 dígitos (sem 9º dígito) - formato: (XX) XXXX-XXXX
     if (localNumbers.length === 10 && localNumbers[2] !== '9') {
       return `(${localNumbers.slice(0, 2)}) ${localNumbers.slice(2, 6)}-${localNumbers.slice(6)}`;
     }
     
-    // Para números com 9 dígitos (com 9º dígito)
-    if (localNumbers.length >= 8) {
+    // Para números com 9 dígitos (começando com 9)
+    if (localNumbers.length >= 7) {
       const ddd = localNumbers.slice(0, 2);
       const firstDigit = localNumbers.slice(2, 3);
       const remainingDigits = localNumbers.slice(3);
       
-      if (firstDigit === '9' && remainingDigits.length >= 4) {
+      if (firstDigit === '9') {
         // Formato: (XX) 9 XXXX-XXXX
         if (remainingDigits.length <= 4) {
           return `(${ddd}) 9 ${remainingDigits}`;
         } else {
-          return `(${ddd}) 9 ${remainingDigits.slice(0, 4)}-${remainingDigits.slice(4, 8)}`;
+          return `(${ddd}) 9 ${remainingDigits.slice(0, 4)}-${remainingDigits.slice(4)}`;
         }
       } else {
         // Formato: (XX) XXXX-XXXX (sem 9º dígito)
         if (remainingDigits.length <= 3) {
           return `(${ddd}) ${firstDigit}${remainingDigits}`;
         } else {
-          return `(${ddd}) ${firstDigit}${remainingDigits.slice(0, 3)}-${remainingDigits.slice(3, 7)}`;
+          return `(${ddd}) ${firstDigit}${remainingDigits.slice(0, 3)}-${remainingDigits.slice(3)}`;
         }
       }
     }
@@ -89,46 +89,37 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
     return `(${localNumbers.slice(0, 2)}) ${localNumbers.slice(2)}`;
   };
 
-  // Função para normalizar número (sempre salvar com 55)
-  const normalizePhoneNumber = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    
-    // Se não começa com 55, adicionar
-    if (!numbers.startsWith('55')) {
-      return '55' + numbers;
-    }
-    
-    return numbers;
-  };
-
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const numbers = value.replace(/\D/g, '');
     
-    // Permitir até 13 dígitos (55 + 11 dígitos do celular com 9º dígito)
-    if (numbers.length <= 13) {
-      setFormData(prev => ({ ...prev, numero: numbers }));
+    // Remove o 55 se presente para armazenar apenas o número local
+    const localNumbers = numbers.startsWith('55') ? numbers.slice(2) : numbers;
+    
+    // Permitir até 11 dígitos locais (DDD + 9 dígitos)
+    if (localNumbers.length <= 11) {
+      setFormData(prev => ({ ...prev, numero: localNumbers }));
     }
   };
 
   const handleSave = async () => {
-    // Validar número de telefone
+    // Validar número de telefone (apenas dígitos locais)
     const phoneNumbers = formData.numero.replace(/\D/g, '');
-    if (phoneNumbers.length < 12 || phoneNumbers.length > 13) {
+    if (phoneNumbers.length < 10 || phoneNumbers.length > 11) {
       toast({
         title: "Erro",
-        description: "Número de telefone deve ter entre 10 e 11 dígitos (sem contar código do país)",
+        description: "Número de telefone deve ter 10 ou 11 dígitos (DDD + número)",
         variant: "destructive",
       });
       return;
     }
 
-    // Normalizar número para salvar no banco
-    const normalizedPhone = normalizePhoneNumber(phoneNumbers);
+    // Sempre adicionar o prefixo 55 ao salvar no backend
+    const phoneWithCountryCode = phoneNumbers.startsWith('55') ? phoneNumbers : '55' + phoneNumbers;
     
     await onSave({
       ...formData,
-      numero: normalizedPhone
+      numero: phoneWithCountryCode
     });
   };
 
