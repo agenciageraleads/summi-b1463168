@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-interface Profile {
+// Exportar a interface Profile para uso em outros componentes
+export interface Profile {
   id: string;
   nome: string;
   numero?: string;
@@ -89,6 +90,41 @@ export const useProfile = () => {
     }
   };
 
+  // Função para deletar a conta do usuário
+  const deleteAccount = async () => {
+    if (!user) return { success: false, error: 'Usuário não autenticado' };
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user-account', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('Erro ao deletar conta:', error);
+        return { success: false, error: error.message };
+      }
+
+      if (!data.success) {
+        return { success: false, error: data.error || 'Erro ao deletar conta' };
+      }
+
+      toast({
+        title: "Conta deletada",
+        description: "Sua conta foi deletada com sucesso",
+      });
+
+      // Fazer logout automático após deletar a conta
+      await supabase.auth.signOut();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erro inesperado ao deletar conta:', error);
+      return { success: false, error: 'Erro inesperado ao deletar conta' };
+    }
+  };
+
   // Função para atualizar/refrescar o perfil
   const refreshProfile = async () => {
     await fetchProfile();
@@ -103,6 +139,7 @@ export const useProfile = () => {
     profile,
     isLoading,
     updateProfile,
+    deleteAccount,
     refreshProfile
   };
 };
