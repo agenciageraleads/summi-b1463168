@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { deleteInstance } from '@/services/evolutionApi';
 
 export interface Profile {
   id: string;
@@ -106,47 +105,31 @@ export const useProfile = () => {
     }
   };
 
+  // TAREFA 3: Nova função de exclusão usando a Edge Function robusta
   const deleteAccount = async (): Promise<{ success: boolean; error?: string }> => {
-    if (!user || !profile) return { success: false, error: 'Usuário não autenticado' };
+    if (!user) return { success: false, error: 'Usuário não autenticado' };
 
     try {
-      // Deletar instância do WhatsApp se existir
-      if (profile.instance_name) {
-        console.log('Deletando instância:', profile.instance_name);
-        await deleteInstance(profile.instance_name);
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        return { success: false, error: 'Sessão não encontrada' };
       }
 
-      // Deletar chats do usuário
-      const { error: chatsError } = await supabase
-        .from('chats')
-        .delete()
-        .eq('id_usuario', user.id);
+      // Chamar a Edge Function robusta para exclusão da conta
+      const { data, error } = await supabase.functions.invoke('delete-user-account', {
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
 
-      if (chatsError) {
-        console.error('Erro ao deletar chats:', chatsError);
+      if (error) {
+        console.error('Erro na Edge Function de exclusão:', error);
+        return { success: false, error: error.message };
       }
 
-      // Deletar perfil
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', user.id);
-
-      if (profileError) {
-        console.error('Erro ao deletar perfil:', profileError);
-        return { success: false, error: profileError.message };
+      if (!data?.success) {
+        return { success: false, error: data?.error || 'Erro na exclusão da conta' };
       }
-
-      // Deletar usuário da autenticação
-      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
-
-      if (authError) {
-        console.error('Erro ao deletar usuário:', authError);
-        // Mesmo com erro na exclusão do auth, consideramos sucesso se o perfil foi deletado
-      }
-
-      // Fazer logout
-      await supabase.auth.signOut();
 
       toast({
         title: "Conta deletada",

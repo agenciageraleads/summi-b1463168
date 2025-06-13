@@ -1,8 +1,8 @@
-
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
+import { PhoneSettingsSection } from '@/components/Settings/PhoneSettingsSection';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 
 const SettingsPage = () => {
@@ -41,25 +41,20 @@ const SettingsPage = () => {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-        {/* Header */}
-        <div>
+        <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground mb-2">
             Configurações ⚙️
           </h1>
           <p className="text-muted-foreground">
-            Gerencie seu perfil e configurações da Summi
+            Gerencie suas preferências e configurações da conta
           </p>
         </div>
 
-        {/* Profile Form */}
-        <ProfileForm 
-          profile={profile}
-          onSave={handleProfileSave}
-          isUpdating={isUpdating}
-        />
-
-        {/* Account Deletion */}
-        <AccountDeletion />
+        <div className="grid gap-6">
+          <ProfileForm />
+          <PhoneSettingsSection />
+          <AccountDeletion />
+        </div>
       </div>
     </DashboardLayout>
   );

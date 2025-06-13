@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -51,7 +50,7 @@ serve(async (req) => {
 
     switch (action) {
       case 'create':
-        return await handleCreateInstance(cleanApiUrl, evolutionApiKey, instanceName, userData, supabaseClient);
+        return await handleCreateInstanceWithWebhook(cleanApiUrl, evolutionApiKey, instanceName, userData, supabaseClient);
       
       case 'get-qrcode':
         return await handleGetQRCode(cleanApiUrl, evolutionApiKey, instanceName);
@@ -82,90 +81,126 @@ serve(async (req) => {
   }
 });
 
-// Função para criar instância e configurar webhook automaticamente
-async function handleCreateInstance(apiUrl: string, apiKey: string, instanceName: string, userData: any, supabase: any) {
-  logStep("Creating instance", { instanceName });
+// TAREFA 1: Função atômica para criar instância E configurar webhook
+async function handleCreateInstanceWithWebhook(apiUrl: string, apiKey: string, instanceName: string, userData: any, supabase: any) {
+  logStep("Starting atomic instance creation with webhook", { instanceName });
 
-  // 1. Criar a instância
-  const createPayload = {
-    instanceName,
-    token: apiKey,
-    qrcode: true,
-    integration: "WHATSAPP-BAILEYS"
-  };
+  let createdInstanceName = null;
 
-  const createResponse = await fetch(`${apiUrl}/instance/create`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': apiKey
-    },
-    body: JSON.stringify(createPayload)
-  });
+  try {
+    // ETAPA 1.1: Criar a instância
+    logStep("Step 1.1: Creating instance", { instanceName });
+    
+    const createPayload = {
+      instanceName,
+      token: apiKey,
+      qrcode: true,
+      integration: "WHATSAPP-BAILEYS"
+    };
 
-  if (!createResponse.ok) {
-    const errorText = await createResponse.text();
-    logStep("Error creating instance", { status: createResponse.status, error: errorText });
-    throw new Error(`Failed to create instance: ${createResponse.status} - ${errorText}`);
-  }
+    const createResponse = await fetch(`${apiUrl}/instance/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': apiKey
+      },
+      body: JSON.stringify(createPayload)
+    });
 
-  const createData = await createResponse.json();
-  logStep("Instance created successfully", createData);
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      logStep("ERROR in Step 1.1: Instance creation failed", { status: createResponse.status, error: errorText });
+      throw new Error(`Failed to create instance: ${createResponse.status} - ${errorText}`);
+    }
 
-  // 2. Configurar webhook automaticamente
-  logStep("Configuring webhook for instance", { instanceName });
-  
-  const webhookPayload = {
-    webhook: {
+    const createData = await createResponse.json();
+    createdInstanceName = createData.instance?.instanceName || instanceName;
+    logStep("Step 1.1: Instance created successfully", { createdInstanceName });
+
+    // ETAPA 1.2: Configurar webhook (usando o endpoint exato especificado)
+    logStep("Step 1.2: Configuring webhook", { instanceName: createdInstanceName });
+    
+    const webhookPayload = {
+      enabled: true,
       url: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
-      by_events: true,
-      base64: true,
+      webhookByEvents: true,
+      webhookBase64: true,
       events: ["MESSAGES_UPSERT"]
+    };
+
+    const webhookResponse = await fetch(`${apiUrl}/webhook/set/${createdInstanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': apiKey
+      },
+      body: JSON.stringify(webhookPayload)
+    });
+
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text();
+      logStep("ERROR in Step 1.2: Webhook configuration failed", { status: webhookResponse.status, error: errorText });
+      
+      // ETAPA 1.3: Rollback - deletar a instância criada
+      logStep("Step 1.3: Rolling back - deleting created instance", { instanceName: createdInstanceName });
+      try {
+        await fetch(`${apiUrl}/instance/delete/${createdInstanceName}`, {
+          method: 'DELETE',
+          headers: { 'apikey': apiKey }
+        });
+        logStep("Rollback completed successfully");
+      } catch (rollbackError) {
+        logStep("WARNING: Rollback failed", { error: rollbackError });
+      }
+      
+      throw new Error(`Failed to configure webhook: ${webhookResponse.status} - ${errorText}`);
     }
-  };
 
-  const webhookResponse = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': apiKey
-    },
-    body: JSON.stringify(webhookPayload)
-  });
-
-  if (!webhookResponse.ok) {
-    const errorText = await webhookResponse.text();
-    logStep("Error configuring webhook", { status: webhookResponse.status, error: errorText });
-    // Não falhar a criação se o webhook falhar, mas logar o erro
-  } else {
     const webhookData = await webhookResponse.json();
-    logStep("Webhook configured successfully", webhookData);
-  }
+    logStep("Step 1.2: Webhook configured successfully", webhookData);
 
-  // 3. Atualizar o perfil do usuário com o nome da instância
-  if (userData) {
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ 
-        instance_name: instanceName,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userData.id);
+    // Atualizar o perfil do usuário com o nome da instância
+    if (userData) {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          instance_name: createdInstanceName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userData.id);
 
-    if (updateError) {
-      logStep("Error updating user profile", updateError);
+      if (updateError) {
+        logStep("WARNING: Failed to update user profile", updateError);
+      } else {
+        logStep("User profile updated successfully");
+      }
     }
-  }
 
-  return new Response(JSON.stringify({
-    success: true,
-    instanceName: createData.instance?.instanceName || instanceName,
-    status: createData.instance?.status || 'created',
-    webhookConfigured: webhookResponse.ok
-  }), {
-    headers: { 'Access-Control-Allow-Origin': '*', "Content-Type": "application/json" },
-    status: 200,
-  });
+    logStep("Atomic operation completed successfully", { instanceName: createdInstanceName });
+
+    return new Response(JSON.stringify({
+      success: true,
+      instanceName: createdInstanceName,
+      status: createData.instance?.status || 'created',
+      webhookConfigured: true
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("FATAL ERROR in atomic operation", { message: errorMessage, instanceName: createdInstanceName });
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: errorMessage,
+      instanceName: createdInstanceName
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
 }
 
 // Função para obter QR Code
@@ -214,7 +249,7 @@ async function handleGetQRCode(apiUrl: string, apiKey: string, instanceName: str
     success: true,
     qrCode: qrCodeData
   }), {
-    headers: { 'Access-Control-Allow-Origin': '*', "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
     status: 200,
   });
 }
@@ -237,7 +272,7 @@ async function handleGetStatus(apiUrl: string, apiKey: string, instanceName: str
       success: true,
       status: 'DISCONNECTED'
     }), {
-      headers: { 'Access-Control-Allow-Origin': '*', "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   }
@@ -252,7 +287,7 @@ async function handleGetStatus(apiUrl: string, apiKey: string, instanceName: str
     success: true,
     status: normalizedStatus
   }), {
-    headers: { 'Access-Control-Allow-Origin': '*', "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
     status: 200,
   });
 }
@@ -293,7 +328,7 @@ async function handleLogout(apiUrl: string, apiKey: string, instanceName: string
     success: true,
     message: 'Instance logged out successfully'
   }), {
-    headers: { 'Access-Control-Allow-Origin': '*', "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
     status: 200,
   });
 }
@@ -334,7 +369,7 @@ async function handleDeleteInstance(apiUrl: string, apiKey: string, instanceName
     success: true,
     message: 'Instance deleted successfully'
   }), {
-    headers: { 'Access-Control-Allow-Origin': '*', "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
     status: 200,
   });
 }
