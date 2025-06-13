@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +12,7 @@ interface Chat {
   id: string;
   nome: string;
   remote_jid: string;
-  prioridade: 'urgente' | 'importante' | 'normal';
+  prioridade: string; // Alterado para aceitar qualquer string
   conversa: any[];
   modificado_em: string;
   contexto?: string;
@@ -40,7 +39,14 @@ export const ChatsList = () => {
         return;
       }
 
-      setChats(data || []);
+      // Transformar dados para garantir tipos corretos
+      const transformedData = (data || []).map(chat => ({
+        ...chat,
+        conversa: Array.isArray(chat.conversa) ? chat.conversa : [],
+        prioridade: chat.prioridade || 'normal' // Garantir que sempre tenha um valor
+      }));
+
+      setChats(transformedData);
     } catch (error) {
       console.error('Erro inesperado ao buscar chats:', error);
     } finally {
@@ -52,8 +58,17 @@ export const ChatsList = () => {
     fetchChats();
   }, [user]);
 
+  // Função para normalizar prioridade para os valores esperados
+  const normalizePriority = (prioridade: string): 'urgente' | 'importante' | 'normal' => {
+    const normalized = prioridade.toLowerCase();
+    if (normalized === 'urgente') return 'urgente';
+    if (normalized === 'importante') return 'importante';
+    return 'normal';
+  };
+
   const getPriorityColor = (prioridade: string) => {
-    switch (prioridade) {
+    const normalized = normalizePriority(prioridade);
+    switch (normalized) {
       case 'urgente':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'importante':
@@ -64,7 +79,8 @@ export const ChatsList = () => {
   };
 
   const getPriorityIcon = (prioridade: string) => {
-    switch (prioridade) {
+    const normalized = normalizePriority(prioridade);
+    switch (normalized) {
       case 'urgente':
         return <AlertCircle className="w-3 h-3" />;
       case 'importante':
@@ -136,7 +152,7 @@ export const ChatsList = () => {
                     <Badge className={`text-xs ${getPriorityColor(chat.prioridade)}`}>
                       <div className="flex items-center space-x-1">
                         {getPriorityIcon(chat.prioridade)}
-                        <span className="capitalize">{chat.prioridade}</span>
+                        <span className="capitalize">{normalizePriority(chat.prioridade)}</span>
                       </div>
                     </Badge>
                   </div>

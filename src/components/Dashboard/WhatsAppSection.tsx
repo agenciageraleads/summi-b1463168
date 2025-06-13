@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConnectionManager } from '@/components/WhatsApp/ConnectionManager';
+import { WhatsAppConnection } from '@/components/WhatsApp/WhatsAppConnection';
 import { MessageSquare } from 'lucide-react';
 
 export const WhatsAppSection = () => {
@@ -13,7 +13,7 @@ export const WhatsAppSection = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ConnectionManager />
+        <WhatsAppConnection />
       </CardContent>
     </Card>
   );
