@@ -1,22 +1,11 @@
 
-import { useState } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 
 const SettingsPage = () => {
-  const { profile, isLoading, updateProfile } = useProfile();
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  const handleProfileSave = async (data: any) => {
-    setIsUpdating(true);
-    try {
-      await updateProfile(data);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
+  const { profile, isLoading } = useProfile();
 
   if (isLoading) {
     return (
@@ -51,11 +40,7 @@ const SettingsPage = () => {
         </div>
 
         <div className="grid gap-6">
-          <ProfileForm 
-            profile={profile}
-            onSave={handleProfileSave}
-            isUpdating={isUpdating}
-          />
+          <ProfileForm />
           <AccountDeletion />
         </div>
       </div>
