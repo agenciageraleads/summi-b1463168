@@ -284,7 +284,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
       case 'error':
         return 'Erro na conexão';
       default:
-        return 'Estado desconhecido';
+        return 'Verificando estado da conexão...';
     }
   };
 

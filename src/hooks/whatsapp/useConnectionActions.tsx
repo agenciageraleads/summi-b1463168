@@ -123,6 +123,17 @@ export const useConnectionActions = ({
           throw new Error(
             initResult.error || 'Ocorreu um erro na inicialização.'
           );
+
+        default:
+          // Lidar com estado desconhecido
+          console.warn('[useConnectionActions] Estado desconhecido recebido:', initResult.state);
+          resetConnectionState();
+          toast({
+            title: 'Estado Desconhecido',
+            description: 'Tente conectar novamente.',
+            variant: 'destructive',
+          });
+          break;
       }
     } catch (error) {
       console.error('[useConnectionActions] Erro na conexão:', error);
