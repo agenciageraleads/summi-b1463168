@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +34,7 @@ interface ComponentState {
   instanceName: string | null;
   message: string;
   isPolling: boolean;
+  hasInitialized: boolean; // Nova flag para controlar inicialização
 }
 
 export const WhatsAppConnectionManager: React.FC = () => {
@@ -48,52 +48,66 @@ export const WhatsAppConnectionManager: React.FC = () => {
     qrCode: null,
     instanceName: null,
     message: 'Carregando...',
-    isPolling: false
+    isPolling: false,
+    hasInitialized: false
   });
 
   // Timer para restart do QR Code
   const [qrTimer, setQrTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Inicializar conexão automaticamente ao carregar
+  // Inicializar conexão automaticamente ao carregar APENAS UMA VEZ
   useEffect(() => {
-    initializeConnectionFlow();
-  }, []);
+    if (!state.hasInitialized) {
+      console.log('[WhatsApp Manager] Inicializando pela primeira vez...');
+      initializeConnectionFlow();
+    }
+  }, [state.hasInitialized]);
 
   // Polling para verificar conexão quando necessário
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
     if (state.isPolling && state.instanceName && state.connectionState === 'needs_qr_code') {
+      console.log('[WhatsApp Manager] Iniciando polling para:', state.instanceName);
       intervalId = setInterval(async () => {
-        const status = await checkConnectionStatus(state.instanceName!);
-        
-        if (status === 'open') {
-          setState(prev => ({ 
-            ...prev, 
-            connectionState: 'already_connected',
-            isPolling: false,
-            qrCode: null,
-            message: 'WhatsApp conectado com sucesso!'
-          }));
+        try {
+          const status = await checkConnectionStatus(state.instanceName!);
+          console.log('[WhatsApp Manager] Status do polling:', status);
           
-          // Limpar timer se existe
-          if (qrTimer) {
-            clearTimeout(qrTimer);
-            setQrTimer(null);
+          if (status === 'open') {
+            console.log('[WhatsApp Manager] Conexão detectada! Parando polling.');
+            setState(prev => ({ 
+              ...prev, 
+              connectionState: 'already_connected',
+              isPolling: false,
+              qrCode: null,
+              message: 'WhatsApp conectado com sucesso!'
+            }));
+            
+            // Limpar timer se existe
+            if (qrTimer) {
+              clearTimeout(qrTimer);
+              setQrTimer(null);
+            }
+            
+            await refreshProfile();
+            
+            toast({
+              title: "Conectado!",
+              description: "WhatsApp conectado com sucesso",
+            });
           }
-          
-          await refreshProfile();
-          
-          toast({
-            title: "Conectado!",
-            description: "WhatsApp conectado com sucesso",
-          });
+        } catch (error) {
+          console.error('[WhatsApp Manager] Erro no polling:', error);
         }
       }, 4000);
     }
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (intervalId) {
+        console.log('[WhatsApp Manager] Limpando interval do polling');
+        clearInterval(intervalId);
+      }
     };
   }, [state.isPolling, state.instanceName, state.connectionState, refreshProfile, toast, qrTimer]);
 
@@ -101,6 +115,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
   useEffect(() => {
     return () => {
       if (qrTimer) {
+        console.log('[WhatsApp Manager] Limpando timer de QR Code');
         clearTimeout(qrTimer);
       }
     };
@@ -108,10 +123,17 @@ export const WhatsAppConnectionManager: React.FC = () => {
 
   // Função principal: inicializar conexão
   const initializeConnectionFlow = async () => {
-    setState(prev => ({ ...prev, isLoading: true, message: 'Verificando estado da conexão...' }));
+    console.log('[WhatsApp Manager] Iniciando fluxo de inicialização...');
+    setState(prev => ({ 
+      ...prev, 
+      isLoading: true, 
+      message: 'Verificando estado da conexão...',
+      hasInitialized: true 
+    }));
     
     try {
       const result = await initializeConnection();
+      console.log('[WhatsApp Manager] Resultado da inicialização:', result);
       
       if (result.success) {
         setState(prev => ({
@@ -124,9 +146,11 @@ export const WhatsAppConnectionManager: React.FC = () => {
 
         // Se precisa de QR Code, buscar automaticamente
         if (result.state === 'needs_qr_code' && result.instanceName) {
+          console.log('[WhatsApp Manager] Estado requer QR Code, gerando...');
           await handleGetQRCode(result.instanceName);
         }
       } else {
+        console.error('[WhatsApp Manager] Erro na inicialização:', result.error);
         setState(prev => ({
           ...prev,
           connectionState: 'error',
@@ -135,6 +159,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
         }));
       }
     } catch (error) {
+      console.error('[WhatsApp Manager] Erro inesperado na inicialização:', error);
       setState(prev => ({
         ...prev,
         connectionState: 'error',
@@ -146,10 +171,12 @@ export const WhatsAppConnectionManager: React.FC = () => {
 
   // Obter QR Code com timer de restart
   const handleGetQRCode = async (instanceName: string) => {
+    console.log('[WhatsApp Manager] Gerando QR Code para:', instanceName);
     setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
     
     try {
       const result = await getQRCode(instanceName);
+      console.log('[WhatsApp Manager] Resultado do QR Code:', result.success ? 'Sucesso' : result.error);
       
       if (result.success && result.qrCode) {
         setState(prev => ({
@@ -222,6 +249,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
         }
       }
     } catch (error) {
+      console.error('[WhatsApp Manager] Erro inesperado ao gerar QR Code:', error);
       setState(prev => ({
         ...prev,
         connectionState: 'error',
@@ -233,10 +261,12 @@ export const WhatsAppConnectionManager: React.FC = () => {
 
   // Desconectar WhatsApp
   const handleDisconnect = async () => {
+    console.log('[WhatsApp Manager] Iniciando desconexão...');
     setState(prev => ({ ...prev, isLoading: true, message: 'Desconectando...' }));
     
     try {
       const result = await disconnectWhatsApp();
+      console.log('[WhatsApp Manager] Resultado da desconexão:', result);
       
       if (result.success) {
         setState({
@@ -245,7 +275,8 @@ export const WhatsAppConnectionManager: React.FC = () => {
           qrCode: null,
           instanceName: null,
           message: result.message || 'WhatsApp desconectado com sucesso',
-          isPolling: false
+          isPolling: false,
+          hasInitialized: true // Manter como inicializado
         });
         
         await refreshProfile();
@@ -260,13 +291,26 @@ export const WhatsAppConnectionManager: React.FC = () => {
           message: result.error || 'Erro ao desconectar',
           isLoading: false
         }));
+        
+        toast({
+          title: "Erro na Desconexão",
+          description: result.error || 'Erro ao desconectar WhatsApp',
+          variant: "destructive"
+        });
       }
     } catch (error) {
+      console.error('[WhatsApp Manager] Erro inesperado ao desconectar:', error);
       setState(prev => ({
         ...prev,
         message: 'Erro inesperado ao desconectar',
         isLoading: false
       }));
+      
+      toast({
+        title: "Erro",
+        description: 'Erro inesperado ao desconectar',
+        variant: "destructive"
+      });
     }
   };
 

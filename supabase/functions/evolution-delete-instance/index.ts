@@ -20,6 +20,53 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
+    // Inicializar cliente Supabase para acessar dados do usuário
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verificar autenticação
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      logStep("No authorization header");
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      logStep("Authentication failed", authError);
+      return new Response(JSON.stringify({ error: 'Authentication failed' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Buscar dados do usuário
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('instance_name')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile?.instance_name) {
+      logStep("No instance found for user", { userId: user.id, profileError });
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: 'Nenhuma instância encontrada para desconectar'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    const instanceName = profile.instance_name;
+    logStep("Found instance for user", { instanceName, userId: user.id });
+
     const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
     const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
     
@@ -27,28 +74,51 @@ serve(async (req) => {
       throw new Error("Evolution API credentials not configured");
     }
 
-    const { instanceName } = await req.json();
-    if (!instanceName) throw new Error("Instance name is required");
+    logStep("Attempting to delete instance", { instanceName });
 
-    logStep("Deleting instance", { instanceName });
-
-    const response = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
-      method: 'DELETE',
-      headers: {
-        'apikey': evolutionApiKey
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logStep("Error deleting instance", { status: response.status, error: errorText });
-      // Don't throw error, just log it - instance might already be deleted
+    // Tentar fazer logout primeiro
+    try {
+      const logoutResponse = await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': evolutionApiKey
+        }
+      });
+      logStep("Logout attempt", { status: logoutResponse.status });
+    } catch (logoutError) {
+      logStep("Logout failed, continuing with delete", logoutError);
     }
 
-    logStep("Instance deletion completed");
+    // Tentar deletar a instância
+    try {
+      const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': evolutionApiKey
+        }
+      });
+      logStep("Delete attempt", { status: deleteResponse.status });
+    } catch (deleteError) {
+      logStep("Delete failed, but continuing", deleteError);
+    }
+
+    // Limpar dados do usuário no banco
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ instance_name: null })
+      .eq('id', user.id);
+
+    if (updateError) {
+      logStep("Failed to clear instance_name", updateError);
+    } else {
+      logStep("Successfully cleared instance_name from profile");
+    }
+
+    logStep("Disconnection process completed successfully");
 
     return new Response(JSON.stringify({
-      success: true
+      success: true,
+      message: 'WhatsApp desconectado com sucesso'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -57,11 +127,13 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in evolution-delete-instance", { message: errorMessage });
+    
     return new Response(JSON.stringify({ 
-      success: true // Return success even on error to prevent blocking user flow
+      success: false,
+      error: `Erro ao desconectar: ${errorMessage}`
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: 500,
     });
   }
 });
