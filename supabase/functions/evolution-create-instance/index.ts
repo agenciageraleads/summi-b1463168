@@ -51,22 +51,24 @@ serve(async (req) => {
 
     logStep("Creating instance", { instanceName, url: `${cleanApiUrl}/instance/create` });
 
-    // CORREÇÃO: Payload ajustado para a especificação da API v2.2.3.
-    // A configuração do webhook agora está corretamente aninhada no objeto 'webhook'.
+    // CORREÇÃO: Payload ajustado para a especificação da API v2.2.3 e com as configurações solicitadas.
     const payload = {
       instanceName: instanceName,
+      // O número de telefone (parâmetro 'number') não está disponível neste contexto,
+      // pois esta função não tem acesso ao perfil do usuário.
+      // A função 'evolution-api-handler' é mais completa para este fim.
       integration: "WHATSAPP-BAILEYS",
       qrcode: true,
-      readMessages: true,
-      readStatus: true,
+      readMessages: false,
+      readStatus: false,
       groupsIgnore: true,
       rejectCall: false,
       alwaysOnline: false,
-      syncFullHistory: false,
+      syncFullHistory: true,
       webhook: {
         url: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
         byEvents: false,
-        base64: false,
+        base64: true, // Corrigido para true.
         headers: {
           "Content-Type": "application/json"
         },
