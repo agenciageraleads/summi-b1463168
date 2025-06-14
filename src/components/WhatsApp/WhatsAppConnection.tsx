@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ConnectionManager } from '@/components/WhatsApp/ConnectionManager';
+import { useWhatsAppConnection } from '@/hooks/useWhatsAppConnection';
 import { Loader2, Wifi, WifiOff, QrCode } from 'lucide-react';
 
 export const WhatsAppConnection = () => {
@@ -14,7 +14,7 @@ export const WhatsAppConnection = () => {
     polling,
     handleConnect,
     handleDisconnect,
-  } = ConnectionManager({});
+  } = useWhatsAppConnection({});
 
   // Função para renderizar o status com cor apropriada
   const renderStatus = () => {
