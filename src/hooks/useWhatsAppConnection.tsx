@@ -21,24 +21,34 @@ export const useWhatsAppConnection = ({
   const [isLoading, setIsLoading] = useState(false);
   const [polling, setPolling] = useState(false);
 
-  // Hook para gerenciar restart de instância
+  // Hook para gerenciar restart de instância com callback atualizado
   const { restartInstance } = useInstanceRestart({
-    onQRCodeChange,
+    onQRCodeChange: (qrCode) => {
+      console.log('[useWhatsAppConnection] QR Code recebido do restart:', qrCode ? 'SIM' : 'NÃO');
+      setQrCode(qrCode);
+      onQRCodeChange?.(qrCode);
+    },
     onRestartComplete: (instanceName: string) => {
+      console.log('[useWhatsAppConnection] Restart completo, reiniciando polling para:', instanceName);
       startPolling(instanceName);
     },
   });
 
-  // Hook para gerenciar polling de status
+  // Hook para gerenciar polling de status com callback de timeout corrigido
   const { startPolling: startStatusPolling, stopPolling } = useConnectionPolling({
     onStatusChange,
-    onQRCodeChange,
+    onQRCodeChange: (qrCode) => {
+      setQrCode(qrCode);
+      onQRCodeChange?.(qrCode);
+    },
     onConnectionSuccess: () => {
+      console.log('[useWhatsAppConnection] CONEXÃO BEM-SUCEDIDA!');
       setConnectionStatus('CONNECTED');
       setQrCode(null);
       setPolling(false);
     },
     onTimeout: (instanceName: string) => {
+      console.log('[useWhatsAppConnection] TIMEOUT! Iniciando processo de restart para:', instanceName);
       setPolling(false);
       restartInstance(instanceName);
     },
@@ -46,6 +56,7 @@ export const useWhatsAppConnection = ({
 
   // Wrapper para controlar o estado de polling
   const startPolling = useCallback((instanceName: string) => {
+    console.log('[useWhatsAppConnection] Iniciando polling wrapper para:', instanceName);
     setPolling(true);
     startStatusPolling(instanceName);
   }, [startStatusPolling]);
@@ -59,6 +70,7 @@ export const useWhatsAppConnection = ({
     onQRCodeChange,
     startPolling,
     stopPolling: () => {
+      console.log('[useWhatsAppConnection] Parando polling via wrapper');
       setPolling(false);
       stopPolling();
     },
@@ -67,6 +79,7 @@ export const useWhatsAppConnection = ({
   // Efeito para limpar o polling quando o componente é desmontado
   useEffect(() => {
     return () => {
+      console.log('[useWhatsAppConnection] Limpando polling no unmount');
       stopPolling();
     };
   }, [stopPolling]);

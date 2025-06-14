@@ -18,11 +18,12 @@ export const useConnectionPolling = ({
 }: UseConnectionPollingProps) => {
   const { toast } = useToast();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const pollingStartTimeRef = useRef<number>(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentInstanceRef = useRef<string | null>(null);
 
   // Função para parar o polling de status
   const stopPolling = useCallback(() => {
+    console.log('[useConnectionPolling] Parando polling...');
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -31,26 +32,31 @@ export const useConnectionPolling = ({
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    currentInstanceRef.current = null;
   }, []);
 
-  // Função para iniciar o polling de status da conexão com timeout
+  // Função para iniciar o polling de status da conexão com timeout de 30 segundos
   const startPolling = useCallback(
     (instanceName: string) => {
+      console.log('[useConnectionPolling] Iniciando polling para:', instanceName);
       stopPolling();
-      pollingStartTimeRef.current = Date.now();
+      currentInstanceRef.current = instanceName;
 
       // Configurar timeout de 30 segundos para reiniciar instância
       timeoutRef.current = setTimeout(() => {
-        console.log('[useConnectionPolling] Timeout de 30s atingido, reiniciando instância...');
+        console.log('[useConnectionPolling] TIMEOUT de 30s atingido! Reiniciando instância:', instanceName);
         stopPolling();
         onTimeout(instanceName);
       }, 30000);
 
+      // Iniciar polling a cada 4 segundos
       pollingIntervalRef.current = setInterval(async () => {
         try {
+          console.log('[useConnectionPolling] Verificando status da instância:', instanceName);
           const result = await getConnectionStatus(instanceName);
 
           if (result.success && result.status === 'OPEN') {
+            console.log('[useConnectionPolling] CONEXÃO ESTABELECIDA! Parando polling.');
             stopPolling();
             onConnectionSuccess();
             onStatusChange?.('CONNECTED');
@@ -60,12 +66,11 @@ export const useConnectionPolling = ({
               description: 'Sua instância está conectada e funcionando',
             });
           } else {
-            // Verificar se ainda está no prazo (antes do timeout)
-            const elapsedTime = Date.now() - pollingStartTimeRef.current;
-            console.log(`[useConnectionPolling] Polling status: ${result.status}, elapsed: ${elapsedTime}ms`);
+            console.log(`[useConnectionPolling] Status atual: ${result.status || 'UNKNOWN'} - continuando polling...`);
           }
         } catch (error) {
           console.error('[useConnectionPolling] Erro no polling:', error);
+          // Não parar o polling por erro único, continuar tentando
         }
       }, 4000);
     },
