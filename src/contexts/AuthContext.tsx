@@ -29,7 +29,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Função para verificar assinatura e sincronizar dados
+  // Função para verificar assinatura e sincronizar dados.
+  // Nenhum alteração aqui, a lógica interna está correta.
   const checkSubscription = useCallback(async (userId: string) => {
     try {
       console.log('[AUTH] Verificando assinatura para usuário:', userId);
@@ -55,31 +56,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // Set up auth state listener
+    // Corrigido: Primeiro, busca a sessão inicial para evitar tela de login piscando.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      setLoading(false);
+
+      if (currentUser) {
+        // Se já houver um usuário, verificamos a assinatura de forma assíncrona.
+        // O uso de setTimeout(..., 0) evita o deadlock, seguindo as boas práticas.
+        setTimeout(() => {
+          checkSubscription(currentUser.id);
+        }, 0);
+      }
+    });
+
+    // Corrigido: O listener de autenticação agora é mais robusto.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setLoading(true);
-        
-        if (session?.user) {
-          setUser(session.user);
-          // Sincroniza dados de assinatura quando usuário faz login
-          await checkSubscription(session.user.id);
-        } else {
-          setUser(null);
+      (event, session) => {
+        setSession(session);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        setLoading(false); // Garante que o estado de loading seja finalizado.
+
+        // A verificação de assinatura agora só ocorre no evento SIGNED_IN
+        // e é feita de forma assíncrona para não bloquear a interface.
+        if (event === 'SIGNED_IN' && currentUser) {
+          setTimeout(() => {
+            checkSubscription(currentUser.id);
+          }, 0);
         }
-        
-        setLoading(false);
       }
     );
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [checkSubscription]);
 
   const login = async (email: string, password: string) => {
