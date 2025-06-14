@@ -21,7 +21,7 @@ export const useWhatsAppConnection = ({
   const [isLoading, setIsLoading] = useState(false);
   const [polling, setPolling] = useState(false);
 
-  // Hook para gerenciar restart de instância com callback atualizado
+  // Hook para gerenciar restart de instância
   const { restartInstance } = useInstanceRestart({
     onQRCodeChange: (qrCode) => {
       console.log('[useWhatsAppConnection] QR Code recebido do restart:', qrCode ? 'SIM' : 'NÃO');
@@ -30,11 +30,14 @@ export const useWhatsAppConnection = ({
     },
     onRestartComplete: (instanceName: string) => {
       console.log('[useWhatsAppConnection] Restart completo, reiniciando polling para:', instanceName);
-      startPolling(instanceName);
+      // Aguardar um pouco antes de reiniciar o polling para dar tempo da instância se estabilizar
+      setTimeout(() => {
+        startPolling(instanceName);
+      }, 2000);
     },
   });
 
-  // Hook para gerenciar polling de status com callback de timeout corrigido
+  // Hook para gerenciar polling de status
   const { startPolling: startStatusPolling, stopPolling } = useConnectionPolling({
     onStatusChange,
     onQRCodeChange: (qrCode) => {
@@ -50,6 +53,7 @@ export const useWhatsAppConnection = ({
     onTimeout: (instanceName: string) => {
       console.log('[useWhatsAppConnection] TIMEOUT! Iniciando processo de restart para:', instanceName);
       setPolling(false);
+      // Chamar restart da instância
       restartInstance(instanceName);
     },
   });

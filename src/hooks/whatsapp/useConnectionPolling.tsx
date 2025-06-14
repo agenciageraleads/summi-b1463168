@@ -20,6 +20,7 @@ export const useConnectionPolling = ({
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentInstanceRef = useRef<string | null>(null);
+  const timeoutCalledRef = useRef<boolean>(false);
 
   // Função para parar o polling de status
   const stopPolling = useCallback(() => {
@@ -33,6 +34,7 @@ export const useConnectionPolling = ({
       timeoutRef.current = null;
     }
     currentInstanceRef.current = null;
+    timeoutCalledRef.current = false;
   }, []);
 
   // Função para iniciar o polling de status da conexão com timeout de 30 segundos
@@ -41,16 +43,32 @@ export const useConnectionPolling = ({
       console.log('[useConnectionPolling] Iniciando polling para:', instanceName);
       stopPolling();
       currentInstanceRef.current = instanceName;
+      timeoutCalledRef.current = false;
 
       // Configurar timeout de 30 segundos para reiniciar instância
       timeoutRef.current = setTimeout(() => {
-        console.log('[useConnectionPolling] TIMEOUT de 30s atingido! Reiniciando instância:', instanceName);
-        stopPolling();
-        onTimeout(instanceName);
+        if (!timeoutCalledRef.current && currentInstanceRef.current === instanceName) {
+          console.log('[useConnectionPolling] TIMEOUT de 30s atingido! Reiniciando instância:', instanceName);
+          timeoutCalledRef.current = true;
+          stopPolling();
+          
+          // Limpar QR Code atual antes do restart
+          onQRCodeChange?.(null);
+          
+          // Chamar callback de timeout para iniciar restart
+          onTimeout(instanceName);
+        }
       }, 30000);
 
       // Iniciar polling a cada 4 segundos
       pollingIntervalRef.current = setInterval(async () => {
+        // Verificar se o timeout já foi chamado
+        if (timeoutCalledRef.current) {
+          console.log('[useConnectionPolling] Timeout já foi executado, parando polling...');
+          stopPolling();
+          return;
+        }
+
         try {
           console.log('[useConnectionPolling] Verificando status da instância:', instanceName);
           const result = await getConnectionStatus(instanceName);

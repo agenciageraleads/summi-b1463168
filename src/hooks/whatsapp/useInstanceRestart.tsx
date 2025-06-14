@@ -38,9 +38,9 @@ export const useInstanceRestart = ({
         throw response.error;
       }
 
-      console.log('[useInstanceRestart] Instância reiniciada com sucesso! Aguardando 3s...');
+      console.log('[useInstanceRestart] Instância reiniciada com sucesso! Aguardando 5s...');
       
-      // Aguardar 3 segundos e tentar gerar novo QR Code
+      // Aguardar 5 segundos para a instância se estabilizar e tentar gerar novo QR Code
       setTimeout(async () => {
         try {
           console.log('[useInstanceRestart] Gerando novo QR Code após restart...');
@@ -49,25 +49,54 @@ export const useInstanceRestart = ({
           if (qrResult.success && qrResult.qrCode) {
             console.log('[useInstanceRestart] QR Code gerado com sucesso após restart!');
             onQRCodeChange?.(qrResult.qrCode);
-            onRestartComplete(instanceName);
             
             toast({
               title: 'Instância Reiniciada',
               description: 'Novo QR Code gerado. Escaneie novamente.',
             });
+            
+            // Notificar que o restart foi concluído para reiniciar o polling
+            onRestartComplete(instanceName);
           } else {
             console.error('[useInstanceRestart] Falha ao gerar QR Code após restart:', qrResult.error);
-            throw new Error(qrResult.error || 'Erro ao gerar QR Code após restart');
+            
+            // Tentar novamente após mais 3 segundos
+            setTimeout(async () => {
+              try {
+                console.log('[useInstanceRestart] Segunda tentativa de gerar QR Code...');
+                const qrResult2 = await getQRCode(instanceName);
+                
+                if (qrResult2.success && qrResult2.qrCode) {
+                  console.log('[useInstanceRestart] QR Code gerado na segunda tentativa!');
+                  onQRCodeChange?.(qrResult2.qrCode);
+                  onRestartComplete(instanceName);
+                  
+                  toast({
+                    title: 'Instância Reiniciada',
+                    description: 'Novo QR Code gerado. Escaneie novamente.',
+                  });
+                } else {
+                  throw new Error(qrResult2.error || 'Erro ao gerar QR Code na segunda tentativa');
+                }
+              } catch (qrError2) {
+                console.error('[useInstanceRestart] Erro na segunda tentativa:', qrError2);
+                toast({
+                  title: 'Erro',
+                  description: 'Não foi possível gerar novo QR Code. Tente conectar novamente.',
+                  variant: 'destructive',
+                });
+              }
+            }, 3000);
           }
         } catch (qrError) {
           console.error('[useInstanceRestart] Erro ao gerar QR Code após restart:', qrError);
           toast({
             title: 'Erro',
-            description: 'Instância reiniciada, mas falha ao gerar novo QR Code',
+            description: 'Instância reiniciada, mas falha ao gerar novo QR Code. Tente conectar novamente.',
             variant: 'destructive',
           });
         }
-      }, 3000);
+      }, 5000);
       
     } catch (error) {
       console.error('[useInstanceRestart] ERRO CRÍTICO no restart:', error);
