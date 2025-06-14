@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface InstanceCreateResult {
@@ -21,18 +20,24 @@ export interface StatusResult {
   error?: string;
 }
 
-// Função para criar instância com webhook configurado automaticamente
-export const createInstanceWithWebhook = async (instanceName: string): Promise<InstanceCreateResult> => {
-  console.log(`[Evolution API v2] Criando instância com webhook: ${instanceName}`);
-  
+export interface ConnectionResult {
+  success: boolean;
+  state: 'needs_phone_number' | 'needs_qr_code' | 'is_connecting' | 'already_connected' | 'error';
+  instanceName?: string;
+  message?: string;
+  error?: string;
+}
+
+// Função para inicializar a conexão (cria a instância se não existir)
+export const initializeConnection = async (): Promise<ConnectionResult> => {
+  console.log(`[Evolution API v2] Inicializando conexão...`);
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) throw new Error('Usuário não autenticado');
 
     const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
       body: { 
-        action: 'create',
-        instanceName 
+        action: 'initialize-connection',
       },
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
@@ -41,10 +46,10 @@ export const createInstanceWithWebhook = async (instanceName: string): Promise<I
 
     if (error) throw error;
     
-    console.log(`[Evolution API v2] Instância criada:`, data);
+    console.log(`[Evolution API v2] Inicialização concluída:`, data);
     return data;
   } catch (error) {
-    console.error(`[Evolution API v2] Erro na criação:`, error);
+    console.error(`[Evolution API v2] Erro na inicialização:`, error);
     throw error;
   }
 };
@@ -76,16 +81,21 @@ export const getConnectionStatus = async (instanceName: string): Promise<StatusR
   console.log(`[Evolution API v2] Verificando status: ${instanceName}`);
   
   try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) throw new Error('Usuário não autenticado');
+
     const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
       body: { 
-        action: 'get-status',
-        instanceName 
-      }
+        action: 'get-status'
+      },
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}`,
+      },
     });
 
     if (error) throw error;
     
-    console.log(`[Evolution API v2] Status verificado:`, data.status);
+    console.log(`[Evolution API v2] Status verificado:`, data.state);
     return data;
   } catch (error) {
     console.error(`[Evolution API v2] Erro ao verificar status:`, error);
@@ -103,7 +113,7 @@ export const logoutInstance = async (instanceName: string): Promise<{ success: b
 
     const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
       body: { 
-        action: 'logout',
+        action: 'logout', // Ação corrigida
         instanceName 
       },
       headers: {
@@ -121,7 +131,7 @@ export const logoutInstance = async (instanceName: string): Promise<{ success: b
   }
 };
 
-// Função para deletar instância
+// Função para deletar instância (usa a mesma lógica de disconnect)
 export const deleteInstance = async (instanceName: string): Promise<{ success: boolean; message?: string; error?: string }> => {
   console.log(`[Evolution API v2] Deletando instância: ${instanceName}`);
   
@@ -131,7 +141,7 @@ export const deleteInstance = async (instanceName: string): Promise<{ success: b
 
     const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
       body: { 
-        action: 'delete',
+        action: 'delete', // Ação corrigida
         instanceName 
       },
       headers: {

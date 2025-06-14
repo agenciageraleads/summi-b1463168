@@ -64,7 +64,16 @@ serve(async (req) => {
         return await handleGetQRCode(cleanApiUrl, evolutionApiKey, instanceName);
       }
       
-      case 'disconnect': {
+      case 'get-status': {
+        const userData = await getAuthenticatedUser();
+        const { data: profile } = await supabaseClient.from('profiles').select('instance_name').eq('id', userData.id).single();
+        if (!profile?.instance_name) throw new Error("Instance not configured for this user.");
+        return await checkExistingInstanceState(cleanApiUrl, evolutionApiKey, profile.instance_name, userData, supabaseClient);
+      }
+      
+      case 'disconnect':
+      case 'logout':
+      case 'delete': {
         const userData = await getAuthenticatedUser();
         return await handleDisconnect(cleanApiUrl, evolutionApiKey, userData, supabaseClient);
       }
