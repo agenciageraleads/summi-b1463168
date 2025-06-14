@@ -3,11 +3,13 @@
   /* 
     Este hook encapsula toda a lógica de estado e comunicação 
     com a API para gerenciar a conexão do WhatsApp.
+    Inclui timeout e reinício automático de instâncias.
   */
 }
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
+import { supabase } from '@/integrations/supabase/client';
 import {
   initializeConnection,
   getQRCode,
@@ -37,22 +39,84 @@ export const useWhatsAppConnection = ({
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollingStartTimeRef = useRef<number>(0);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Função para parar o polling de status
   const stopStatusPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
     setPolling(false);
   }, []);
 
-  // Função para iniciar o polling de status da conexão
+  // Função para reiniciar instância quando necessário
+  const restartInstance = useCallback(async (instanceName: string) => {
+    console.log('[useWhatsAppConnection] Reiniciando instância por timeout:', instanceName);
+    
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) throw new Error('Usuário não autenticado');
+
+      const response = await supabase.functions.invoke('evolution-restart-instance', {
+        body: { instanceName },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (response.error) {
+        console.error('[useWhatsAppConnection] Erro ao reiniciar instância:', response.error);
+        throw response.error;
+      }
+
+      console.log('[useWhatsAppConnection] Instância reiniciada com sucesso');
+      
+      // Aguardar 3 segundos e tentar gerar novo QR Code
+      setTimeout(async () => {
+        console.log('[useWhatsAppConnection] Gerando novo QR Code após restart...');
+        const qrResult = await getQRCode(instanceName);
+        
+        if (qrResult.success && qrResult.qrCode) {
+          setQrCode(qrResult.qrCode);
+          onQRCodeChange?.(qrResult.qrCode);
+          startStatusPolling(instanceName);
+          
+          toast({
+            title: 'Instância Reiniciada',
+            description: 'Novo QR Code gerado. Escaneie novamente.',
+          });
+        }
+      }, 3000);
+      
+    } catch (error) {
+      console.error('[useWhatsAppConnection] Erro no restart:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível reiniciar a instância',
+        variant: 'destructive',
+      });
+    }
+  }, [onQRCodeChange, toast]);
+
+  // Função para iniciar o polling de status da conexão com timeout
   const startStatusPolling = useCallback(
     (instanceName: string) => {
       stopStatusPolling();
 
       setPolling(true);
       pollingStartTimeRef.current = Date.now();
+
+      // Configurar timeout de 30 segundos para reiniciar instância
+      timeoutRef.current = setTimeout(() => {
+        console.log('[useWhatsAppConnection] Timeout de 30s atingido, reiniciando instância...');
+        stopStatusPolling();
+        restartInstance(instanceName);
+      }, 30000);
 
       pollingIntervalRef.current = setInterval(async () => {
         try {
@@ -69,25 +133,16 @@ export const useWhatsAppConnection = ({
               description: 'Sua instância está conectada e funcionando',
             });
           } else {
+            // Verificar se ainda está no prazo (antes do timeout)
             const elapsedTime = Date.now() - pollingStartTimeRef.current;
-            if (elapsedTime > 30000) {
-              console.log(
-                '[useWhatsAppConnection] Timeout atingido, parando polling'
-              );
-              stopStatusPolling();
-              toast({
-                title: 'Timeout de Conexão',
-                description: 'Tente gerar um novo QR Code',
-                variant: 'destructive',
-              });
-            }
+            console.log(`[useWhatsAppConnection] Polling status: ${result.status}, elapsed: ${elapsedTime}ms`);
           }
         } catch (error) {
           console.error('[useWhatsAppConnection] Erro no polling:', error);
         }
       }, 4000);
     },
-    [onQRCodeChange, onStatusChange, stopStatusPolling, toast]
+    [onQRCodeChange, onStatusChange, stopStatusPolling, toast, restartInstance]
   );
 
   // Efeito para limpar o polling quando o componente é desmontado
@@ -114,11 +169,14 @@ export const useWhatsAppConnection = ({
     onStatusChange?.('CONNECTING');
 
     try {
+      console.log('[useWhatsAppConnection] Iniciando processo de conexão...');
       const initResult = await initializeConnection();
 
       if (!initResult.success) {
         throw new Error(initResult.error || 'Erro ao inicializar conexão');
       }
+
+      console.log('[useWhatsAppConnection] Estado inicial:', initResult.state);
 
       switch (initResult.state) {
         case 'needs_phone_number':
@@ -145,6 +203,8 @@ export const useWhatsAppConnection = ({
           if (!initResult.instanceName) {
             throw new Error('Nome da instância não foi retornado pela API.');
           }
+          
+          console.log('[useWhatsAppConnection] Gerando QR Code para:', initResult.instanceName);
           const qrResult = await getQRCode(initResult.instanceName);
 
           if (!qrResult.success || !qrResult.qrCode) {
@@ -179,6 +239,7 @@ export const useWhatsAppConnection = ({
           );
       }
     } catch (error) {
+      console.error('[useWhatsAppConnection] Erro na conexão:', error);
       setConnectionStatus('DISCONNECTED');
       onStatusChange?.('DISCONNECTED');
       toast({
@@ -217,6 +278,7 @@ export const useWhatsAppConnection = ({
     stopStatusPolling();
 
     try {
+      console.log('[useWhatsAppConnection] Desconectando instância:', instanceName);
       await logoutInstance(instanceName);
 
       setConnectionStatus('DISCONNECTED');
@@ -228,6 +290,7 @@ export const useWhatsAppConnection = ({
         description: 'WhatsApp desconectado com sucesso',
       });
     } catch (error) {
+      console.error('[useWhatsAppConnection] Erro na desconexão:', error);
       toast({
         title: 'Erro',
         description: 'Erro ao desconectar WhatsApp',
