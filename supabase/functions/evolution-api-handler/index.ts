@@ -164,26 +164,26 @@ async function createInstanceAtomically(apiUrl: string, apiKey: string, userData
     // 1. Criar a instância com webhook incluído no payload
     logStep("Step 1: Creating instance with webhook", { instanceName });
     
-    // CORREÇÃO: Unificado o payload de criação da instância para ser consistente com a V2.
+    // CORREÇÃO: O payload de criação foi ajustado para corresponder à especificação da API v2.2.3,
+    // que exige que a configuração do webhook esteja em um objeto aninhado 'webhook'.
     const createPayload = {
-      instanceName,
-      token: apiKey,
-      qrcode: true,
+      instanceName: instanceName,
       integration: "WHATSAPP-BAILEYS",
-      instanceSettings: {
-        settings: {
-          groupsIgnore: true,
-          syncFullHistory: true
-        }
-      },
+      qrcode: true,
+      readMessages: true,
+      readStatus: true,
+      groupsIgnore: true,
+      rejectCall: false,
+      alwaysOnline: false,
+      syncFullHistory: false,
       webhook: {
-        webhookSettings: {
-          webhookUrl: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
-          webhookBase64: true,
-          webhookEvents: [
-            "MESSAGES_UPSERT"
-          ]
-        }
+        url: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
+        byEvents: false,
+        base64: false,
+        headers: {
+          "Content-Type": "application/json"
+        },
+        events: ["MESSAGES_UPSERT"]
       }
     };
 
