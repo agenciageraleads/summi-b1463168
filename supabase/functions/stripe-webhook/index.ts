@@ -33,7 +33,7 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Verificar assinatura do webhook
+    // Verificar assinatura do webhook usando método assíncrono
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SIGNING_SECRET");
@@ -46,7 +46,8 @@ serve(async (req) => {
     
     let event: Stripe.Event;
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      // Usar o método assíncrono para compatibilidade com Deno
+      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
     } catch (err) {
       logWebhookEvent("Erro na verificação da assinatura", { error: err.message });
       return new Response(`Webhook signature verification failed: ${err.message}`, { status: 400 });
@@ -67,6 +68,18 @@ serve(async (req) => {
           if (customer.email) {
             logWebhookEvent("Atualizando dados do cliente", { email: customer.email });
             
+            // Buscar usuário no Supabase por email
+            const { data: userData, error: userError } = await supabaseClient
+              .from('profiles')
+              .select('id')
+              .eq('email', customer.email)
+              .single();
+
+            if (userError) {
+              logWebhookEvent("Usuário não encontrado no banco", { email: customer.email });
+              break;
+            }
+
             // Buscar a assinatura criada (pode estar 'active' ou 'trialing')
             const subscriptions = await stripe.subscriptions.list({
               customer: customerId,
@@ -80,6 +93,7 @@ serve(async (req) => {
               const priceId = subscription.items.data[0].price.id;
               
               await supabaseClient.from("subscribers").upsert({
+                user_id: userData.id,
                 email: customer.email,
                 stripe_customer_id: customerId,
                 stripe_subscription_id: subscription.id,
@@ -111,10 +125,23 @@ serve(async (req) => {
         const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
         
         if (customer.email) {
+          // Buscar usuário no Supabase por email
+          const { data: userData, error: userError } = await supabaseClient
+            .from('profiles')
+            .select('id')
+            .eq('email', customer.email)
+            .single();
+
+          if (userError) {
+            logWebhookEvent("Usuário não encontrado no banco", { email: customer.email });
+            break;
+          }
+
           const isActive = subscription.status === 'active';
           const priceId = isActive ? subscription.items.data[0].price.id : null;
           
           await supabaseClient.from("subscribers").upsert({
+            user_id: userData.id,
             email: customer.email,
             stripe_customer_id: customerId,
             stripe_subscription_id: subscription.id,
@@ -141,12 +168,25 @@ serve(async (req) => {
           const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
           
           if (customer.email) {
+            // Buscar usuário no Supabase por email
+            const { data: userData, error: userError } = await supabaseClient
+              .from('profiles')
+              .select('id')
+              .eq('email', customer.email)
+              .single();
+
+            if (userError) {
+              logWebhookEvent("Usuário não encontrado no banco", { email: customer.email });
+              break;
+            }
+
             // Atualizar a data de renovação
             const subscription = await stripe.subscriptions.retrieve(
               typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id
             );
             
             await supabaseClient.from("subscribers").upsert({
+              user_id: userData.id,
               email: customer.email,
               subscription_end: new Date(subscription.current_period_end * 1000).toISOString(),
               updated_at: new Date().toISOString(),
