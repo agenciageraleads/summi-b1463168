@@ -1,10 +1,9 @@
-
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useProfile } from '@/hooks/useProfile';
-import { ConnectionManager } from '@/components/WhatsApp/ConnectionManager';
+import { useWhatsAppConnection } from '@/hooks/useWhatsAppConnection';
 import { CheckCircle, AlertCircle, RotateCcw, Smartphone } from 'lucide-react';
 
 const WhatsAppConnectionV2Page = () => {
@@ -13,13 +12,11 @@ const WhatsAppConnectionV2Page = () => {
   const [currentQRCode, setCurrentQRCode] = useState<string | null>(null);
 
   const {
-    connectionStatus,
-    qrCode,
     isLoading,
     polling,
     handleConnect,
     handleDisconnect
-  } = ConnectionManager({
+  } = useWhatsAppConnection({
     onStatusChange: setCurrentStatus,
     onQRCodeChange: setCurrentQRCode
   });
