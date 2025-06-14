@@ -89,6 +89,7 @@ export type Database = {
           nome: string
           numero: string | null
           resume_audio: boolean | null
+          role: string | null
           segundos_para_resumir: number | null
           temas_importantes: string | null
           temas_urgentes: string | null
@@ -103,6 +104,7 @@ export type Database = {
           nome: string
           numero?: string | null
           resume_audio?: boolean | null
+          role?: string | null
           segundos_para_resumir?: number | null
           temas_importantes?: string | null
           temas_urgentes?: string | null
@@ -117,6 +119,7 @@ export type Database = {
           nome?: string
           numero?: string | null
           resume_audio?: boolean | null
+          role?: string | null
           segundos_para_resumir?: number | null
           temas_importantes?: string | null
           temas_urgentes?: string | null
@@ -173,7 +176,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

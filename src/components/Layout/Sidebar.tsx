@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Menu, X, Bell } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { useChats } from '@/hooks/useChats';
+import { Shield } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
@@ -29,6 +30,9 @@ export const Sidebar = () => {
   const pendingChats = chats.filter(chat => 
     chat.prioridade === 'urgente' || chat.prioridade === 'importante'
   ).length;
+  
+  // Verificar se é admin
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <>
@@ -86,6 +90,18 @@ export const Sidebar = () => {
               {item.name}
             </Link>
           ))}
+          
+          {/* Admin Panel Link - só mostra para admins */}
+          {isAdmin && (
+            <Link
+              to="/admin"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200"
+            >
+              <Shield className="mr-3 h-5 w-5" />
+              Painel Admin
+            </Link>
+          )}
         </nav>
 
         {/* User Info & Logout */}
@@ -113,6 +129,9 @@ export const Sidebar = () => {
             <div className="text-sm overflow-hidden">
               <p className="font-medium text-summi-gray-900 truncate" title={displayName}>{displayName}</p>
               <p className="text-summi-gray-600 truncate" title={user?.email}>{user?.email}</p>
+              {isAdmin && (
+                <p className="text-red-600 text-xs font-medium">ADMIN</p>
+              )}
             </div>
           </div>
 

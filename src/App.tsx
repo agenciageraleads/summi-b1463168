@@ -16,6 +16,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
 import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
+import AdminUsersPage from "./pages/AdminUsersPage";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +64,11 @@ const App = () => (
                   <FeedbackPage />
                 </ProtectedRoute>
               } />
+              
+              {/* Admin Routes */}
+              <Route path="/admin" element={<AdminDashboardPage />} />
+              <Route path="/admin/users" element={<AdminUsersPage />} />
+              
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>
