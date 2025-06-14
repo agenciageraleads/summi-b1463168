@@ -18,6 +18,7 @@ interface UseConnectionActionsProps {
   onQRCodeChange?: (qrCode: string | null) => void;
   startPolling: (instanceName: string) => void;
   stopPolling: () => void;
+  resetConnectionState: () => void; // Nova função para reset completo
 }
 
 export const useConnectionActions = ({
@@ -28,6 +29,7 @@ export const useConnectionActions = ({
   onQRCodeChange,
   startPolling,
   stopPolling,
+  resetConnectionState,
 }: UseConnectionActionsProps) => {
   const { profile } = useProfile();
   const { toast } = useToast();
@@ -44,12 +46,17 @@ export const useConnectionActions = ({
       return;
     }
 
+    // Primeiro, limpar qualquer estado anterior
+    console.log('[useConnectionActions] INICIANDO CONEXÃO - limpando estado anterior');
+    stopPolling();
+    resetConnectionState();
+
     setIsLoading(true);
     setConnectionStatus('CONNECTING');
     onStatusChange?.('CONNECTING');
 
     try {
-      console.log('[useConnectionActions] Iniciando processo de conexão...');
+      console.log('[useConnectionActions] Inicializando conexão...');
       const initResult = await initializeConnection();
 
       if (!initResult.success) {
@@ -60,14 +67,13 @@ export const useConnectionActions = ({
 
       switch (initResult.state) {
         case 'needs_phone_number':
+          resetConnectionState();
           toast({
             title: 'Telefone necessário',
             description:
               'Por favor, adicione seu número de telefone no seu perfil.',
             variant: 'destructive',
           });
-          setConnectionStatus('DISCONNECTED');
-          onStatusChange?.('DISCONNECTED');
           break;
 
         case 'already_connected':
@@ -120,8 +126,7 @@ export const useConnectionActions = ({
       }
     } catch (error) {
       console.error('[useConnectionActions] Erro na conexão:', error);
-      setConnectionStatus('DISCONNECTED');
-      onStatusChange?.('DISCONNECTED');
+      resetConnectionState();
       toast({
         title: 'Erro de Conexão',
         description:
@@ -139,6 +144,8 @@ export const useConnectionActions = ({
     onStatusChange,
     onQRCodeChange,
     startPolling,
+    stopPolling,
+    resetConnectionState,
     setConnectionStatus,
     setQrCode,
     setIsLoading,
@@ -164,10 +171,7 @@ export const useConnectionActions = ({
       console.log('[useConnectionActions] Desconectando instância:', instanceName);
       await logoutInstance(instanceName);
 
-      setConnectionStatus('DISCONNECTED');
-      setQrCode(null);
-      onStatusChange?.('DISCONNECTED');
-      onQRCodeChange?.(null);
+      resetConnectionState();
       toast({
         title: 'Desconectado',
         description: 'WhatsApp desconectado com sucesso',
@@ -186,10 +190,7 @@ export const useConnectionActions = ({
     profile?.instance_name,
     toast,
     stopPolling,
-    onStatusChange,
-    onQRCodeChange,
-    setConnectionStatus,
-    setQrCode,
+    resetConnectionState,
     setIsLoading,
   ]);
 

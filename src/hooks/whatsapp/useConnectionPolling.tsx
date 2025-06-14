@@ -21,10 +21,13 @@ export const useConnectionPolling = ({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentInstanceRef = useRef<string | null>(null);
   const timeoutCalledRef = useRef<boolean>(false);
+  const isActiveRef = useRef<boolean>(false);
 
   // Função para parar o polling de status
   const stopPolling = useCallback(() => {
     console.log('[useConnectionPolling] Parando polling...');
+    isActiveRef.current = false;
+    
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -41,16 +44,27 @@ export const useConnectionPolling = ({
   const startPolling = useCallback(
     (instanceName: string) => {
       console.log('[useConnectionPolling] Iniciando polling para:', instanceName);
+      
+      // Parar qualquer polling anterior
       stopPolling();
+      
+      // Configurar estado inicial
       currentInstanceRef.current = instanceName;
       timeoutCalledRef.current = false;
+      isActiveRef.current = true;
 
       // Configurar timeout de 30 segundos para reiniciar instância
       timeoutRef.current = setTimeout(() => {
-        if (!timeoutCalledRef.current && currentInstanceRef.current === instanceName) {
+        if (isActiveRef.current && !timeoutCalledRef.current && currentInstanceRef.current === instanceName) {
           console.log('[useConnectionPolling] TIMEOUT de 30s atingido! Reiniciando instância:', instanceName);
           timeoutCalledRef.current = true;
-          stopPolling();
+          isActiveRef.current = false;
+          
+          // Limpar polling atual
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
           
           // Limpar QR Code atual antes do restart
           onQRCodeChange?.(null);
@@ -62,9 +76,9 @@ export const useConnectionPolling = ({
 
       // Iniciar polling a cada 4 segundos
       pollingIntervalRef.current = setInterval(async () => {
-        // Verificar se o timeout já foi chamado
-        if (timeoutCalledRef.current) {
-          console.log('[useConnectionPolling] Timeout já foi executado, parando polling...');
+        // Verificar se ainda está ativo e não teve timeout
+        if (!isActiveRef.current || timeoutCalledRef.current) {
+          console.log('[useConnectionPolling] Polling inativo ou timeout executado, parando...');
           stopPolling();
           return;
         }
@@ -73,8 +87,14 @@ export const useConnectionPolling = ({
           console.log('[useConnectionPolling] Verificando status da instância:', instanceName);
           const result = await getConnectionStatus(instanceName);
 
+          // Se o polling foi parado enquanto aguardava a resposta, sair
+          if (!isActiveRef.current) {
+            return;
+          }
+
           if (result.success && result.status === 'OPEN') {
             console.log('[useConnectionPolling] CONEXÃO ESTABELECIDA! Parando polling.');
+            isActiveRef.current = false;
             stopPolling();
             onConnectionSuccess();
             onStatusChange?.('CONNECTED');
@@ -89,6 +109,10 @@ export const useConnectionPolling = ({
         } catch (error) {
           console.error('[useConnectionPolling] Erro no polling:', error);
           // Não parar o polling por erro único, continuar tentando
+          // Mas verificar se ainda está ativo
+          if (!isActiveRef.current) {
+            stopPolling();
+          }
         }
       }, 4000);
     },
