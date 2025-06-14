@@ -261,12 +261,30 @@ async function checkExistingInstanceState(apiUrl: string, apiKey: string, instan
       }
     });
 
+    // Se a instância não for encontrada (404), recria a instância.
+    if (statusResponse.status === 404) {
+      logStep("Instance not found on Evolution API, but exists in our DB. Recreating...", { instanceName });
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userData.id)
+        .single();
+      
+      if (profileError || !profile) {
+        throw new Error(`Profile not found for instance re-creation: ${profileError?.message}`);
+      }
+
+      return await createInstanceAtomically(apiUrl, apiKey, userData, supabase, profile);
+    }
+    
     let connectionState = 'DISCONNECTED';
     if (statusResponse.ok) {
       const statusData = await statusResponse.json();
       connectionState = statusData.instance?.state || statusData.state || 'DISCONNECTED';
       logStep("Instance state retrieved", { connectionState });
     } else {
+      // Para outros erros HTTP, apenas logamos e assumimos desconectado
       logStep("Failed to get instance state, assuming DISCONNECTED", { status: statusResponse.status });
     }
 
