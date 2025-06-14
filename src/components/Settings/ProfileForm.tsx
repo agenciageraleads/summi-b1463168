@@ -6,36 +6,51 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { disconnectWhatsApp } from '@/services/whatsappConnection';
+import { disconnectWhatsApp, checkConnectionStatus } from '@/services/whatsappService';
 import { AlertCircle, Phone, Unlink, User, Loader2 } from 'lucide-react';
-import { useProfile } from '@/hooks/useProfile';
+import type { Profile } from '@/hooks/useProfile';
 import { useEffect } from 'react';
 
-export const ProfileForm = () => {
+interface ProfileFormProps {
+  profile: Profile;
+  onSave: (data: Partial<Profile>) => Promise<void>;
+  isUpdating: boolean;
+}
+
+export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) => {
   const { toast } = useToast();
-  const { profile, updateProfile, refreshProfile } = useProfile();
+  
+  // Remover o código 55 do número ao inicializar para exibição
+  const getLocalNumber = (numero: string) => {
+    if (!numero) return '';
+    const cleanNumber = numero.replace(/\D/g, '');
+    return cleanNumber.startsWith('55') ? cleanNumber.slice(2) : cleanNumber;
+  };
+
   const [formData, setFormData] = useState({
-    nome: profile?.nome || '',
-    numero: profile?.numero || '',
-    temas_importantes: profile?.temas_importantes || '',
-    temas_urgentes: profile?.temas_urgentes || '',
-    transcreve_audio_recebido: profile?.transcreve_audio_recebido ?? true,
-    transcreve_audio_enviado: profile?.transcreve_audio_enviado ?? true,
-    resume_audio: profile?.resume_audio ?? false,
-    segundos_para_resumir: profile?.segundos_para_resumir || 45,
+    nome: profile.nome || '',
+    numero: getLocalNumber(profile.numero || ''),
+    temas_importantes: profile.temas_importantes || '',
+    temas_urgentes: profile.temas_urgentes || '',
+    transcreve_audio_recebido: profile.transcreve_audio_recebido ?? true,
+    transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
+    resume_audio: profile.resume_audio ?? false,
+    segundos_para_resumir: profile.segundos_para_resumir || 45,
   });
-  const [isUpdating, setIsUpdating] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
 
   // Verificar se há uma instância conectada
   const hasConnectedInstance = Boolean(profile?.instance_name);
+  const isConnecting = connectionStatus === 'connecting';
+  const isPhoneFieldLocked = hasConnectedInstance || isConnecting;
 
   // Atualizar formData quando o perfil carregar
   useEffect(() => {
     if (profile) {
       setFormData({
         nome: profile.nome || '',
-        numero: profile.numero || '',
+        numero: getLocalNumber(profile.numero || ''),
         temas_importantes: profile.temas_importantes || '',
         temas_urgentes: profile.temas_urgentes || '',
         transcreve_audio_recebido: profile.transcreve_audio_recebido ?? true,
@@ -45,6 +60,31 @@ export const ProfileForm = () => {
       });
     }
   }, [profile]);
+
+  // Verificar status da conexão periodicamente
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (profile?.instance_name) {
+        const status = await checkConnectionStatus(profile.instance_name);
+        if (status === 'open') {
+          setConnectionStatus('connected');
+        } else if (status === 'connecting') {
+          setConnectionStatus('connecting');
+        } else {
+          setConnectionStatus('disconnected');
+        }
+      }
+    };
+
+    checkStatus();
+    
+    // Verificar a cada 4 segundos se tem instância
+    const interval = profile?.instance_name ? setInterval(checkStatus, 4000) : null;
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [profile?.instance_name]);
 
   // Função para formatar número de telefone
   const formatPhoneNumber = (value: string) => {
@@ -116,7 +156,6 @@ export const ProfileForm = () => {
 
   const handleSave = async () => {
     console.log('[ProfileForm] Iniciando salvamento das configurações...');
-    setIsUpdating(true);
     
     try {
       // Validar número de telefone (apenas dígitos locais)
@@ -134,17 +173,15 @@ export const ProfileForm = () => {
       const phoneWithCountryCode = phoneNumbers ? 
         (phoneNumbers.startsWith('55') ? phoneNumbers : '55' + phoneNumbers) : '';
       
-      const result = await updateProfile({
+      await onSave({
         ...formData,
         numero: phoneWithCountryCode || null
       });
 
-      if (result?.success) {
-        toast({
-          title: "Configurações salvas",
-          description: "Todas as suas configurações foram atualizadas com sucesso.",
-        });
-      }
+      toast({
+        title: "Configurações salvas",
+        description: "Todas as suas configurações foram atualizadas com sucesso.",
+      });
     } catch (error) {
       console.error('[ProfileForm] Erro ao salvar configurações:', error);
       toast({
@@ -152,8 +189,6 @@ export const ProfileForm = () => {
         description: "Não foi possível salvar as configurações. Tente novamente.",
         variant: "destructive",
       });
-    } finally {
-      setIsUpdating(false);
     }
   };
 
@@ -163,15 +198,16 @@ export const ProfileForm = () => {
     setIsDisconnecting(true);
     
     try {
-      console.log('[ProfileForm] Iniciando desconexão da instância...');
       const result = await disconnectWhatsApp();
       
       if (result.success) {
-        await refreshProfile();
         toast({
           title: "Desconectado",
           description: "WhatsApp desconectado com sucesso. Agora você pode alterar o número de telefone.",
         });
+        
+        // Recarregar a página para atualizar o estado
+        window.location.reload();
       } else {
         toast({
           title: "Erro",
@@ -180,7 +216,7 @@ export const ProfileForm = () => {
         });
       }
     } catch (error) {
-      console.error('[ProfileForm] Erro ao desconectar:', error);
+      console.error('Erro ao desconectar:', error);
       toast({
         title: "Erro",
         description: "Erro ao desconectar WhatsApp",
@@ -229,43 +265,59 @@ export const ProfileForm = () => {
               placeholder="Ex: (62) 9 8243-5286"
               value={formatPhoneNumber(formData.numero)}
               onChange={handlePhoneChange}
-              disabled={hasConnectedInstance}
-              className={hasConnectedInstance ? 'bg-gray-100 cursor-not-allowed' : ''}
+              disabled={isPhoneFieldLocked}
+              className={isPhoneFieldLocked ? 'bg-gray-100 cursor-not-allowed' : ''}
             />
-            {hasConnectedInstance && (
+            {isPhoneFieldLocked && (
               <p className="text-sm text-amber-600 mt-1 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                Campo bloqueado: WhatsApp conectado
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    Conectando...
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    Campo bloqueado: WhatsApp conectado
+                  </>
+                )}
               </p>
             )}
           </div>
         </div>
 
         {/* Desconectar WhatsApp se conectado */}
-        {hasConnectedInstance && (
+        {(hasConnectedInstance || isConnecting) && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <h4 className="font-medium text-amber-800 mb-1">WhatsApp Conectado</h4>
+            <h4 className="font-medium text-amber-800 mb-1">
+              {isConnecting ? 'WhatsApp Conectando' : 'WhatsApp Conectado'}
+            </h4>
             <p className="text-sm text-amber-700 mb-3">
-              Para alterar o número de telefone, é necessário desconectar o WhatsApp primeiro.
+              {isConnecting 
+                ? 'Conexão em andamento. Para alterar o número, aguarde ou desconecte.'
+                : 'Para alterar o número de telefone, é necessário desconectar o WhatsApp primeiro.'
+              }
             </p>
-            <Button 
-              onClick={handleDisconnectInstance}
-              disabled={isDisconnecting}
-              variant="destructive"
-              size="sm"
-            >
-              {isDisconnecting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Desconectando...
-                </>
-              ) : (
-                <>
-                  <Unlink className="w-4 h-4 mr-2" />
-                  Desconectar WhatsApp
-                </>
-              )}
-            </Button>
+            {!isConnecting && (
+              <Button 
+                onClick={handleDisconnectInstance}
+                disabled={isDisconnecting}
+                variant="destructive"
+                size="sm"
+              >
+                {isDisconnecting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Desconectando...
+                  </>
+                ) : (
+                  <>
+                    <Unlink className="w-4 h-4 mr-2" />
+                    Desconectar WhatsApp
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
 
