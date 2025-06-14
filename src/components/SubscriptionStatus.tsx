@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -86,9 +87,26 @@ export const SubscriptionStatus = () => {
     }
   };
 
-  // Carrega dados iniciais
+  // Carrega e sincroniza dados iniciais para evitar a condição de corrida
   useEffect(() => {
-    loadSubscriptionData();
+    const initialSyncAndLoad = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        // Primeiro, sincroniza os dados do Stripe com o Supabase para garantir que estão atualizados.
+        await syncSubscriptionData();
+        // Depois, carrega os dados já atualizados do banco local para exibir.
+        await loadSubscriptionData();
+      } catch (error) {
+        console.error("Erro na sincronização e carregamento inicial:", error);
+        setIsLoading(false); // Garante que o loading para em caso de erro.
+      }
+    };
+
+    initialSyncAndLoad();
   }, [user]);
 
   // Configura listener para mudanças em tempo real

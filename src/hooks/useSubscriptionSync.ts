@@ -1,4 +1,3 @@
-
 import { useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -105,13 +104,8 @@ export const useSubscriptionSync = () => {
     };
   }, [user, toast]);
 
-  // Sincronização inicial quando o usuário faz login
-  useEffect(() => {
-    if (user) {
-      console.log('[SYNC] Usuário logado, iniciando sincronização inicial...');
-      syncSubscriptionData();
-    }
-  }, [user, syncSubscriptionData]);
+  // A sincronização inicial foi removida daqui para ser controlada pelo componente que consome o hook.
+  // Isso evita chamadas duplicadas e resolve condições de corrida.
 
   return {
     syncSubscriptionData
