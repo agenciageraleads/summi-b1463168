@@ -131,8 +131,8 @@ export type Database = {
           created_at: string
           email: string
           id: string
-          plan_type: string | null
           stripe_customer_id: string | null
+          stripe_price_id: string | null
           stripe_subscription_id: string | null
           subscription_end: string | null
           subscription_start: string | null
@@ -144,8 +144,8 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
-          plan_type?: string | null
           stripe_customer_id?: string | null
+          stripe_price_id?: string | null
           stripe_subscription_id?: string | null
           subscription_end?: string | null
           subscription_start?: string | null
@@ -157,8 +157,8 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
-          plan_type?: string | null
           stripe_customer_id?: string | null
+          stripe_price_id?: string | null
           stripe_subscription_id?: string | null
           subscription_end?: string | null
           subscription_start?: string | null
