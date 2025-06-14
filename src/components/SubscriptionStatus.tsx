@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Crown, Calendar, RefreshCw, Clock } from 'lucide-react';
 import { useSubscriptionSync } from '@/hooks/useSubscriptionSync';
+import { useNavigate } from 'react-router-dom';
 
 interface SubscriptionData {
   isSubscribed: boolean;
@@ -24,6 +25,7 @@ export const SubscriptionStatus = () => {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const navigate = useNavigate();
 
   // Carrega dados de assinatura do banco local
   const loadSubscriptionData = async () => {
@@ -233,6 +235,22 @@ export const SubscriptionStatus = () => {
             </div>
           )}
         </div>
+
+        {/* CTA para usuários inativos */}
+        {subscriptionData.status === 'inactive' && (
+          <div className="mt-4 pt-4 border-t border-summi-gray-200 text-center">
+            <h4 className="font-semibold text-summi-gray-800">Ative sua conta para continuar</h4>
+            <p className="text-sm text-summi-gray-600 mt-2">
+              Para utilizar todas as funcionalidades da Summi, é necessário ter uma assinatura ativa. Inicie agora e aproveite um <strong>período de teste gratuito</strong>.
+            </p>
+            <Button
+              onClick={() => navigate('/subscription')}
+              className="mt-4 w-full bg-summi-gradient text-white hover:opacity-90"
+            >
+              Ver Planos e Iniciar Teste
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
