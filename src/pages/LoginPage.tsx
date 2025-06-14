@@ -19,7 +19,8 @@ const LoginPage = () => {
   const [resetEmail, setResetEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect if already logged in
+  // Efeito para redirecionar o usuário após o login bem-sucedido.
+  // Isso garante que a navegação só ocorra quando o estado de 'user' for atualizado.
   useEffect(() => {
     if (user && !isLoading) {
       navigate('/dashboard');
@@ -30,11 +31,11 @@ const LoginPage = () => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    const result = await login(formData.email, formData.password);
+    // A função de login é chamada, e os toasts de sucesso/erro são exibidos.
+    await login(formData.email, formData.password);
     
-    if (!result.error) {
-      navigate('/dashboard');
-    }
+    // A navegação foi removida daqui para evitar a condição de corrida.
+    // O useEffect acima agora é o único responsável pelo redirecionamento.
     
     setIsSubmitting(false);
   };
