@@ -1,5 +1,4 @@
-
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -27,16 +26,49 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  // Função para verificar assinatura e sincronizar dados
+  const checkSubscription = useCallback(async (userId: string) => {
+    try {
+      console.log('[AUTH] Verificando assinatura para usuário:', userId);
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) return;
+
+      // Chama a função para sincronizar com Stripe
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('[AUTH] Erro ao verificar assinatura:', error);
+        return;
+      }
+
+      console.log('[AUTH] Dados de assinatura sincronizados:', data);
+    } catch (error) {
+      console.error('[AUTH] Erro na verificação de assinatura:', error);
+    }
+  }, []);
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsLoading(false);
+        setLoading(true);
+        
+        if (session?.user) {
+          setUser(session.user);
+          // Sincroniza dados de assinatura quando usuário faz login
+          await checkSubscription(session.user.id);
+        } else {
+          setUser(null);
+        }
+        
+        setLoading(false);
       }
     );
 
@@ -44,14 +76,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setIsLoading(false);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [checkSubscription]);
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
+    setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -73,12 +105,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return {};
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const register = async (name: string, email: string, password: string) => {
-    setIsLoading(true);
+    setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/`;
       
@@ -108,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return {};
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
