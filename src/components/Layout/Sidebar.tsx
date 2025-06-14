@@ -31,8 +31,8 @@ export const Sidebar = () => {
     chat.prioridade === 'urgente' || chat.prioridade === 'importante'
   ).length;
   
-  // Verificar se é admin
-  const isAdmin = profile?.role === 'admin';
+  // Verificar se é admin - acessando diretamente os dados do profile
+  const isAdmin = (profile as any)?.role === 'admin';
 
   return (
     <>
