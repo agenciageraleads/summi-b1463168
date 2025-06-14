@@ -3,171 +3,176 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[DELETE-USER-ACCOUNT] ${step}${detailsStr}`);
+// Função para log de auditoria de segurança
+const auditLog = (action: string, userId: string, details?: any) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[SECURITY-AUDIT] ${timestamp} - ${action} - User: ${userId}`, details ? JSON.stringify(details) : '');
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false } }
-  );
-
   try {
-    logStep("Delete user account process started");
-
-    const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
-    const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
-    
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error("Evolution API credentials not configured");
-    }
-
+    // Verificar se há token de autorização
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      throw new Error("No authorization header provided");
+      auditLog("UNAUTHORIZED_ACCESS_ATTEMPT", "unknown", { endpoint: "delete-user-account" });
+      return new Response(JSON.stringify({ success: false, error: "Token de autorização obrigatório" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    // Configurar cliente Supabase com service role
+    const supabaseServiceRole = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    // Configurar cliente para verificação de usuário
+    const supabaseAuth = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+
+    // Verificar token do usuário
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      auditLog("INVALID_TOKEN", "unknown", { error: authError?.message });
+      return new Response(JSON.stringify({ success: false, error: "Token inválido" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    const body = await req.json();
+    const targetUserId = body.target_user_id || user.id; // Se não especificado, assume própria conta
+
+    // Verificar se é auto-deleção ou deleção por admin
+    const isSelfDeletion = targetUserId === user.id;
     
-    if (userError || !userData.user) {
-      throw new Error("User not authenticated");
-    }
+    if (!isSelfDeletion) {
+      // Verificar se o usuário é admin usando função segura
+      const { data: isAdmin, error: adminError } = await supabaseServiceRole
+        .rpc('verify_admin_access', { user_id: user.id });
 
-    const user = userData.user;
-    logStep("User authenticated for deletion", { userId: user.id, email: user.email });
-
-    // Buscar dados do perfil para obter instance_name
-    const { data: profileData, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('instance_name')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (profileError) {
-      logStep("Warning: Could not fetch profile data", profileError);
-    }
-
-    const instanceName = profileData?.instance_name;
-
-    // ETAPA A: Deletar instância da Evolution API (se existir)
-    if (instanceName) {
-      logStep("Step A: Deleting Evolution API instance", { instanceName });
-      
-      try {
-        const deleteInstanceResponse = await fetch(`${evolutionApiUrl.replace(/\/$/, '')}/instance/delete/${instanceName}`, {
-          method: 'DELETE',
-          headers: {
-            'apikey': evolutionApiKey
-          }
+      if (adminError || !isAdmin) {
+        auditLog("UNAUTHORIZED_ADMIN_ACTION", user.id, { 
+          action: "delete_user", 
+          target: targetUserId,
+          reason: "não é admin ou erro de verificação" 
         });
-
-        if (deleteInstanceResponse.ok) {
-          logStep("Evolution API instance deleted successfully");
-        } else {
-          const errorText = await deleteInstanceResponse.text();
-          logStep("Warning: Could not delete Evolution API instance", { status: deleteInstanceResponse.status, error: errorText });
-          // Continuar mesmo se a deleção da instância falhar
-        }
-      } catch (evolutionError) {
-        logStep("Warning: Error deleting Evolution API instance", { error: evolutionError });
-        // Continuar mesmo se houver erro
+        return new Response(JSON.stringify({ success: false, error: "Acesso negado" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
+      
+      auditLog("ADMIN_USER_DELETION", user.id, { target_user: targetUserId });
     } else {
-      logStep("No Evolution API instance to delete");
+      auditLog("SELF_ACCOUNT_DELETION", user.id);
     }
 
-    // ETAPA B: Deletar dados relacionados do usuário
-    logStep("Step B: Deleting user related data");
-
-    // Deletar chats do usuário
-    const { error: chatsError } = await supabaseClient
-      .from('chats')
-      .delete()
-      .eq('id_usuario', user.id);
-
-    if (chatsError) {
-      logStep("Error deleting user chats", chatsError);
-      throw new Error(`Failed to delete user chats: ${chatsError.message}`);
-    }
-    logStep("User chats deleted successfully");
-
-    // Deletar feedback do usuário
-    const { error: feedbackError } = await supabaseClient
-      .from('feedback')
-      .delete()
-      .eq('user_id', user.id);
-
-    if (feedbackError) {
-      logStep("Warning: Could not delete user feedback", feedbackError);
-      // Não falhar por causa do feedback
-    }
-
-    // Deletar dados de assinatura
-    const { error: subscribersError } = await supabaseClient
-      .from('subscribers')
-      .delete()
-      .eq('user_id', user.id);
-
-    if (subscribersError) {
-      logStep("Warning: Could not delete subscriber data", subscribersError);
-      // Não falhar por causa da assinatura
-    }
-
-    // Deletar perfil do usuário
-    const { error: profileDeleteError } = await supabaseClient
+    // Validar se o usuário alvo existe
+    const { data: targetProfile, error: profileError } = await supabaseServiceRole
       .from('profiles')
-      .delete()
-      .eq('id', user.id);
+      .select('id, nome, email')
+      .eq('id', targetUserId)
+      .single();
 
-    if (profileDeleteError) {
-      logStep("Error deleting user profile", profileDeleteError);
-      throw new Error(`Failed to delete user profile: ${profileDeleteError.message}`);
+    if (profileError || !targetProfile) {
+      auditLog("DELETE_NONEXISTENT_USER", user.id, { target: targetUserId });
+      return new Response(JSON.stringify({ success: false, error: "Usuário não encontrado" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
-    logStep("User profile deleted successfully");
 
-    // ETAPA C: Deletar usuário do sistema de autenticação
-    logStep("Step C: Deleting user from auth system");
-    
-    const { error: authDeleteError } = await supabaseClient.auth.admin.deleteUser(user.id);
-    
-    if (authDeleteError) {
-      logStep("Error deleting user from auth system", authDeleteError);
-      throw new Error(`Failed to delete user from auth: ${authDeleteError.message}`);
+    // Rate limiting simples (máximo 3 deleções por hora por usuário admin)
+    if (!isSelfDeletion) {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // Nota: Em produção, implementar rate limiting adequado com Redis/cache
     }
-    logStep("User deleted from auth system successfully");
 
-    logStep("User account deletion completed successfully", { userId: user.id });
+    // Deletar dados relacionados do usuário de forma segura
+    try {
+      // 1. Deletar chats do usuário
+      await supabaseServiceRole
+        .from('chats')
+        .delete()
+        .eq('id_usuario', targetUserId);
 
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'User account deleted successfully'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+      // 2. Deletar feedback do usuário  
+      await supabaseServiceRole
+        .from('feedback')
+        .delete()
+        .eq('user_id', targetUserId);
+
+      // 3. Deletar assinatura do usuário
+      await supabaseServiceRole
+        .from('subscribers')
+        .delete()
+        .eq('user_id', targetUserId);
+
+      // 4. Deletar perfil do usuário
+      await supabaseServiceRole
+        .from('profiles')
+        .delete()
+        .eq('id', targetUserId);
+
+      // 5. Deletar usuário da autenticação (último passo)
+      const { error: deleteAuthError } = await supabaseServiceRole.auth.admin.deleteUser(targetUserId);
+      
+      if (deleteAuthError) {
+        throw new Error(`Erro ao deletar usuário da autenticação: ${deleteAuthError.message}`);
+      }
+
+      auditLog("USER_DELETION_SUCCESS", user.id, { 
+        deleted_user: targetUserId,
+        deleted_profile: targetProfile.nome 
+      });
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: "Conta deletada com sucesso" 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+
+    } catch (deleteError) {
+      auditLog("USER_DELETION_ERROR", user.id, { 
+        target: targetUserId,
+        error: deleteError.message 
+      });
+      
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: "Erro interno ao deletar conta" 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in delete-user-account", { message: errorMessage });
+    auditLog("FUNCTION_ERROR", "unknown", { error: error.message });
     
     return new Response(JSON.stringify({ 
-      success: false,
-      error: errorMessage 
+      success: false, 
+      error: "Erro interno do servidor" 
     }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });

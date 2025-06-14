@@ -1,566 +1,450 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, instance-name",
 };
 
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[EVOLUTION-HANDLER] ${step}${detailsStr}`);
+// Função para log de auditoria de segurança
+const auditLog = (action: string, userId: string, details?: any) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[SECURITY-AUDIT] ${timestamp} - ${action} - User: ${userId}`, details ? JSON.stringify(details) : '');
+};
+
+// Função para validar entrada e sanitizar dados
+const sanitizeInput = (input: string): string => {
+  if (!input) return '';
+  return input.replace(/[<>\"']/g, '').trim();
+};
+
+const validatePhoneNumber = (phone: string): boolean => {
+  // Validação para números brasileiros
+  const phoneRegex = /^55[1-9][1-9][0-9]{8,9}$/;
+  return phoneRegex.test(phone.replace(/\D/g, ''));
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false } }
-  );
-
   try {
-    logStep("Evolution API Handler started");
-
-    const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
-    const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
+    console.log("[EVOLUTION-HANDLER] Evolution API Handler started");
     
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error("Evolution API credentials not configured");
+    // Verificar autenticação
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      auditLog("UNAUTHORIZED_API_ACCESS", "unknown", { endpoint: "evolution-api-handler" });
+      return new Response(JSON.stringify({ success: false, error: "Token de autorização obrigatório" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
-    const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
-    
-    const { action, instanceName, ...params } = await req.json();
-    logStep("Action requested", { action, instanceName });
+    // Configurar clientes Supabase
+    const supabaseServiceRole = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
 
-    // Função helper para obter o usuário autenticado, movida para dentro do switch
-    const getAuthenticatedUser = async () => {
-      const authHeader = req.headers.get("Authorization");
-      if (!authHeader) {
-        throw new Error("Authorization header is required for this action");
-      }
-      const token = authHeader.replace("Bearer ", "");
-      const { data, error } = await supabaseClient.auth.getUser(token);
+    const supabaseAuth = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
 
-      if (error || !data.user) {
-        logStep("Authentication failed", { error: error?.message });
-        throw new Error("User not authenticated");
-      }
-      return data.user;
-    };
+    // Verificar usuário
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
 
+    if (authError || !user) {
+      auditLog("INVALID_TOKEN_API", "unknown", { error: authError?.message });
+      return new Response(JSON.stringify({ success: false, error: "Token inválido" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    const body = await req.json();
+    const action = sanitizeInput(body.action);
+    const instanceName = sanitizeInput(req.headers.get("instance-name") || body.instanceName || '');
+
+    console.log(`[EVOLUTION-HANDLER] Action requested - ${JSON.stringify({ action })}`);
+
+    // Buscar perfil do usuário com validação de segurança
+    const { data: profile, error: profileError } = await supabaseServiceRole
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      auditLog("PROFILE_NOT_FOUND", user.id, { error: profileError?.message });
+      return new Response(JSON.stringify({ success: false, error: "Perfil não encontrado" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // Verificar configuração das variáveis de ambiente
+    const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
+    const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      auditLog("MISSING_ENV_VARS", user.id, { action });
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: "Configuração da API Evolution não encontrada" 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // Processar ações baseadas no tipo
     switch (action) {
-      case 'initialize-connection': {
-        const userData = await getAuthenticatedUser();
-        return await handleInitializeConnection(cleanApiUrl, evolutionApiKey, userData, supabaseClient);
+      case "initialize-connection": {
+        auditLog("INITIALIZE_CONNECTION", user.id, { instanceName: profile.instance_name });
+        
+        console.log(`[EVOLUTION-HANDLER] Starting initialize-connection flow - ${JSON.stringify({ userId: user.id })}`);
+        
+        // Validar número se fornecido
+        if (profile.numero && !validatePhoneNumber(profile.numero)) {
+          auditLog("INVALID_PHONE_NUMBER", user.id, { phone: profile.numero });
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "Número de telefone inválido" 
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        const hasInstanceName = !!profile.instance_name;
+        const instanceNameToUse = hasInstanceName ? profile.instance_name : `${profile.nome.toLowerCase().replace(/\s+/g, '')}_${profile.numero}`;
+        
+        console.log(`[EVOLUTION-HANDLER] Profile state analyzed - ${JSON.stringify({ 
+          hasInstanceName, 
+          instanceName: instanceNameToUse, 
+          numero: profile.numero 
+        })}`);
+
+        if (hasInstanceName) {
+          // Cenário B: Instância existente - verificar estado
+          console.log(`[EVOLUTION-HANDLER] SCENARIO B: Existing instance - checking state - ${JSON.stringify({ instanceName: instanceNameToUse })}`);
+          
+          try {
+            const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceNameToUse}`, {
+              headers: { 'apikey': evolutionApiKey }
+            });
+            
+            const statusData = await statusResponse.json();
+            console.log(`[EVOLUTION-HANDLER] Instance state retrieved - ${JSON.stringify({ connectionState: statusData.state })}`);
+            
+            if (statusData.state === 'open') {
+              // Garantir que o webhook está configurado
+              console.log(`[EVOLUTION-HANDLER] Ensuring webhook is configured - ${JSON.stringify({ instanceName: instanceNameToUse })}`);
+              
+              try {
+                await fetch(`${evolutionApiUrl}/webhook/set/${instanceNameToUse}`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': evolutionApiKey
+                  },
+                  body: JSON.stringify({
+                    url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
+                    webhook_by_events: false,
+                    webhook_base64: false,
+                    events: [
+                      "APPLICATION_STARTUP",
+                      "QRCODE_UPDATED", 
+                      "CONNECTION_UPDATE",
+                      "MESSAGES_UPSERT",
+                      "MESSAGES_UPDATE"
+                    ]
+                  })
+                });
+              } catch (webhookError) {
+                console.log(`[EVOLUTION-HANDLER] WARNING: Failed to configure webhook - ${JSON.stringify({ status: 400 })}`);
+              }
+              
+              return new Response(JSON.stringify({ 
+                success: true, 
+                status: 'connected',
+                instanceName: instanceNameToUse
+              }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              });
+            }
+            
+            // Se não está conectado, gerar novo QR
+            const qrResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceNameToUse}`, {
+              method: 'GET',
+              headers: { 'apikey': evolutionApiKey }
+            });
+            
+            const qrData = await qrResponse.json();
+            
+            return new Response(JSON.stringify({ 
+              success: true,
+              qrCode: qrData.base64,
+              instanceName: instanceNameToUse,
+              status: 'awaiting_connection'
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+            
+          } catch (error) {
+            auditLog("CONNECTION_CHECK_ERROR", user.id, { error: error.message });
+            console.error(`[EVOLUTION-HANDLER] Error checking instance state:`, error);
+            
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: "Erro ao verificar estado da conexão" 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+        }
+        
+        // Cenário A: Nova instância
+        console.log(`[EVOLUTION-HANDLER] SCENARIO A: New instance - creating - ${JSON.stringify({ instanceName: instanceNameToUse })}`);
+        
+        try {
+          // Criar nova instância
+          const createResponse = await fetch(`${evolutionApiUrl}/instance/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': evolutionApiKey
+            },
+            body: JSON.stringify({
+              instanceName: instanceNameToUse,
+              token: evolutionApiKey,
+              qrcode: true,
+              number: profile.numero,
+              webhook: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
+              webhook_by_events: false,
+              events: [
+                "APPLICATION_STARTUP",
+                "QRCODE_UPDATED", 
+                "CONNECTION_UPDATE",
+                "MESSAGES_UPSERT",
+                "MESSAGES_UPDATE"
+              ]
+            })
+          });
+          
+          if (!createResponse.ok) {
+            throw new Error(`HTTP ${createResponse.status}: ${await createResponse.text()}`);
+          }
+          
+          const createData = await createResponse.json();
+          console.log(`[EVOLUTION-HANDLER] Instance created successfully - ${JSON.stringify({ instanceName: instanceNameToUse })}`);
+          
+          // Atualizar perfil com instance_name
+          await supabaseServiceRole
+            .from('profiles')
+            .update({ instance_name: instanceNameToUse })
+            .eq('id', user.id);
+          
+          auditLog("INSTANCE_CREATED", user.id, { instanceName: instanceNameToUse });
+          
+          return new Response(JSON.stringify({ 
+            success: true,
+            qrCode: createData.qrcode?.base64,
+            instanceName: instanceNameToUse,
+            status: 'created'
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+          
+        } catch (error) {
+          auditLog("INSTANCE_CREATION_ERROR", user.id, { error: error.message });
+          console.error(`[EVOLUTION-HANDLER] Error creating instance:`, error);
+          
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "Erro ao criar nova instância" 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      }
+
+      case "get-status": {
+        if (!instanceName) {
+          auditLog("MISSING_INSTANCE_NAME", user.id, { action });
+          return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      
+        auditLog("GET_STATUS", user.id, { instanceName });
+      
+        try {
+          const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
+            headers: { 'apikey': evolutionApiKey }
+          });
+      
+          if (!statusResponse.ok) {
+            throw new Error(`HTTP ${statusResponse.status}: ${await statusResponse.text()}`);
+          }
+      
+          const statusData = await statusResponse.json();
+          console.log(`[EVOLUTION-HANDLER] Status da instância ${instanceName}: ${statusData.state}`);
+      
+          return new Response(JSON.stringify({ success: true, status: statusData.state }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        } catch (error) {
+          auditLog("GET_STATUS_ERROR", user.id, { instanceName, error: error.message });
+          console.error(`[EVOLUTION-HANDLER] Erro ao obter status da instância ${instanceName}:`, error);
+          return new Response(JSON.stringify({ success: false, error: "Erro ao obter status da instância" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
       }
       
-      case 'get-qrcode': {
-        if (!instanceName) throw new Error("instanceName is required for get-qrcode");
-        return await handleGetQRCode(cleanApiUrl, evolutionApiKey, instanceName);
+      case "restart": {
+        if (!instanceName) {
+          auditLog("MISSING_INSTANCE_NAME", user.id, { action });
+          return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      
+        auditLog("RESTART_INSTANCE", user.id, { instanceName });
+      
+        try {
+          const restartResponse = await fetch(`${evolutionApiUrl}/instance/restart/${instanceName}`, {
+            method: 'GET',
+            headers: { 'apikey': evolutionApiKey }
+          });
+      
+          if (!restartResponse.ok) {
+            throw new Error(`HTTP ${restartResponse.status}: ${await restartResponse.text()}`);
+          }
+      
+          console.log(`[EVOLUTION-HANDLER] Instância ${instanceName} reiniciada com sucesso.`);
+          return new Response(JSON.stringify({ success: true, message: "Instância reiniciada com sucesso" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        } catch (error) {
+          auditLog("RESTART_INSTANCE_ERROR", user.id, { instanceName, error: error.message });
+          console.error(`[EVOLUTION-HANDLER] Erro ao reiniciar instância ${instanceName}:`, error);
+          return new Response(JSON.stringify({ success: false, error: "Erro ao reiniciar instância" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
       }
       
-      case 'get-status': {
-        const userData = await getAuthenticatedUser();
-        const { data: profile } = await supabaseClient.from('profiles').select('instance_name').eq('id', userData.id).single();
-        if (!profile?.instance_name) throw new Error("Instance not configured for this user.");
-        return await checkExistingInstanceState(cleanApiUrl, evolutionApiKey, profile.instance_name, userData, supabaseClient);
+      case "logout": {
+        if (!instanceName) {
+          auditLog("MISSING_INSTANCE_NAME", user.id, { action });
+          return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      
+        auditLog("LOGOUT_INSTANCE", user.id, { instanceName });
+      
+        try {
+          const logoutResponse = await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+            method: 'GET',
+            headers: { 'apikey': evolutionApiKey }
+          });
+      
+          if (!logoutResponse.ok) {
+            throw new Error(`HTTP ${logoutResponse.status}: ${await logoutResponse.text()}`);
+          }
+      
+          console.log(`[EVOLUTION-HANDLER] Instância ${instanceName} deslogada com sucesso.`);
+          return new Response(JSON.stringify({ success: true, message: "Instância deslogada com sucesso" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        } catch (error) {
+          auditLog("LOGOUT_INSTANCE_ERROR", user.id, { instanceName, error: error.message });
+          console.error(`[EVOLUTION-HANDLER] Erro ao deslogar instância ${instanceName}:`, error);
+          return new Response(JSON.stringify({ success: false, error: "Erro ao deslogar instância" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
       }
       
-      case 'disconnect':
-      case 'logout':
-      case 'delete': {
-        const userData = await getAuthenticatedUser();
-        return await handleDisconnect(cleanApiUrl, evolutionApiKey, userData, supabaseClient);
+      case "delete": {
+        if (!instanceName) {
+          auditLog("MISSING_INSTANCE_NAME", user.id, { action });
+          return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      
+        auditLog("DELETE_INSTANCE", user.id, { instanceName });
+      
+        try {
+          const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+            method: 'GET',
+            headers: { 'apikey': evolutionApiKey }
+          });
+      
+          if (!deleteResponse.ok) {
+            throw new Error(`HTTP ${deleteResponse.status}: ${await deleteResponse.text()}`);
+          }
+      
+          // Limpar instance_name no perfil
+          await supabaseServiceRole
+            .from('profiles')
+            .update({ instance_name: null })
+            .eq('id', user.id);
+      
+          console.log(`[EVOLUTION-HANDLER] Instância ${instanceName} deletada com sucesso.`);
+          return new Response(JSON.stringify({ success: true, message: "Instância deletada com sucesso" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        } catch (error) {
+          auditLog("DELETE_INSTANCE_ERROR", user.id, { instanceName, error: error.message });
+          console.error(`[EVOLUTION-HANDLER] Erro ao deletar instância ${instanceName}:`, error);
+          return new Response(JSON.stringify({ success: false, error: "Erro ao deletar instância" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
       }
       
       default:
-        throw new Error(`Unknown action: ${action}`);
+        auditLog("UNKNOWN_ACTION", user.id, { action });
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "Ação não reconhecida" 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
     }
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in evolution-api-handler", { message: errorMessage });
+    auditLog("FUNCTION_ERROR", "unknown", { error: error.message });
+    console.error(`[EVOLUTION-HANDLER] Function error:`, error);
+    
     return new Response(JSON.stringify({ 
-      success: false,
-      error: errorMessage 
+      success: false, 
+      error: "Erro interno do servidor" 
     }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });
-
-// FUNÇÃO PRINCIPAL: Inicializar conexão com lógica de estados inteligente
-async function handleInitializeConnection(apiUrl: string, apiKey: string, userData: any, supabase: any) {
-  logStep("Starting initialize-connection flow", { userId: userData.id });
-
-  try {
-    // Passo 1.0: Verificar estado atual do usuário no banco
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userData.id)
-      .single();
-
-    if (profileError && profileError.code !== 'PGRST116') {
-      throw new Error(`Failed to get user profile: ${profileError.message}`);
-    }
-
-    if (!profile) {
-      throw new Error("User profile not found");
-    }
-
-    const hasInstanceName = profile.instance_name && profile.instance_name.trim() !== '';
-    logStep("Profile state analyzed", { 
-      hasInstanceName, 
-      instanceName: profile.instance_name,
-      numero: profile.numero 
-    });
-
-    // Verificar se tem número de telefone configurado
-    if (!profile.numero) {
-      return new Response(JSON.stringify({
-        success: true,
-        state: 'needs_phone_number',
-        message: 'Configure seu número de telefone primeiro'
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    // CENÁRIO A: Nenhuma instância registrada (novo usuário)
-    if (!hasInstanceName) {
-      logStep("SCENARIO A: New user - creating instance atomically");
-      return await createInstanceAtomically(apiUrl, apiKey, userData, supabase, profile);
-    }
-
-    // CENÁRIO B: Instância já registrada - verificar estado
-    logStep("SCENARIO B: Existing instance - checking state", { instanceName: profile.instance_name });
-    return await checkExistingInstanceState(apiUrl, apiKey, profile.instance_name, userData, supabase);
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in initialize-connection", { message: errorMessage });
-    return new Response(JSON.stringify({
-      success: false,
-      error: errorMessage,
-      state: 'error'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
-  }
-}
-
-// CENÁRIO A: Criar instância atomicamente (nova) - Alteração: usar nome + últimos dígitos do telefone
-async function createInstanceAtomically(apiUrl: string, apiKey: string, userData: any, supabase: any, profile: any) {
-  logStep("Creating instance atomically for new user");
-
-  // Gerar instanceName usando nome + últimos 4 dígitos do telefone
-  const nome = profile.nome?.toLowerCase().replace(/[^a-zA-Z0-9]/g, '') || 'user';
-  const ultimosDigitos = profile.numero?.slice(-4) || '0000';
-  const instanceName = `${nome}_${ultimosDigitos}`;
-  
-  let createdInstanceName = null;
-
-  try {
-    // 1. Criar a instância com webhook incluído no payload
-    logStep("Step 1: Creating instance with webhook", { instanceName });
-    
-    // CORREÇÃO: Payload ajustado para a especificação da API v2.2.3 e com as configurações solicitadas.
-    // O parâmetro 'token' não é necessário no corpo, a autenticação é via header 'apikey'.
-    const createPayload = {
-      instanceName: instanceName,
-      number: profile.numero, // Adicionado número de telefone do perfil.
-      integration: "WHATSAPP-BAILEYS",
-      qrcode: true,
-      readMessages: false,
-      readStatus: false,
-      groupsIgnore: true,
-      rejectCall: false,
-      alwaysOnline: false,
-      syncFullHistory: true,
-      webhook: {
-        url: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
-        byEvents: false,
-        base64: true, // Corrigido para true conforme solicitado.
-        headers: {
-          "Content-Type": "application/json"
-        },
-        events: ["MESSAGES_UPSERT"]
-      }
-    };
-
-    const createResponse = await fetch(`${apiUrl}/instance/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': apiKey
-      },
-      body: JSON.stringify(createPayload)
-    });
-
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      logStep("ERROR: Instance creation failed", { status: createResponse.status, error: errorText });
-      throw new Error(`Failed to create instance: ${createResponse.status} - ${errorText}`);
-    }
-
-    const createData = await createResponse.json();
-    createdInstanceName = createData.instance?.instanceName || instanceName;
-    logStep("Step 1: Instance created successfully with webhook", { createdInstanceName });
-
-    // 2. Atualizar o perfil do usuário
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ 
-        instance_name: createdInstanceName,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userData.id);
-
-    if (updateError) {
-      logStep("WARNING: Failed to update user profile", updateError);
-    } else {
-      logStep("User profile updated successfully");
-    }
-
-    return new Response(JSON.stringify({
-      success: true,
-      state: 'needs_qr_code',
-      instanceName: createdInstanceName,
-      message: 'Instância criada com webhook configurado. Gere o QR Code para conectar.'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("FATAL ERROR in atomic creation", { message: errorMessage, instanceName: createdInstanceName });
-    
-    // ROLLBACK: Deletar a instância criada se algo deu errado
-    if (createdInstanceName) {
-      logStep("Step 3: Rolling back - deleting created instance", { instanceName: createdInstanceName });
-      try {
-        await fetch(`${apiUrl}/instance/delete/${createdInstanceName}`, {
-          method: 'DELETE',
-          headers: { 'apikey': apiKey }
-        });
-        logStep("Rollback completed successfully");
-      } catch (rollbackError) {
-        logStep("WARNING: Rollback failed", { error: rollbackError });
-      }
-    }
-    
-    return new Response(JSON.stringify({
-      success: false,
-      error: errorMessage,
-      state: 'error'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
-  }
-}
-
-// CENÁRIO B: Verificar estado de instância existente
-async function checkExistingInstanceState(apiUrl: string, apiKey: string, instanceName: string, userData: any, supabase: any) {
-  logStep("Checking existing instance state", { instanceName });
-
-  try {
-    // 1. Verificar estado na Evolution API
-    const statusResponse = await fetch(`${apiUrl}/instance/connectionState/${instanceName}`, {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    // Se a instância não for encontrada (404), recria a instância.
-    if (statusResponse.status === 404) {
-      logStep("Instance not found on Evolution API, but exists in our DB. Recreating...", { instanceName });
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userData.id)
-        .single();
-      
-      if (profileError || !profile) {
-        throw new Error(`Profile not found for instance re-creation: ${profileError?.message}`);
-      }
-
-      return await createInstanceAtomically(apiUrl, apiKey, userData, supabase, profile);
-    }
-    
-    let connectionState = 'DISCONNECTED';
-    if (statusResponse.ok) {
-      const statusData = await statusResponse.json();
-      connectionState = statusData.instance?.state || statusData.state || 'DISCONNECTED';
-      logStep("Instance state retrieved", { connectionState });
-    } else {
-      // Para outros erros HTTP, apenas logamos e assumimos desconectado
-      logStep("Failed to get instance state, assuming DISCONNECTED", { status: statusResponse.status });
-    }
-
-    // 2. Verificar e corrigir webhook se necessário
-    await ensureWebhookConfigured(apiUrl, apiKey, instanceName);
-
-    // 3. Retornar estado baseado na conexão
-    switch (connectionState.toUpperCase()) {
-      case 'OPEN':
-      case 'CONNECTED':
-        return new Response(JSON.stringify({
-          success: true,
-          state: 'already_connected',
-          instanceName,
-          message: 'WhatsApp já está conectado'
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-
-      case 'CONNECTING':
-        return new Response(JSON.stringify({
-          success: true,
-          state: 'is_connecting',
-          instanceName,
-          message: 'WhatsApp está conectando...'
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-
-      default:
-        return new Response(JSON.stringify({
-          success: true,
-          state: 'needs_qr_code',
-          instanceName,
-          message: 'Instância existe. Gere o QR Code para reconectar.'
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-    }
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR checking existing instance", { message: errorMessage });
-    
-    return new Response(JSON.stringify({
-      success: false,
-      error: errorMessage,
-      state: 'error'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
-  }
-}
-
-// Garantir que o webhook está configurado corretamente
-async function ensureWebhookConfigured(apiUrl: string, apiKey: string, instanceName: string) {
-  logStep("Ensuring webhook is configured", { instanceName });
-
-  try {
-    const webhookPayload = {
-      enabled: true,
-      webhookUrl: "https://webhookn8n.gera-leads.com/webhook/whatsapp",
-      webhookBase64: true,
-      webhookEvents: [
-        "MESSAGES_UPSERT"
-      ]
-    };
-
-    const webhookResponse = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': apiKey
-      },
-      body: JSON.stringify(webhookPayload)
-    });
-
-    if (webhookResponse.ok) {
-      logStep("Webhook configured/verified successfully");
-    } else {
-      logStep("WARNING: Failed to configure webhook", { status: webhookResponse.status });
-    }
-  } catch (error) {
-    logStep("WARNING: Error configuring webhook", { error });
-  }
-}
-
-// Função para obter QR Code
-async function handleGetQRCode(apiUrl: string, apiKey: string, instanceName: string) {
-  logStep("Getting QR Code", { instanceName });
-
-  try {
-    // Adicionar verificação de status antes de gerar QR Code
-    const statusResponse = await fetch(`${apiUrl}/instance/connectionState/${instanceName}`, {
-      method: 'GET',
-      headers: { 'apikey': apiKey }
-    });
-
-    if (statusResponse.ok) {
-        const statusData = await statusResponse.json();
-        const connectionState = statusData.state?.toLowerCase();
-
-        if (connectionState === 'open' || connectionState === 'connected') {
-            logStep("Instance already connected, no QR needed for this request.");
-            return new Response(JSON.stringify({
-                success: false,
-                error: 'Instância já está conectada. Não é necessário QR Code.',
-                alreadyConnected: true
-            }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
-    }
-    
-    const response = await fetch(`${apiUrl}/instance/connect/${instanceName}`, {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logStep("Error getting QR Code", { status: response.status, error: errorText });
-      throw new Error(`Failed to get QR Code: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    logStep("QR Code response received");
-
-    // Extrair QR Code corretamente
-    let qrCodeData = null;
-    if (data.qrcode?.base64) {
-      qrCodeData = data.qrcode.base64;
-    } else if (data.qrcode?.code) {
-      qrCodeData = data.qrcode.code;
-    } else if (data.base64) {
-      qrCodeData = data.base64;
-    } else if (data.code) {
-      qrCodeData = data.code;
-    }
-
-    if (!qrCodeData) {
-      throw new Error('QR Code not found in API response');
-    }
-
-    // Garantir formato correto do QR Code
-    if (!qrCodeData.startsWith('data:image/')) {
-      qrCodeData = `data:image/png;base64,${qrCodeData}`;
-    }
-
-    return new Response(JSON.stringify({
-      success: true,
-      qrCode: qrCodeData
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR getting QR Code", { message: errorMessage });
-    return new Response(JSON.stringify({ 
-      success: false,
-      error: errorMessage 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
-  }
-}
-
-// Função para desconectar e remover instância
-async function handleDisconnect(apiUrl: string, apiKey: string, userData: any, supabase: any) {
-  logStep("Starting disconnect flow", { userId: userData.id });
-
-  try {
-    // 1. Obter dados do usuário
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('instance_name')
-      .eq('id', userData.id)
-      .single();
-
-    if (profileError || !profile?.instance_name) {
-      logStep("No instance to disconnect");
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'Nenhuma instância para desconectar'
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    const instanceName = profile.instance_name;
-    logStep("Disconnecting instance", { instanceName });
-
-    // 2. Deletar instância na Evolution API
-    const response = await fetch(`${apiUrl}/instance/delete/${instanceName}`, {
-      method: 'DELETE',
-      headers: {
-        'apikey': apiKey
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logStep("WARNING: Failed to delete instance", { status: response.status, error: errorText });
-      // Continuar mesmo assim para limpar os dados locais
-    } else {
-      logStep("Instance deleted successfully");
-    }
-
-    // 3. Limpar dados no Supabase
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ 
-        instance_name: null,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userData.id);
-
-    if (updateError) {
-      logStep("ERROR updating profile after disconnect", updateError);
-      throw new Error(`Failed to update profile: ${updateError.message}`);
-    }
-
-    logStep("Disconnect completed successfully");
-
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'WhatsApp desconectado com sucesso'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in disconnect flow", { message: errorMessage });
-    return new Response(JSON.stringify({ 
-      success: false,
-      error: errorMessage 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
-  }
-}

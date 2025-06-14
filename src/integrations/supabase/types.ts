@@ -84,6 +84,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
+          email: string | null
           id: string
           instance_name: string | null
           nome: string
@@ -99,6 +100,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          email?: string | null
           id: string
           instance_name?: string | null
           nome: string
@@ -114,6 +116,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          email?: string | null
           id?: string
           instance_name?: string | null
           nome?: string
@@ -177,6 +180,14 @@ export type Database = {
     }
     Functions: {
       is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
+      sync_profile_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      verify_admin_access: {
         Args: { user_id: string }
         Returns: boolean
       }

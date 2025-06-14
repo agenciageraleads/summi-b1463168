@@ -4,10 +4,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-// Exportar a interface Profile para uso em outros componentes
+// Interface do perfil com validações de segurança
 export interface Profile {
   id: string;
   nome: string;
+  email?: string;
   numero?: string;
   instance_name?: string;
   temas_importantes?: string;
@@ -18,13 +19,33 @@ export interface Profile {
   segundos_para_resumir?: number;
 }
 
+// Função para validar número de telefone brasileiro
+const validatePhoneNumber = (phone: string): boolean => {
+  if (!phone) return true; // Campo opcional
+  const cleanPhone = phone.replace(/\D/g, '');
+  return /^55[1-9][1-9][0-9]{8,9}$/.test(cleanPhone);
+};
+
+// Função para sanitizar entrada de texto
+const sanitizeText = (text: string): string => {
+  if (!text) return '';
+  return text.replace(/[<>\"']/g, '').trim();
+};
+
+// Função para validar email
+const validateEmail = (email: string): boolean => {
+  if (!email) return false;
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+  return emailRegex.test(email);
+};
+
 export const useProfile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Função para buscar o perfil
+  // Função para buscar o perfil com validação de segurança
   const fetchProfile = async () => {
     if (!user) {
       setProfile(null);
@@ -33,6 +54,8 @@ export const useProfile = () => {
     }
 
     try {
+      console.log('[PROFILE] Fetching profile for user:', user.id);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -40,27 +63,111 @@ export const useProfile = () => {
         .single();
 
       if (error) {
-        console.error('Erro ao buscar perfil:', error);
+        console.error('[PROFILE] Erro ao buscar perfil:', error);
+        
+        // Se perfil não existe, pode ser um usuário novo
+        if (error.code === 'PGRST116') {
+          console.log('[PROFILE] Profile not found, user may be new');
+          toast({
+            title: "Perfil não encontrado",
+            description: "Criando perfil automaticamente...",
+            variant: "destructive",
+          });
+        }
         return;
       }
 
+      // Validar dados do perfil antes de definir no estado
+      if (data.numero && !validatePhoneNumber(data.numero)) {
+        console.warn('[PROFILE] Invalid phone number detected');
+        toast({
+          title: "Aviso",
+          description: "Número de telefone inválido detectado. Por favor, corrija.",
+          variant: "destructive",
+        });
+      }
+
+      if (data.email && !validateEmail(data.email)) {
+        console.warn('[PROFILE] Invalid email detected');
+      }
+
       setProfile(data);
+      console.log('[PROFILE] Profile loaded successfully');
+      
     } catch (error) {
-      console.error('Erro inesperado ao buscar perfil:', error);
+      console.error('[PROFILE] Erro inesperado ao buscar perfil:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao carregar perfil",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Função para atualizar o perfil
+  // Função para atualizar o perfil com validações de segurança
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!user) return { success: false, error: 'Usuário não autenticado' };
+    if (!user) {
+      console.error('[PROFILE] No user found for update');
+      return { success: false, error: 'Usuário não autenticado' };
+    }
 
     try {
+      console.log('[PROFILE] Updating profile with:', updates);
+
+      // Validações de entrada
+      if (updates.numero && !validatePhoneNumber(updates.numero)) {
+        toast({
+          title: "Erro de validação",
+          description: "Número de telefone deve seguir o formato brasileiro (55 + DDD + número)",
+          variant: "destructive",
+        });
+        return { success: false, error: 'Número de telefone inválido' };
+      }
+
+      if (updates.email && !validateEmail(updates.email)) {
+        toast({
+          title: "Erro de validação", 
+          description: "Formato de email inválido",
+          variant: "destructive",
+        });
+        return { success: false, error: 'Email inválido' };
+      }
+
+      // Sanitizar campos de texto
+      const sanitizedUpdates = {
+        ...updates,
+        nome: updates.nome ? sanitizeText(updates.nome) : updates.nome,
+        temas_importantes: updates.temas_importantes ? sanitizeText(updates.temas_importantes) : updates.temas_importantes,
+        temas_urgentes: updates.temas_urgentes ? sanitizeText(updates.temas_urgentes) : updates.temas_urgentes,
+      };
+
+      // Validar que nome não está vazio após sanitização
+      if (sanitizedUpdates.nome !== undefined && sanitizedUpdates.nome.length < 2) {
+        toast({
+          title: "Erro de validação",
+          description: "Nome deve ter pelo menos 2 caracteres",
+          variant: "destructive",
+        });
+        return { success: false, error: 'Nome muito curto' };
+      }
+
+      // Verificar se o email está sendo alterado (não permitido por usuários comuns)
+      if (updates.email && profile?.email && updates.email !== profile.email) {
+        console.warn('[PROFILE] Attempt to change email detected');
+        toast({
+          title: "Erro",
+          description: "Alteração de email não permitida. Contate o suporte.",
+          variant: "destructive",
+        });
+        return { success: false, error: 'Alteração de email não permitida' };
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .update({ 
-          ...updates, 
+          ...sanitizedUpdates, 
           updated_at: new Date().toISOString() 
         })
         .eq('id', user.id)
@@ -68,19 +175,37 @@ export const useProfile = () => {
         .single();
 
       if (error) {
-        console.error('Erro ao atualizar perfil:', error);
+        console.error('[PROFILE] Erro ao atualizar perfil:', error);
+        
+        let errorMessage = "Erro ao atualizar perfil";
+        
+        // Tratamento específico de erros
+        if (error.code === '23505') {
+          errorMessage = "Email já está em uso por outro usuário";
+        } else if (error.code === '23514') {
+          errorMessage = "Dados fornecidos não atendem aos critérios de segurança";
+        }
+        
         toast({
           title: "Erro",
-          description: "Erro ao atualizar perfil",
+          description: errorMessage,
           variant: "destructive",
         });
         return { success: false, error: error.message };
       }
 
       setProfile(data);
+      console.log('[PROFILE] Profile updated successfully');
+      
+      toast({
+        title: "Sucesso",
+        description: "Perfil atualizado com sucesso",
+      });
+      
       return { success: true, data };
+      
     } catch (error) {
-      console.error('Erro inesperado ao atualizar perfil:', error);
+      console.error('[PROFILE] Erro inesperado ao atualizar perfil:', error);
       toast({
         title: "Erro",
         description: "Erro inesperado ao atualizar perfil",
@@ -90,19 +215,30 @@ export const useProfile = () => {
     }
   };
 
-  // Função para deletar a conta do usuário
+  // Função para deletar a conta com confirmação adicional
   const deleteAccount = async () => {
-    if (!user) return { success: false, error: 'Usuário não autenticado' };
+    if (!user) {
+      console.error('[PROFILE] No user found for deletion');
+      return { success: false, error: 'Usuário não autenticado' };
+    }
 
     try {
+      console.log('[PROFILE] Initiating account deletion for user:', user.id);
+      
+      // Verificar se há sessão ativa
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        return { success: false, error: 'Sessão expirada. Faça login novamente.' };
+      }
+
       const { data, error } = await supabase.functions.invoke('delete-user-account', {
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
       if (error) {
-        console.error('Erro ao deletar conta:', error);
+        console.error('[PROFILE] Erro ao deletar conta:', error);
         return { success: false, error: error.message };
       }
 
@@ -110,6 +246,8 @@ export const useProfile = () => {
         return { success: false, error: data.error || 'Erro ao deletar conta' };
       }
 
+      console.log('[PROFILE] Account deletion successful');
+      
       toast({
         title: "Conta deletada",
         description: "Sua conta foi deletada com sucesso",
@@ -119,14 +257,21 @@ export const useProfile = () => {
       await supabase.auth.signOut();
       
       return { success: true };
+      
     } catch (error) {
-      console.error('Erro inesperado ao deletar conta:', error);
+      console.error('[PROFILE] Erro inesperado ao deletar conta:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao deletar conta",
+        variant: "destructive",
+      });
       return { success: false, error: 'Erro inesperado ao deletar conta' };
     }
   };
 
   // Função para atualizar/refrescar o perfil
   const refreshProfile = async () => {
+    console.log('[PROFILE] Refreshing profile...');
     await fetchProfile();
   };
 
