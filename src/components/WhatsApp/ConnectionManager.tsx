@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
 import { 
-  createInstanceWithWebhook, 
+  initializeConnection, 
   getQRCode, 
   getConnectionStatus, 
   logoutInstance 
@@ -17,7 +17,7 @@ interface ConnectionManagerProps {
 type ConnectionStatus = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
 
 export const ConnectionManager = ({ onStatusChange, onQRCodeChange }: ConnectionManagerProps) => {
-  const { profile, updateProfile } = useProfile();
+  const { profile } = useProfile();
   const { toast } = useToast();
   
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('DISCONNECTED');
@@ -37,14 +37,7 @@ export const ConnectionManager = ({ onStatusChange, onQRCodeChange }: Connection
     };
   }, []);
 
-  // Gerar nome da instância baseado no perfil
-  const generateInstanceName = () => {
-    if (!profile?.nome || !profile?.numero) return '';
-    
-    const nome = profile.nome.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const ultimosDigitos = profile.numero.slice(-4);
-    return `${nome}_${ultimosDigitos}`;
-  };
+  // A função generateInstanceName foi removida pois a API gerencia o nome da instância agora.
 
   // Iniciar polling de status
   const startStatusPolling = (instanceName: string) => {
@@ -111,70 +104,101 @@ export const ConnectionManager = ({ onStatusChange, onQRCodeChange }: Connection
 
   // Conectar WhatsApp
   const handleConnect = async () => {
-    // Verificar dados do perfil
-    if (!profile?.nome || !profile?.numero) {
+    if (!profile?.numero) {
       toast({
         title: 'Informações incompletas',
-        description: 'Complete seu perfil antes de conectar o WhatsApp',
-        variant: 'destructive'
+        description: 'Configure seu número de telefone no perfil antes de conectar.',
+        variant: 'destructive',
       });
       return;
     }
 
     setIsLoading(true);
-    const instanceName = generateInstanceName();
+    setConnectionStatus('CONNECTING');
+    onStatusChange?.('CONNECTING');
 
     try {
-      console.log('[Connection Manager] Iniciando processo de conexão:', instanceName);
+      console.log('[Connection Manager] Iniciando processo de conexão...');
 
-      // 1. Criar instância com webhook configurado
-      setConnectionStatus('CONNECTING');
-      onStatusChange?.('CONNECTING');
+      const initResult = await initializeConnection();
 
-      const createResult = await createInstanceWithWebhook(instanceName);
-      
-      if (!createResult.success) {
-        throw new Error(createResult.error || 'Erro ao criar instância');
+      if (!initResult.success) {
+        throw new Error(initResult.error || 'Erro ao inicializar conexão');
       }
 
-      // Atualizar perfil com nome da instância
-      await updateProfile({ instance_name: instanceName });
+      switch (initResult.state) {
+        case 'needs_phone_number':
+          toast({
+            title: 'Telefone necessário',
+            description: 'Por favor, adicione seu número de telefone no seu perfil.',
+            variant: 'destructive',
+          });
+          setConnectionStatus('DISCONNECTED');
+          onStatusChange?.('DISCONNECTED');
+          break;
 
-      toast({
-        title: 'Instância criada!',
-        description: `Webhook configurado: ${createResult.webhookConfigured ? 'Sim' : 'Não'}`
-      });
+        case 'already_connected':
+          setConnectionStatus('CONNECTED');
+          onStatusChange?.('CONNECTED');
+          toast({
+            title: 'Já Conectado',
+            description: 'Seu WhatsApp já está conectado.',
+          });
+          break;
 
-      // 2. Obter QR Code
-      console.log('[Connection Manager] Obtendo QR Code...');
-      
-      const qrResult = await getQRCode(instanceName);
-      
-      if (!qrResult.success || !qrResult.qrCode) {
-        throw new Error(qrResult.error || 'Erro ao obter QR Code');
+        case 'needs_qr_code':
+          if (!initResult.instanceName) {
+            throw new Error('Nome da instância não foi retornado pela API.');
+          }
+          const instanceName = initResult.instanceName;
+
+          toast({
+            title: 'Instância Pronta',
+            description: 'Gerando QR Code para conexão...',
+          });
+
+          console.log('[Connection Manager] Obtendo QR Code para:', instanceName);
+          const qrResult = await getQRCode(instanceName);
+
+          if (!qrResult.success || !qrResult.qrCode) {
+            throw new Error(qrResult.error || 'Erro ao obter QR Code');
+          }
+
+          setQrCode(qrResult.qrCode);
+          onQRCodeChange?.(qrResult.qrCode);
+
+          toast({
+            title: 'QR Code Gerado!',
+            description: 'Escaneie o QR Code com seu WhatsApp.',
+          });
+
+          startStatusPolling(instanceName);
+          break;
+
+        case 'is_connecting':
+          if (!initResult.instanceName) {
+            throw new Error('Nome da instância não foi retornado pela API.');
+          }
+          setConnectionStatus('CONNECTING');
+          onStatusChange?.('CONNECTING');
+          startStatusPolling(initResult.instanceName);
+          toast({
+            title: 'Conectando...',
+            description: 'Sua instância está conectando, aguarde.',
+          });
+          break;
+        
+        case 'error':
+          throw new Error(initResult.error || 'Ocorreu um erro na inicialização.');
       }
-
-      setQrCode(qrResult.qrCode);
-      onQRCodeChange?.(qrResult.qrCode);
-
-      toast({
-        title: 'QR Code gerado!',
-        description: 'Escaneie o QR Code com seu WhatsApp'
-      });
-
-      // 3. Iniciar monitoramento
-      startStatusPolling(instanceName);
-
     } catch (error) {
       console.error('[Connection Manager] Erro na conexão:', error);
-      
       setConnectionStatus('DISCONNECTED');
       onStatusChange?.('DISCONNECTED');
-      
       toast({
-        title: 'Erro',
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
-        variant: 'destructive'
+        title: 'Erro de Conexão',
+        description: error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -183,12 +207,12 @@ export const ConnectionManager = ({ onStatusChange, onQRCodeChange }: Connection
 
   // Desconectar WhatsApp
   const handleDisconnect = async () => {
-    const instanceName = generateInstanceName();
+    const instanceName = profile?.instance_name;
     
     if (!instanceName) {
       toast({
         title: 'Erro',
-        description: 'Nome da instância não encontrado',
+        description: 'Nome da instância não encontrado no seu perfil.',
         variant: 'destructive'
       });
       return;
@@ -231,6 +255,5 @@ export const ConnectionManager = ({ onStatusChange, onQRCodeChange }: Connection
     polling,
     handleConnect,
     handleDisconnect,
-    generateInstanceName
   };
 };
