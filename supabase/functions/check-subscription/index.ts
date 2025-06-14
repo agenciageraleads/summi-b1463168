@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -66,11 +67,11 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
-    // Busca por assinaturas ativas ou em trial
+    // Busca por assinaturas ativas ou em trial, verificando as mais recentes
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: "all", // Buscamos todas para pegar 'active' e 'trialing'
-      limit: 1,
+      limit: 10, // Aumenta o limite para garantir que encontramos a assinatura correta entre as mais recentes
     });
 
     const activeOrTrialingSubscription = subscriptions.data.find(sub => sub.status === 'active' || sub.status === 'trialing');

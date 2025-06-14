@@ -67,15 +67,16 @@ serve(async (req) => {
           if (customer.email) {
             logWebhookEvent("Atualizando dados do cliente", { email: customer.email });
             
-            // Buscar a assinatura criada
+            // Buscar a assinatura criada (pode estar 'active' ou 'trialing')
             const subscriptions = await stripe.subscriptions.list({
               customer: customerId,
-              status: "active",
-              limit: 1,
+              status: "all",
+              limit: 1, // A mais recente é a que acabou de ser criada
             });
 
-            if (subscriptions.data.length > 0) {
-              const subscription = subscriptions.data[0];
+            const subscription = subscriptions.data.find(s => s.status === 'active' || s.status === 'trialing');
+
+            if (subscription) {
               const priceId = subscription.items.data[0].price.id;
               
               await supabaseClient.from("subscribers").upsert({
@@ -83,13 +84,15 @@ serve(async (req) => {
                 stripe_customer_id: customerId,
                 stripe_subscription_id: subscription.id,
                 stripe_price_id: priceId,
-                subscription_status: 'active',
+                subscription_status: subscription.status,
                 subscription_start: new Date(subscription.start_date * 1000).toISOString(),
                 subscription_end: new Date(subscription.current_period_end * 1000).toISOString(),
                 updated_at: new Date().toISOString(),
               }, { onConflict: 'email' });
               
-              logWebhookEvent("Assinatura ativada com sucesso", { email: customer.email, priceId });
+              logWebhookEvent("Assinatura ativada com sucesso", { email: customer.email, priceId, status: subscription.status });
+            } else {
+              logWebhookEvent("Nenhuma assinatura ativa ou em teste encontrada após o checkout", { customerId });
             }
           }
         }
