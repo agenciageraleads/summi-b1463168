@@ -1,5 +1,5 @@
 
-// Componente simplificado que usa apenas o hook principal
+// Componente simplificado que usa apenas o hook principal - VERSÃO CORRIGIDA
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
 
   // Renderizar botões de ação
   const renderActionButtons = () => {
+    // Se está carregando, mostrar botão desabilitado
     if (state.isLoading) {
       return (
         <Button disabled size="sm">
@@ -85,15 +86,12 @@ export const WhatsAppConnectionManager: React.FC = () => {
         );
 
       case 'needs_qr_code':
-        if (!state.qrCode) {
-          return (
-            <Button onClick={handleConnect} size="sm">
-              <QrCode className="w-4 h-4 mr-2" />
-              Conectar WhatsApp
-            </Button>
-          );
-        }
-        return null;
+        return (
+          <Button onClick={handleConnect} size="sm">
+            <QrCode className="w-4 h-4 mr-2" />
+            Conectar WhatsApp
+          </Button>
+        );
 
       case 'already_connected':
         return (

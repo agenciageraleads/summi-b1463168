@@ -1,5 +1,5 @@
 
-// Hook principal para gerenciar toda a conexão WhatsApp
+// Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO CORRIGIDA
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
@@ -32,15 +32,48 @@ export const useWhatsAppManager = () => {
     isLoading: false,
     qrCode: null,
     instanceName: null,
-    message: 'Carregando...',
+    message: 'Verificando estado da conexão...',
     isPolling: false
   });
 
-  // Refs para controle de timers e polling
+  // Refs para controle de timers e inicialização
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
   const hasInitializedRef = useRef(false);
+  const isInitializingRef = useRef(false);
+
+  // Função para determinar estado inicial baseado no perfil
+  const getInitialStateFromProfile = useCallback(() => {
+    console.log('[WhatsApp Manager] Determinando estado inicial do perfil:', profile);
+    
+    if (!profile) {
+      return {
+        connectionState: 'needs_phone_number' as ConnectionState,
+        message: 'Carregando perfil...'
+      };
+    }
+
+    if (!profile.numero) {
+      return {
+        connectionState: 'needs_phone_number' as ConnectionState,
+        message: 'Configure seu número de telefone nas configurações'
+      };
+    }
+
+    if (profile.instance_name) {
+      return {
+        connectionState: 'already_connected' as ConnectionState,
+        message: 'WhatsApp conectado e funcionando',
+        instanceName: profile.instance_name
+      };
+    }
+
+    return {
+      connectionState: 'needs_qr_code' as ConnectionState,
+      message: 'Clique em "Conectar WhatsApp" para gerar o QR Code'
+    };
+  }, [profile]);
 
   // Limpar todos os timers
   const clearTimers = useCallback(() => {
@@ -175,12 +208,17 @@ export const useWhatsAppManager = () => {
     }
   }, [startPolling, refreshProfile]);
 
-  // Inicializar conexão
+  // Inicializar conexão - CORRIGIDO para evitar loops
   const initializeConnection = useCallback(async () => {
-    if (hasInitializedRef.current) return;
-    hasInitializedRef.current = true;
-    
+    // Evitar múltiplas inicializações simultâneas
+    if (isInitializingRef.current || hasInitializedRef.current) {
+      console.log('[WhatsApp Manager] Inicialização já em andamento ou concluída');
+      return;
+    }
+
+    isInitializingRef.current = true;
     console.log('[WhatsApp Manager] Inicializando conexão...');
+    
     setState(prev => ({ 
       ...prev, 
       isLoading: true, 
@@ -199,7 +237,7 @@ export const useWhatsAppManager = () => {
           isLoading: false
         }));
 
-        // Se precisa de QR Code, gerar automaticamente
+        // Se precisa de QR Code, gerar automaticamente apenas se não já conectado
         if (result.state === 'needs_qr_code' && result.instanceName) {
           await handleGenerateQR(result.instanceName);
         }
@@ -219,11 +257,16 @@ export const useWhatsAppManager = () => {
         message: 'Erro inesperado ao inicializar conexão',
         isLoading: false
       }));
+    } finally {
+      hasInitializedRef.current = true;
+      isInitializingRef.current = false;
     }
   }, [handleGenerateQR]);
 
-  // Conectar WhatsApp
+  // Conectar WhatsApp - CORRIGIDO
   const handleConnect = useCallback(async () => {
+    console.log('[WhatsApp Manager] Tentativa de conexão iniciada');
+    
     if (!profile?.numero) {
       toast({
         title: 'Informações incompletas',
@@ -233,7 +276,15 @@ export const useWhatsAppManager = () => {
       return;
     }
 
+    // Se já está carregando, não fazer nada
+    if (state.isLoading) {
+      console.log('[WhatsApp Manager] Já está carregando, ignorando clique');
+      return;
+    }
+
+    // Parar polling anterior
     stopPolling();
+    
     setState(prev => ({
       ...prev,
       isLoading: true,
@@ -242,8 +293,26 @@ export const useWhatsAppManager = () => {
       qrCode: null
     }));
 
-    await initializeConnection();
-  }, [profile?.numero, toast, stopPolling, initializeConnection]);
+    // Só inicializar se não foi inicializado ainda
+    if (!hasInitializedRef.current) {
+      await initializeConnection();
+    } else {
+      // Se já foi inicializado, verificar estado atual e agir
+      const currentState = getInitialStateFromProfile();
+      if (currentState.connectionState === 'already_connected') {
+        setState(prev => ({
+          ...prev,
+          connectionState: 'already_connected',
+          message: 'WhatsApp já está conectado',
+          isLoading: false
+        }));
+      } else {
+        // Tentar gerar QR code direto
+        const instanceName = profile.instance_name || `user_${profile.id}`;
+        await handleGenerateQR(instanceName);
+      }
+    }
+  }, [profile, toast, stopPolling, state.isLoading, hasInitializedRef, initializeConnection, getInitialStateFromProfile, handleGenerateQR]);
 
   // Desconectar WhatsApp
   const handleDisconnect = useCallback(async () => {
@@ -267,6 +336,7 @@ export const useWhatsAppManager = () => {
         
         // Reset da flag de inicialização para permitir nova conexão
         hasInitializedRef.current = false;
+        isInitializingRef.current = false;
         
         await refreshProfile();
         
@@ -321,10 +391,18 @@ export const useWhatsAppManager = () => {
     }
   };
 
-  // Inicializar automaticamente apenas uma vez
+  // Atualizar estado baseado no perfil - SEM inicialização automática
   useEffect(() => {
-    initializeConnection();
-  }, [initializeConnection]);
+    if (profile && !hasInitializedRef.current && !isInitializingRef.current) {
+      const initialState = getInitialStateFromProfile();
+      setState(prev => ({
+        ...prev,
+        connectionState: initialState.connectionState,
+        message: initialState.message,
+        instanceName: initialState.instanceName || null
+      }));
+    }
+  }, [profile, getInitialStateFromProfile]);
 
   // Cleanup ao desmontar
   useEffect(() => {
