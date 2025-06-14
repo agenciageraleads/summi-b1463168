@@ -3,7 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Bell } from 'lucide-react';
+import { useProfile } from '@/hooks/useProfile';
+import { useChats } from '@/hooks/useChats';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
@@ -14,12 +16,19 @@ const navigation = [
 
 export const Sidebar = () => {
   const location = useLocation();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { profile } = useProfile();
+  const { chats } = useChats();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  const displayName = profile?.nome || user?.email || 'Usuário';
+  const pendingChats = chats.filter(chat => 
+    chat.prioridade === 'urgente' || chat.prioridade === 'importante'
+  ).length;
 
   return (
     <>
@@ -79,8 +88,35 @@ export const Sidebar = () => {
           ))}
         </nav>
 
-        {/* Logout */}
-        <div className="p-4 border-t border-summi-gray-200">
+        {/* User Info & Logout */}
+        <div className="p-4 border-t border-summi-gray-200 mt-auto space-y-4">
+          {/* Notifications */}
+          <Link to="/dashboard" className="relative p-2 text-summi-gray-600 hover:text-summi-green transition-colors flex items-center justify-between hover:bg-summi-gray-100 rounded-lg">
+            <div className="flex items-center">
+              <Bell className="w-5 h-5 mr-3" />
+              <span className="text-sm font-medium">Notificações</span>
+            </div>
+            {pendingChats > 0 && (
+              <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                {pendingChats > 99 ? '99+' : pendingChats}
+              </span>
+            )}
+          </Link>
+          
+          {/* User Avatar & Info */}
+          <div className="flex items-center space-x-3 pt-4 border-t border-summi-gray-100">
+            <div className="w-10 h-10 bg-summi-green rounded-full flex items-center justify-center shrink-0">
+              <span className="text-white font-medium">
+                {displayName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="text-sm overflow-hidden">
+              <p className="font-medium text-summi-gray-900 truncate" title={displayName}>{displayName}</p>
+              <p className="text-summi-gray-600 truncate" title={user?.email}>{user?.email}</p>
+            </div>
+          </div>
+
+          {/* Logout */}
           <button
             onClick={() => {
               logout();

@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,8 +28,11 @@ export const SubscriptionStatus = () => {
   const navigate = useNavigate();
 
   // Carrega dados de assinatura do banco local
-  const loadSubscriptionData = async () => {
-    if (!user) return;
+  const loadSubscriptionData = useCallback(async () => {
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -74,10 +76,10 @@ export const SubscriptionStatus = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   // Função para forçar atualização dos dados
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       await syncSubscriptionData();
@@ -85,7 +87,7 @@ export const SubscriptionStatus = () => {
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [syncSubscriptionData, loadSubscriptionData]);
 
   // Carrega e sincroniza dados iniciais para evitar a condição de corrida
   useEffect(() => {
@@ -107,7 +109,7 @@ export const SubscriptionStatus = () => {
     };
 
     initialSyncAndLoad();
-  }, [user]);
+  }, [user, syncSubscriptionData, loadSubscriptionData]);
 
   // Configura listener para mudanças em tempo real
   useEffect(() => {
@@ -132,7 +134,7 @@ export const SubscriptionStatus = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, loadSubscriptionData]);
 
   if (isLoading) {
     return (
