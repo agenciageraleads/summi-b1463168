@@ -54,7 +54,7 @@ serve(async (req) => {
         user_id: user.id,
         stripe_customer_id: null,
         subscription_status: 'inactive',
-        plan_type: null,
+        stripe_price_id: null,
         subscription_end: null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email' });
@@ -75,19 +75,21 @@ serve(async (req) => {
     const hasActiveSub = subscriptions.data.length > 0;
     let planType = null;
     let subscriptionEnd = null;
+    let stripePriceId = null;
 
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-      logStep("Active subscription found", { subscriptionId: subscription.id, endDate: subscriptionEnd });
+      stripePriceId = subscription.items.data[0].price.id;
+      logStep("Active subscription found", { subscriptionId: subscription.id, endDate: subscriptionEnd, priceId: stripePriceId });
       
-      const priceId = subscription.items.data[0].price.id;
-      if (priceId === "price_1RZ8j9KyDqE0F1PtNvJzdK0F") {
+      // Determinar tipo do plano baseado no Price ID
+      if (stripePriceId === "price_1RZ8j9KyDqE0F1PtNvJzdK0F") {
         planType = "monthly";
-      } else if (priceId === "price_1RZ8j9KyDqE0F1PtIlw9cx2C") {
+      } else if (stripePriceId === "price_1RZ8j9KyDqE0F1PtIlw9cx2C") {
         planType = "annual";
       }
-      logStep("Determined plan type", { priceId, planType });
+      logStep("Determined plan type", { priceId: stripePriceId, planType });
     } else {
       logStep("No active subscription found");
     }
@@ -97,15 +99,16 @@ serve(async (req) => {
       user_id: user.id,
       stripe_customer_id: customerId,
       subscription_status: hasActiveSub ? 'active' : 'inactive',
-      plan_type: planType,
+      stripe_price_id: stripePriceId,
       subscription_end: subscriptionEnd,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'email' });
 
-    logStep("Updated database with subscription info", { subscribed: hasActiveSub, planType });
+    logStep("Updated database with subscription info", { subscribed: hasActiveSub, planType, stripePriceId });
     return new Response(JSON.stringify({
       subscribed: hasActiveSub,
       plan_type: planType,
+      stripe_price_id: stripePriceId,
       subscription_end: subscriptionEnd
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

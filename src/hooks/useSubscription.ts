@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export interface Subscription {
   subscribed: boolean;
   plan_type: string | null;
+  stripe_price_id: string | null;
   subscription_end: string | null;
 }
 
@@ -13,11 +14,13 @@ export const useSubscription = () => {
   const [subscription, setSubscription] = useState<Subscription>({
     subscribed: false,
     plan_type: null,
+    stripe_price_id: null,
     subscription_end: null
   });
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
 
+  // Função para verificar assinatura no Stripe
   const checkSubscription = async () => {
     if (!user) return;
     
@@ -40,6 +43,7 @@ export const useSubscription = () => {
       setSubscription({
         subscribed: data.subscribed || false,
         plan_type: data.plan_type || null,
+        stripe_price_id: data.stripe_price_id || null,
         subscription_end: data.subscription_end || null
       });
     } catch (error) {
@@ -49,6 +53,7 @@ export const useSubscription = () => {
     }
   };
 
+  // Função para criar checkout do Stripe
   const createCheckout = async (planType: 'monthly' | 'annual') => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -71,6 +76,7 @@ export const useSubscription = () => {
     }
   };
 
+  // Função para gerenciar assinatura via portal do cliente
   const manageSubscription = async () => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();

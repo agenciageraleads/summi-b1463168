@@ -2,11 +2,45 @@
 project_id = "fuhdqxaiewdztzuxriho"
 
 [auth]
-# Habilita a verificação de senhas em listas de senhas vazadas (Have I Been Pwned).
-# Isso impede que os usuários utilizem senhas que já foram comprometidas em outros vazamentos.
-password_hibp_enabled = true
+enabled = true
+external_url = "https://fuhdqxaiewdztzuxriho.supabase.co"
 
-[auth.email]
-# Define o tempo de expiração do OTP (One-Time Password) por e-mail para 1 hora (3600 segundos).
-# A recomendação é ter um tempo de expiração curto para aumentar a segurança.
-otp_expiration = 3600
+[db]
+shadow_db_url = "postgresql://postgres.fuhdqxaiewdztzuxriho:${POSTGRES_PASSWORD}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db.pooler]
+enabled = true
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[edge_runtime]
+enabled = true
+ip_version = "ipv4"
+
+[analytics]
+enabled = true
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.check-subscription]
+verify_jwt = true
+
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.customer-portal]
+verify_jwt = true
