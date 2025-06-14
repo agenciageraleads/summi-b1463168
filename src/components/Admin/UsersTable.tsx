@@ -11,12 +11,14 @@ interface UsersTableProps {
   users: AdminUser[];
   onDeleteUser: (userId: string) => Promise<boolean>;
   onDisconnectUser: (userId: string) => Promise<boolean>;
+  onRestartInstance?: (userId: string, instanceName: string) => Promise<boolean>;
 }
 
 export const UsersTable: React.FC<UsersTableProps> = ({ 
   users, 
   onDeleteUser, 
-  onDisconnectUser 
+  onDisconnectUser,
+  onRestartInstance
 }) => {
   const [loadingStates, setLoadingStates] = useState<Record<string, string>>({});
 
@@ -43,7 +45,10 @@ export const UsersTable: React.FC<UsersTableProps> = ({
     if (status === 'connected') {
       return <Badge className="bg-emerald-100 text-emerald-800">Conectado</Badge>;
     }
-    return <Badge className="bg-red-100 text-red-800">Desconectado</Badge>;
+    if (status === 'disconnected') {
+      return <Badge className="bg-red-100 text-red-800">Desconectado</Badge>;
+    }
+    return <Badge className="bg-gray-100 text-gray-800">Verificando...</Badge>;
   };
 
   return (
@@ -66,6 +71,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Role</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Assinatura</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Conexão</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-600">Instância</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Criado em</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Ações</th>
               </tr>
@@ -96,10 +102,53 @@ export const UsersTable: React.FC<UsersTableProps> = ({
                     {getConnectionBadge(user.connectionStatus || 'unknown')}
                   </td>
                   <td className="py-3 px-4 text-gray-700">
+                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                      {user.instance_name || 'Nenhuma'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-gray-700">
                     {new Date(user.created_at).toLocaleDateString('pt-BR')}
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex space-x-2">
+                      {/* Reiniciar instância */}
+                      {user.instance_name && onRestartInstance && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={loadingStates[user.id] === 'restart'}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reiniciar Instância</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja reiniciar a instância <strong>{user.instance_name}</strong> do usuário <strong>{user.nome}</strong>? 
+                                Isso pode interromper temporariamente a conexão WhatsApp.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleAction(
+                                  user.id, 
+                                  'restart', 
+                                  () => onRestartInstance(user.id, user.instance_name!)
+                                )}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                Reiniciar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+
                       {/* Desconectar usuário */}
                       {user.connectionStatus === 'connected' && (
                         <AlertDialog>

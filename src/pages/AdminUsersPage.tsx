@@ -12,7 +12,8 @@ const AdminUsersPage = () => {
     isLoading, 
     fetchUsers, 
     deleteUserAccount, 
-    disconnectUser 
+    disconnectUser,
+    restartUserInstance
   } = useAdmin();
 
   const handleRefresh = () => {
@@ -54,6 +55,7 @@ const AdminUsersPage = () => {
             users={users}
             onDeleteUser={deleteUserAccount}
             onDisconnectUser={disconnectUser}
+            onRestartInstance={restartUserInstance}
           />
         </div>
       </AdminLayout>
