@@ -1,16 +1,15 @@
-
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Crown, Calendar, RefreshCw } from 'lucide-react';
+import { Crown, Calendar, RefreshCw, Clock } from 'lucide-react';
 import { useSubscriptionSync } from '@/hooks/useSubscriptionSync';
 
 interface SubscriptionData {
-  subscribed: boolean;
-  subscription_status: string;
+  isSubscribed: boolean;
+  status: string; // 'trialing', 'active', 'inactive', etc.
   stripe_price_id: string | null;
   subscription_end: string | null;
   plan_type: string | null;
@@ -52,16 +51,16 @@ export const SubscriptionStatus = () => {
         }
 
         setSubscriptionData({
-          subscribed: data.subscription_status === 'active',
-          subscription_status: data.subscription_status || 'inactive',
+          isSubscribed: data.subscription_status === 'active' || data.subscription_status === 'trialing',
+          status: data.subscription_status || 'inactive',
           stripe_price_id: data.stripe_price_id,
           subscription_end: data.subscription_end,
           plan_type: planType
         });
       } else {
         setSubscriptionData({
-          subscribed: false,
-          subscription_status: 'inactive',
+          isSubscribed: false,
+          status: 'inactive',
           stripe_price_id: null,
           subscription_end: null,
           plan_type: null
@@ -150,13 +149,21 @@ export const SubscriptionStatus = () => {
     );
   }
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'trialing': return 'Em teste';
+      case 'active': return 'Ativo';
+      default: return 'Inativo';
+    }
+  };
+
   return (
-    <Card className={`${subscriptionData.subscribed ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'}`}>
+    <Card className={`${subscriptionData.isSubscribed ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'}`}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Crown className={`w-5 h-5 ${subscriptionData.subscribed ? 'text-summi-green' : 'text-summi-gray-400'}`} />
-            <span className={subscriptionData.subscribed ? 'text-summi-green' : 'text-summi-gray-600'}>
+            <Crown className={`w-5 h-5 ${subscriptionData.isSubscribed ? 'text-summi-green' : 'text-summi-gray-400'}`} />
+            <span className={subscriptionData.isSubscribed ? 'text-summi-green' : 'text-summi-gray-600'}>
               Status da Assinatura
             </span>
           </div>
@@ -175,12 +182,12 @@ export const SubscriptionStatus = () => {
           <div className="flex items-center justify-between">
             <span className="text-sm text-summi-gray-600">Status:</span>
             <Badge 
-              className={subscriptionData.subscribed 
+              className={subscriptionData.isSubscribed 
                 ? 'bg-summi-green text-white' 
                 : 'bg-summi-gray-100 text-summi-gray-600'
               }
             >
-              {subscriptionData.subscribed ? 'Ativo' : 'Inativo'}
+              {getStatusText(subscriptionData.status)}
             </Badge>
           </div>
 
@@ -193,7 +200,19 @@ export const SubscriptionStatus = () => {
             </div>
           )}
 
-          {subscriptionData.subscription_end && (
+          {subscriptionData.status === 'trialing' && subscriptionData.subscription_end && (
+             <div className="flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-blue-700">Seu teste termina em:</span>
+                </div>
+                <span className="text-sm font-medium text-blue-800">
+                  {new Date(subscriptionData.subscription_end).toLocaleDateString('pt-BR')}
+                </span>
+            </div>
+          )}
+
+          {subscriptionData.status === 'active' && subscriptionData.subscription_end && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-summi-gray-600">Próxima cobrança:</span>
               <div className="flex items-center space-x-1">

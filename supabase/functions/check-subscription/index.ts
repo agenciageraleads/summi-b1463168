@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -67,21 +66,26 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
+    // Busca por assinaturas ativas ou em trial
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
-      status: "active",
+      status: "all", // Buscamos todas para pegar 'active' e 'trialing'
       limit: 1,
     });
-    const hasActiveSub = subscriptions.data.length > 0;
+
+    const activeOrTrialingSubscription = subscriptions.data.find(sub => sub.status === 'active' || sub.status === 'trialing');
+    
+    let subscriptionStatus = 'inactive';
     let planType = null;
     let subscriptionEnd = null;
     let stripePriceId = null;
 
-    if (hasActiveSub) {
-      const subscription = subscriptions.data[0];
+    if (activeOrTrialingSubscription) {
+      const subscription = activeOrTrialingSubscription;
+      subscriptionStatus = subscription.status; // 'active' ou 'trialing'
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
       stripePriceId = subscription.items.data[0].price.id;
-      logStep("Active subscription found", { subscriptionId: subscription.id, endDate: subscriptionEnd, priceId: stripePriceId });
+      logStep("Active or trialing subscription found", { subscriptionId: subscription.id, status: subscriptionStatus, endDate: subscriptionEnd, priceId: stripePriceId });
       
       // Determinar tipo do plano baseado no Price ID
       if (stripePriceId === "price_1RZ8j9KyDqE0F1PtNvJzdK0F") {
@@ -91,22 +95,23 @@ serve(async (req) => {
       }
       logStep("Determined plan type", { priceId: stripePriceId, planType });
     } else {
-      logStep("No active subscription found");
+      logStep("No active or trialing subscription found");
     }
 
     await supabaseClient.from("subscribers").upsert({
       email: user.email,
       user_id: user.id,
       stripe_customer_id: customerId,
-      subscription_status: hasActiveSub ? 'active' : 'inactive',
+      subscription_status: subscriptionStatus,
       stripe_price_id: stripePriceId,
       subscription_end: subscriptionEnd,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'email' });
 
-    logStep("Updated database with subscription info", { subscribed: hasActiveSub, planType, stripePriceId });
+    logStep("Updated database with subscription info", { subscribed: subscriptionStatus !== 'inactive', status: subscriptionStatus, planType, stripePriceId });
     return new Response(JSON.stringify({
-      subscribed: hasActiveSub,
+      subscribed: subscriptionStatus !== 'inactive',
+      status: subscriptionStatus,
       plan_type: planType,
       stripe_price_id: stripePriceId,
       subscription_end: subscriptionEnd
