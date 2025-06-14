@@ -33,34 +33,41 @@ serve(async (req) => {
     }
 
     const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
-    const authHeader = req.headers.get("Authorization");
     
-    // Verificar autenticação para todas as ações
-    let userData = null;
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data, error } = await supabaseClient.auth.getUser(token);
-      if (!error && data.user) {
-        userData = data.user;
-      }
-    }
-
-    if (!userData) {
-      throw new Error("User not authenticated");
-    }
-
     const { action, instanceName, ...params } = await req.json();
     logStep("Action requested", { action, instanceName });
 
+    // Função helper para obter o usuário autenticado, movida para dentro do switch
+    const getAuthenticatedUser = async () => {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        throw new Error("Authorization header is required for this action");
+      }
+      const token = authHeader.replace("Bearer ", "");
+      const { data, error } = await supabaseClient.auth.getUser(token);
+
+      if (error || !data.user) {
+        logStep("Authentication failed", { error: error?.message });
+        throw new Error("User not authenticated");
+      }
+      return data.user;
+    };
+
     switch (action) {
-      case 'initialize-connection':
+      case 'initialize-connection': {
+        const userData = await getAuthenticatedUser();
         return await handleInitializeConnection(cleanApiUrl, evolutionApiKey, userData, supabaseClient);
+      }
       
-      case 'get-qrcode':
+      case 'get-qrcode': {
+        if (!instanceName) throw new Error("instanceName is required for get-qrcode");
         return await handleGetQRCode(cleanApiUrl, evolutionApiKey, instanceName);
+      }
       
-      case 'disconnect':
+      case 'disconnect': {
+        const userData = await getAuthenticatedUser();
         return await handleDisconnect(cleanApiUrl, evolutionApiKey, userData, supabaseClient);
+      }
       
       default:
         throw new Error(`Unknown action: ${action}`);
