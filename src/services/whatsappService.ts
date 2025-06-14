@@ -65,12 +65,23 @@ export const getQRCode = async (instanceName: string): Promise<ConnectionResult>
 
     if (error) throw error;
     
-    console.log('[WhatsApp Service] QR Code obtido com sucesso');
-    return {
-      success: true,
-      state: 'needs_qr_code',
-      qrCode: data.qrCode
-    };
+    // Verificar a flag de sucesso da resposta da função
+    if (data.success) {
+      console.log('[WhatsApp Service] QR Code obtido com sucesso');
+      return {
+        success: true,
+        state: 'needs_qr_code',
+        qrCode: data.qrCode
+      };
+    } else {
+      // Lida com casos em que a função executou com sucesso, mas a operação falhou (ex: já conectado)
+      console.warn('[WhatsApp Service] Falha ao obter QR Code no serviço:', data.error);
+      return {
+        success: false,
+        state: data.alreadyConnected ? 'already_connected' : 'error',
+        error: data.error || 'Falha ao obter QR Code'
+      };
+    }
   } catch (error) {
     console.error('[WhatsApp Service] Erro ao obter QR Code:', error);
     return {

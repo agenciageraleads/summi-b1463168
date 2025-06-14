@@ -362,6 +362,29 @@ async function handleGetQRCode(apiUrl: string, apiKey: string, instanceName: str
   logStep("Getting QR Code", { instanceName });
 
   try {
+    // Adicionar verificação de status antes de gerar QR Code
+    const statusResponse = await fetch(`${apiUrl}/instance/connectionState/${instanceName}`, {
+      method: 'GET',
+      headers: { 'apikey': apiKey }
+    });
+
+    if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        const connectionState = statusData.state?.toLowerCase();
+
+        if (connectionState === 'open' || connectionState === 'connected') {
+            logStep("Instance already connected, no QR needed for this request.");
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Instância já está conectada. Não é necessário QR Code.',
+                alreadyConnected: true
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
+        }
+    }
+    
     const response = await fetch(`${apiUrl}/instance/connect/${instanceName}`, {
       method: 'GET',
       headers: {

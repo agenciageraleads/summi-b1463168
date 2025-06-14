@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -196,12 +197,29 @@ export const WhatsAppConnectionManager: React.FC = () => {
 
         setQrTimer(timer);
       } else {
-        setState(prev => ({
-          ...prev,
-          connectionState: 'error',
-          message: result.error || 'Erro ao gerar QR Code',
-          isLoading: false
-        }));
+        // Se a instância já estiver conectada, o serviço retornará `state: 'already_connected'`
+        if (result.state === 'already_connected') {
+          setState(prev => ({
+            ...prev,
+            connectionState: 'already_connected',
+            isPolling: false,
+            qrCode: null,
+            message: 'WhatsApp já está conectado!',
+            isLoading: false
+          }));
+          await refreshProfile();
+          toast({
+            title: "Já Conectado",
+            description: result.error || "Seu WhatsApp já está conectado.",
+          });
+        } else {
+          setState(prev => ({
+            ...prev,
+            connectionState: 'error',
+            message: result.error || 'Erro ao gerar QR Code',
+            isLoading: false
+          }));
+        }
       }
     } catch (error) {
       setState(prev => ({
