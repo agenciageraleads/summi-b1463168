@@ -1,3 +1,4 @@
+
 // Componente simplificado que usa apenas o hook principal - VERSÃO CORRIGIDA
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useNavigate } from 'react-router-dom';
 import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 import { MessageSquare, Loader2, Wifi, WifiOff, QrCode, Phone, CheckCircle, AlertCircle, Unlink, Settings } from 'lucide-react';
+
 export const WhatsAppConnectionManager: React.FC = () => {
   const {
     profile
@@ -22,7 +24,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
   const renderStatusBadge = () => {
     switch (state.connectionState) {
       case 'already_connected':
-        return <Badge className="bg-green-100 text-green-800 border-green-200 mx-[100px]">
+        return <Badge className="bg-green-100 text-green-800 border-green-200">
             <CheckCircle className="w-3 h-3 mr-1" />
             Conectado
           </Badge>;
@@ -66,7 +68,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
             Conectar WhatsApp
           </Button>;
       case 'already_connected':
-        return <Button onClick={handleDisconnect} variant="destructive" size="sm" className="text-center mx-[84px]">
+        return <Button onClick={handleDisconnect} variant="destructive" size="sm">
             <Unlink className="w-4 h-4 mr-2" />
             Desconectar
           </Button>;
@@ -81,18 +83,18 @@ export const WhatsAppConnectionManager: React.FC = () => {
           </Button>;
     }
   };
+
   return <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
+        <CardTitle className="flex items-center justify-center space-x-2">
           <MessageSquare className="w-5 h-5 text-green-600" />
           <span>Conexão WhatsApp</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Status da Conexão */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-center space-y-3">
           <div className="flex items-center space-x-2">
-            
             {renderStatusBadge()}
           </div>
           
@@ -106,17 +108,19 @@ export const WhatsAppConnectionManager: React.FC = () => {
         <p className="text-sm text-muted-foreground text-center">{state.message}</p>
 
         {/* Número de Telefone (se conectado) */}
-        {state.connectionState === 'already_connected' && profile?.numero && <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <Phone className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800 text-center">
-                Telefone: ({profile.numero.slice(2, 4)}) {profile.numero.length === 13 ? profile.numero.slice(4, 5) + ' ' : ''}{profile.numero.slice(-8)}
-              </span>
+        {state.connectionState === 'already_connected' && profile?.numero && <div className="flex justify-center">
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Phone className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-medium text-green-800">
+                  Telefone: ({profile.numero.slice(2, 4)}) {profile.numero.length === 13 ? profile.numero.slice(4, 5) + ' ' : ''}{profile.numero.slice(-8)}
+                </span>
+              </div>
             </div>
           </div>}
 
         {/* Botões de Ação */}
-        <div className="flex space-x-2">
+        <div className="flex justify-center">
           {renderActionButtons()}
         </div>
 
