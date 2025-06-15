@@ -52,7 +52,7 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="py-20 lg:py-32">
+      <section className="py-20 lg:py-[92px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-6 bg-green-100 text-green-700 border-green-200">
@@ -62,8 +62,7 @@ const LandingPage = () => {
             <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6">
               Automatize seu{" "}
               <span className="bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent">
-                WhatsApp
-              </span>
+WhatsApp</span>
               <br />
               com IA
             </h1>
@@ -95,9 +94,7 @@ const LandingPage = () => {
       <section id="recursos" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Summi da Hora
-            </h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Recursos</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Nossa assistente Summi analisa suas conversas de WhatsApp e entrega resumos periódicos 
               com as informações mais importantes.
@@ -478,7 +475,7 @@ Cancele quando quiser.</CardDescription>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-16">
+      <footer className="text-white py-16 bg-emerald-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
