@@ -31,7 +31,7 @@ export const OnboardingTour: React.FC = () => {
 
   return (
     <Dialog open={isOnboardingActive} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-[500px]" hideCloseButton>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center space-x-2">

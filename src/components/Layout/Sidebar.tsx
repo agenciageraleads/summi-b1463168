@@ -1,8 +1,10 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Users, Settings, MessageSquare, PieChart, LogOut, Star } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,9 +49,9 @@ export const Sidebar = () => {
                 {isLoading ? (
                   <Skeleton className="h-8 w-8 rounded-full" />
                 ) : profile?.avatar ? (
-                  <AvatarImage src={profile.avatar} alt={profile?.name} />
+                  <AvatarImage src={profile.avatar} alt={profile?.name || profile?.nome} />
                 ) : (
-                  <AvatarFallback>{profile?.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback>{(profile?.name || profile?.nome)?.charAt(0).toUpperCase()}</AvatarFallback>
                 )}
               </Avatar>
             </Button>
