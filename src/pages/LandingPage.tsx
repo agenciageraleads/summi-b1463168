@@ -83,11 +83,29 @@ const LandingPage = () => {
               </Link>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-500">
+            <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-500 mb-6">
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Configuração em 5 min
               </div>
+              <div className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Sem cartão de crédito
+              </div>
+              <div className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Cancele quando quiser
+              </div>
+            </div>
+
+            {/* Aviso destacado sobre teste gratuito */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-2xl mx-auto">
+              <p className="text-green-800 font-medium text-lg">
+                🎉 <strong>7 dias grátis</strong> para testar todas as funcionalidades
+              </p>
+              <p className="text-green-700 text-sm mt-1">
+                Nenhum cartão necessário • Sem compromisso • Ativação imediata
+              </p>
             </div>
           </div>
         </div>
@@ -258,6 +276,27 @@ const LandingPage = () => {
             <p className="text-xl text-gray-600 mb-8">
               Escolha o plano ideal para suas necessidades e comece a usar hoje mesmo.
             </p>
+            
+            {/* Aviso importante sobre teste gratuito */}
+            <div className="bg-white border-2 border-green-300 rounded-xl p-6 max-w-3xl mx-auto mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                🚀 Comece Grátis - Sem Riscos!
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4 text-sm">
+                <div className="flex items-center justify-center space-x-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  <span className="text-gray-700">Sem cartão de crédito</span>
+                </div>
+                <div className="flex items-center justify-center space-x-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  <span className="text-gray-700">Cancele quando quiser</span>
+                </div>
+                <div className="flex items-center justify-center space-x-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  <span className="text-gray-700">Ativação imediata</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -269,7 +308,7 @@ const LandingPage = () => {
                   <span className="text-5xl font-bold text-gray-900">R$ 29,90</span>
                   <span className="text-gray-500 ml-2 text-lg">por mês</span>
                 </div>
-                <CardDescription className="mt-4 text-gray-600 text-base text-center">Flexibilidade total com pagamento mensal. 
+                <CardDescription className="mt-4 text-gray-600 text-base text-center">Flexibilidade total com pagamento mensal. 
 Cancele quando quiser.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -390,16 +429,40 @@ Cancele quando quiser.</CardDescription>
             </Card>
           </div>
 
-          {/* Informações adicionais */}
-          <div className="text-center mt-12 space-y-4">
-            <p className="text-gray-600 text-lg">
-              🔒 <strong>Sem compromisso:</strong> Cancele quando quiser, sem taxas ou multas
-            </p>
+          {/* Informações adicionais aprimoradas */}
+          <div className="text-center mt-12 space-y-6">
+            {/* Seção principal de garantias */}
+            <div className="bg-white rounded-xl p-6 max-w-4xl mx-auto border border-green-200 shadow-sm">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                ✨ Sem Riscos, Sem Complicações
+              </h3>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="text-left">
+                  <h4 className="font-medium text-gray-900 mb-2 flex items-center">
+                    <Check className="w-5 h-5 text-green-600 mr-2" />
+                    Teste Gratuito Completo
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    7 dias com acesso total às funcionalidades, sem necessidade de cartão de crédito.
+                  </p>
+                </div>
+                <div className="text-left">
+                  <h4 className="font-medium text-gray-900 mb-2 flex items-center">
+                    <Check className="w-5 h-5 text-green-600 mr-2" />
+                    Cancelamento Simples
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    Cancele a qualquer momento com apenas 1 clique. Sem taxas, multas ou burocracia.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <p className="text-gray-500">
               💳 Aceitamos todos os cartões de crédito • 🔐 Pagamento 100% seguro via Stripe
             </p>
             
-            <div className="flex flex-wrap justify-center gap-6 mt-8 text-sm text-gray-500">
+            <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500">
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Ativação imediata
@@ -407,6 +470,10 @@ Cancele quando quiser.</CardDescription>
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Suporte em português
+              </div>
+              <div className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Sem compromisso
               </div>
             </div>
           </div>
