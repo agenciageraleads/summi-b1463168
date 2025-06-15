@@ -24,6 +24,7 @@ export interface Profile {
   referral_code?: string;
   referred_by_user_id?: string;
   onboarding_completed?: boolean; // Novo campo
+  role?: string; // Campo de papel/função do usuário (admin, user, etc)
 }
 
 // Função para validar número de telefone brasileiro
