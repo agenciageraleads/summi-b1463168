@@ -1,4 +1,3 @@
-
 // Serviço unificado para conexão WhatsApp - consolida todas as operações
 import { supabase } from '@/integrations/supabase/client';
 
@@ -168,51 +167,56 @@ export const checkConnectionStatus = async (instanceName: string): Promise<Statu
 
 // Desconectar WhatsApp
 export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
-  console.log('[WhatsApp Connection] Iniciando desconexão...');
+  console.log('[WhatsApp Service] Desconectando WhatsApp...');
   
   try {
     const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      throw new Error('Usuário não autenticado');
-    }
+    if (!sessionData.session) throw new Error('Usuário não autenticado');
 
-    const response = await supabase.functions.invoke('evolution-delete-instance', {
+    const { data, error } = await supabase.functions.invoke('evolution-delete-instance', {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
     });
 
-    if (response.error) {
-      console.error('[WhatsApp Connection] Erro na desconexão:', response.error);
+    if (error) {
+      console.error('[WhatsApp Service] Erro na desconexão:', error);
+      // Erro de autenticação
+      if (error.status === 401 || (error.message && error.message.includes("expirada"))) {
+        return {
+          success: false,
+          state: 'error',
+          error: 'Sessão expirada. Por favor, faça login novamente.'
+        };
+      }
       return {
         success: false,
         state: 'error',
-        error: response.error.message || 'Erro ao desconectar'
+        error: error.message || 'Erro ao desconectar'
       };
     }
-
-    const result = response.data;
-    console.log('[WhatsApp Connection] Resultado da desconexão:', result);
-
-    if (result.success) {
-      return {
-        success: true,
-        state: 'needs_phone_number',
-        message: result.message || 'WhatsApp desconectado com sucesso'
-      };
-    } else {
+    
+    if (data && !data.success && data.error && /sessão|expirada|inválida|autentic/.test(data.error)) {
+      // Trata erro explícito de sessão do backend
       return {
         success: false,
         state: 'error',
-        error: result.error || 'Erro ao desconectar'
+        error: 'Sessão expirada ou inválida. Faça login novamente.'
       };
     }
+
+    console.log('[WhatsApp Service] Desconectado com sucesso');
+    return {
+      success: true,
+      state: 'needs_phone_number', // Volta ao estado inicial
+      message: data?.message || 'WhatsApp desconectado com sucesso'
+    };
   } catch (error) {
-    console.error('[WhatsApp Connection] Erro inesperado na desconexão:', error);
+    console.error('[WhatsApp Service] Erro na desconexão:', error);
     return {
       success: false,
       state: 'error',
-      error: error instanceof Error ? error.message : 'Erro inesperado'
+      error: error instanceof Error ? error.message : 'Erro ao desconectar'
     };
   }
 };

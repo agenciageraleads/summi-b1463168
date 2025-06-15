@@ -29,7 +29,10 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       logStep("No authorization header");
-      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Nenhum token de autorização fornecido. Faça login novamente.' 
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -40,13 +43,16 @@ serve(async (req) => {
     
     if (authError || !user) {
       logStep("Authentication failed", authError);
-      return new Response(JSON.stringify({ error: 'Authentication failed' }), {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Sessão expirada ou inválida. Faça login novamente.' 
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Buscar dados do usuário
+    // Buscar dados do usuário (instance_name)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('instance_name')
@@ -137,3 +143,4 @@ serve(async (req) => {
     });
   }
 });
+

@@ -309,12 +309,11 @@ export const useWhatsAppManager = () => {
   const handleDisconnect = useCallback(async () => {
     console.log('[WhatsApp Manager] Iniciando desconexão...');
     setState(prev => ({ ...prev, isLoading: true, message: 'Desconectando...' }));
-    
     stopPolling();
-    
+
     try {
       const result = await disconnectWhatsApp();
-      
+
       if (result.success) {
         setState({
           connectionState: 'needs_phone_number',
@@ -324,13 +323,13 @@ export const useWhatsAppManager = () => {
           message: result.message || 'WhatsApp desconectado com sucesso',
           isPolling: false
         });
-        
+
         // Reset da flag de inicialização para permitir nova conexão
         hasInitializedRef.current = false;
         isInitializingRef.current = false;
-        
+
         await refreshProfile();
-        
+
         toast({
           title: "Desconectado",
           description: "WhatsApp desconectado com sucesso"
@@ -341,12 +340,21 @@ export const useWhatsAppManager = () => {
           message: result.error || 'Erro ao desconectar',
           isLoading: false
         }));
-        
-        toast({
-          title: "Erro na Desconexão",
-          description: result.error || 'Erro ao desconectar WhatsApp',
-          variant: "destructive"
-        });
+
+        // Verifica erro de autenticação (sessão expirada)
+        if (result.error && /sessão|expirada|inválida|autentic/.test(result.error.toLowerCase())) {
+          toast({
+            title: "Sessão expirada",
+            description: "Faça login novamente para continuar.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Erro na Desconexão",
+            description: result.error || 'Erro ao desconectar WhatsApp',
+            variant: "destructive"
+          });
+        }
       }
     } catch (error) {
       console.error('[WhatsApp Manager] Erro na desconexão:', error);
@@ -355,7 +363,7 @@ export const useWhatsAppManager = () => {
         message: 'Erro inesperado ao desconectar',
         isLoading: false
       }));
-      
+
       toast({
         title: "Erro",
         description: 'Erro inesperado ao desconectar',
