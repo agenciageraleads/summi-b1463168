@@ -511,7 +511,9 @@ export const useWhatsAppManager = () => {
     }
   };
 
-  // Atualizar estado baseado no perfil - CORRIGIDO PARA NÃO INICIAR POLLING INDEVIDO!
+  // Atualizar estado baseado no perfil. 
+  // ATENÇÃO: NÃO fazer NENHUMA chamada à Evolution API aqui para evitar loops ou requisições indesejadas.
+  // Apenas ajusta o estado visual local. Todas as requisições serão feitas somente por ação explícita do usuário (handleConnect).
   useEffect(() => {
     if (!profile || hasInitializedRef.current || isInitializingRef.current) return;
 
@@ -524,24 +526,11 @@ export const useWhatsAppManager = () => {
       instanceName: initialState.instanceName || null
     }));
 
-    // Se está conectado, não faz NADA! Nunca começa polling.
-    if (
-      profile.instance_name &&
-      initialState.connectionState !== 'already_connected' &&
-      state.connectionState !== 'already_connected'
-    ) {
-      // Aqui pode iniciar checagem APENAS se NÃO está conectado
-      checkConnectionAndUpdate(profile.instance_name);
-    }
-    // Caso já esteja connected, garante polling parado:
-    if (
-      initialState.connectionState === 'already_connected' ||
-      state.connectionState === 'already_connected'
-    ) {
-      stopPolling();
-    }
+    // NÃO CHAMA MAIS checkConnectionAndUpdate NUNCA AUTOMATICAMENTE AQUI!
+    // Toda e qualquer verificação de status é apenas acionada pelo usuário manualmente.
+    // Isso acaba com o problema de flood de requisições/sobrecarregar a API.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, getInitialStateFromProfile, checkConnectionAndUpdate]);
+  }, [profile, getInitialStateFromProfile]); // removido checkConnectionAndUpdate das deps
 
   // Cleanup ao desmontar
   useEffect(() => {
