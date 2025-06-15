@@ -25,20 +25,20 @@ export const useMessageAnalysis = () => {
     console.log('[MESSAGE_ANALYSIS] Iniciando análise para usuário:', user.id);
 
     try {
-      // Preparar dados para a edge function
-      const requestData = { userId: user.id };
-      console.log('[MESSAGE_ANALYSIS] Dados da requisição:', requestData);
+      // Payload simples com apenas o userId
+      const payload = { userId: user.id };
+      console.log('[MESSAGE_ANALYSIS] Enviando payload:', payload);
 
-      // Chamar edge function que fará a requisição ao webhook
+      // Chamar edge function
       const { data, error } = await supabase.functions.invoke('analyze-messages', {
-        body: requestData
+        body: payload
       });
 
       console.log('[MESSAGE_ANALYSIS] Resposta da edge function:', { data, error });
 
       if (error) {
         console.error('[MESSAGE_ANALYSIS] Erro na edge function:', error);
-        throw error;
+        throw new Error(error.message || 'Erro na comunicação com o servidor');
       }
 
       if (data && !data.success) {
@@ -46,7 +46,7 @@ export const useMessageAnalysis = () => {
         throw new Error(data.error || 'Falha na análise');
       }
 
-      console.log('[MESSAGE_ANALYSIS] Análise iniciada com sucesso:', data);
+      console.log('[MESSAGE_ANALYSIS] Análise iniciada com sucesso');
 
       toast({
         title: "Análise Iniciada! 🔄",
@@ -71,13 +71,7 @@ export const useMessageAnalysis = () => {
       console.error('[MESSAGE_ANALYSIS] Erro ao iniciar análise:', error);
       setIsAnalyzing(false);
       
-      let errorMessage = 'Falha ao iniciar a classificação das mensagens';
-      
-      if (error.message && typeof error.message === 'string') {
-        errorMessage = error.message;
-      } else if (error.details && typeof error.details === 'string') {
-        errorMessage = error.details;
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Falha ao iniciar a classificação das mensagens';
       
       toast({
         title: "Erro na Análise",
