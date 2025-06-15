@@ -4,10 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-
 const LandingPage = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
+  return <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
       <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,11 +13,7 @@ const LandingPage = () => {
             {/* Logo */}
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10">
-                <img 
-                  src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" 
-                  alt="Summi Logo" 
-                  className="w-full h-full object-contain"
-                />
+                <img src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" alt="Summi Logo" className="w-full h-full object-contain" />
               </div>
               <span className="text-2xl font-bold text-green-600">Summi</span>
             </div>
@@ -207,9 +201,8 @@ const LandingPage = () => {
                   <span className="text-5xl font-bold text-gray-900">R$ 29,90</span>
                   <span className="text-gray-500 ml-2 text-lg">por mês</span>
                 </div>
-                <CardDescription className="mt-4 text-gray-600 text-base">
-                  Flexibilidade total com pagamento mensal. Cancele quando quiser.
-                </CardDescription>
+                <CardDescription className="mt-4 text-gray-600 text-base text-center">Flexibilidade total com pagamento mensal. 
+Cancele quando quiser.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -267,7 +260,7 @@ const LandingPage = () => {
                 <CardTitle className="text-2xl text-gray-900">Plano Anual</CardTitle>
                 <div className="mt-6">
                   <div className="flex items-center justify-center space-x-2">
-                    <span className="text-2xl text-gray-400 line-through">R$ 29,90</span>
+                    <span className="text-gray-400 line-through text-sm">R$ 29,90</span>
                     <span className="text-5xl font-bold text-green-600">R$ 19,90</span>
                   </div>
                   <span className="text-gray-500 text-lg">por mês</span>
@@ -281,9 +274,7 @@ const LandingPage = () => {
                     </p>
                   </div>
                 </div>
-                <CardDescription className="mt-4 text-gray-600 text-base">
-                  <strong>O melhor custo-benefício!</strong> Pague apenas R$ 238,80 por ano.
-                </CardDescription>
+                
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -493,11 +484,7 @@ const LandingPage = () => {
             <div>
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-8 h-8">
-                  <img 
-                    src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" 
-                    alt="Summi Logo" 
-                    className="w-full h-full object-contain"
-                  />
+                  <img src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" alt="Summi Logo" className="w-full h-full object-contain" />
                 </div>
                 <span className="text-xl font-bold">Summi</span>
               </div>
@@ -539,8 +526,6 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default LandingPage;
