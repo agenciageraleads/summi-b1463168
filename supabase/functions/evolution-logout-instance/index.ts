@@ -85,28 +85,49 @@ serve(async (req) => {
       throw new Error("Evolution API credentials not configured");
     }
 
-    logStep("Attempting to logout instance", { instanceName });
+    // Garantir que a URL base não termine com barra
+    const baseUrl = evolutionApiUrl.replace(/\/$/, '');
+    const logoutUrl = `${baseUrl}/instance/logout/${instanceName}`;
+    
+    logStep("Attempting to logout instance", { instanceName, logoutUrl });
 
     // Fazer logout na Evolution API
     try {
-      const logoutResponse = await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+      const logoutResponse = await fetch(logoutUrl, {
         method: 'DELETE',
         headers: {
-          'apikey': evolutionApiKey
+          'apikey': evolutionApiKey,
+          'Content-Type': 'application/json'
         }
       });
       
-      logStep("Logout attempt", { status: logoutResponse.status });
+      logStep("Logout API response", { 
+        status: logoutResponse.status, 
+        statusText: logoutResponse.statusText,
+        url: logoutUrl 
+      });
       
-      if (!logoutResponse.ok) {
+      if (logoutResponse.ok) {
+        logStep("Logout successful in Evolution API");
+      } else {
         const errorText = await logoutResponse.text();
-        logStep("Logout failed", { status: logoutResponse.status, error: errorText });
+        logStep("Logout failed in Evolution API", { 
+          status: logoutResponse.status, 
+          error: errorText 
+        });
+        
+        // Mesmo se o logout falhar na API, vamos limpar o perfil
+        // pois pode ser que a instância já não exista mais
+        if (logoutResponse.status === 404) {
+          logStep("Instance not found in Evolution API (404) - proceeding with profile cleanup");
+        }
       }
     } catch (logoutError) {
-      logStep("Logout request failed", logoutError);
+      logStep("Logout request failed", { error: logoutError.message });
+      // Continuar mesmo com erro, pois vamos limpar o perfil
     }
 
-    // IMPORTANTE: Apenas limpar instance_name do perfil, NÃO deletar a instância
+    // IMPORTANTE: Sempre limpar instance_name do perfil, independente do resultado do logout
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ instance_name: null })

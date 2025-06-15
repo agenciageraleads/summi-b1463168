@@ -80,31 +80,38 @@ serve(async (req) => {
       throw new Error("Evolution API credentials not configured");
     }
 
+    // Garantir que a URL base não termine com barra
+    const baseUrl = evolutionApiUrl.replace(/\/$/, '');
+
     logStep("Attempting to delete instance", { instanceName });
 
     // Primeiro fazer logout
     try {
-      const logoutResponse = await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+      const logoutUrl = `${baseUrl}/instance/logout/${instanceName}`;
+      const logoutResponse = await fetch(logoutUrl, {
         method: 'DELETE',
         headers: {
-          'apikey': evolutionApiKey
+          'apikey': evolutionApiKey,
+          'Content-Type': 'application/json'
         }
       });
-      logStep("Logout attempt", { status: logoutResponse.status });
+      logStep("Logout attempt", { status: logoutResponse.status, url: logoutUrl });
     } catch (logoutError) {
       logStep("Logout failed, continuing with delete", logoutError);
     }
 
     // Depois deletar a instância
     try {
-      const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+      const deleteUrl = `${baseUrl}/instance/delete/${instanceName}`;
+      const deleteResponse = await fetch(deleteUrl, {
         method: 'DELETE',
         headers: {
-          'apikey': evolutionApiKey
+          'apikey': evolutionApiKey,
+          'Content-Type': 'application/json'
         }
       });
       
-      logStep("Delete attempt", { status: deleteResponse.status });
+      logStep("Delete attempt", { status: deleteResponse.status, url: deleteUrl });
       
       if (!deleteResponse.ok) {
         const errorText = await deleteResponse.text();
