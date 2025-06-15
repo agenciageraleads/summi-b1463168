@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -129,6 +128,22 @@ export const ChatsList = () => {
     }
   };
 
+  // Função para contar mensagens baseada nos \n na string conversa
+  const getMessageCount = (conversa: any[]) => {
+    if (!conversa || conversa.length === 0) return 0;
+    
+    // Se conversa é um array, pegar o primeiro item como string
+    const conversaString = Array.isArray(conversa) ? 
+      (typeof conversa[0] === 'string' ? conversa[0] : JSON.stringify(conversa[0] || '')) : 
+      JSON.stringify(conversa);
+    
+    // Contar quantidade de \n na string
+    const lineBreaks = (conversaString.match(/\n/g) || []).length;
+    
+    // Retornar quantidade de quebras de linha (cada \n representa uma mensagem)
+    return lineBreaks > 0 ? lineBreaks : 1; // Mínimo 1 se tem conteúdo
+  };
+
   // Função para formatar número de telefone
   const formatPhoneNumber = (remoteJid: string) => {
     // Extrair apenas os números do remote_jid
@@ -240,6 +255,7 @@ export const ChatsList = () => {
               const priorityInfo = getPriorityInfo(chat.prioridade);
               const formattedNumber = formatPhoneNumber(chat.remote_jid);
               const whatsappNumber = getWhatsAppNumber(chat.remote_jid);
+              const messageCount = getMessageCount(chat.conversa);
               
               return (
                 <div
@@ -277,7 +293,7 @@ export const ChatsList = () => {
                   
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>
-                      {formattedNumber} | {chat.conversa?.length || 0} mensagem(s)
+                      {formattedNumber} | {messageCount} mensagem(s)
                     </span>
                     <span>
                       {formatDistanceToNow(new Date(chat.modificado_em), {

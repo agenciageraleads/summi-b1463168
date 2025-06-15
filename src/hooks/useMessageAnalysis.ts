@@ -29,16 +29,10 @@ export const useMessageAnalysis = () => {
       const payload = { userId: user.id };
       console.log('[MESSAGE_ANALYSIS] Enviando payload:', payload);
 
-      // Chamar edge function com timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
-
+      // Chamar edge function sem signal (não suportado pelo Supabase)
       const { data, error } = await supabase.functions.invoke('analyze-messages', {
-        body: payload,
-        signal: controller.signal
+        body: payload
       });
-
-      clearTimeout(timeoutId);
 
       console.log('[MESSAGE_ANALYSIS] Resposta da edge function:', { data, error });
 
@@ -80,11 +74,7 @@ export const useMessageAnalysis = () => {
       let errorMessage = 'Falha ao iniciar a classificação das mensagens';
       
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          errorMessage = 'Timeout na comunicação com o servidor';
-        } else {
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
       }
       
       toast({
