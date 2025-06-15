@@ -4,7 +4,6 @@ import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 import { SubscriptionStatus } from '@/components/SubscriptionStatus';
-import ReferralSection from '@/components/Settings/ReferralSection';
 import { useState } from 'react';
 
 const SettingsPage = () => {
@@ -51,16 +50,17 @@ const SettingsPage = () => {
           </p>
         </div>
 
-        {/* Seção de Indicação */}
-        <ReferralSection />
-
-        {/* Existing components */}
+        {/* Formulário de perfil */}
         <ProfileForm 
           profile={profile}
           onSave={handleSaveProfile}
           isUpdating={isUpdating}
         />
+        
+        {/* Status da assinatura */}
         <SubscriptionStatus />
+        
+        {/* Exclusão de conta */}
         <AccountDeletion />
       </div>
     </DashboardLayout>

@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +12,7 @@ import DashboardPage from "./pages/DashboardPage";
 import SettingsPage from "./pages/SettingsPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import FeedbackPage from "./pages/FeedbackPage";
+import ReferralsPage from "./pages/ReferralsPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -66,13 +68,19 @@ function App() {
                     <FeedbackPage />
                   </ProtectedRoute>
                 } />
+                <Route path="/referrals" element={
+                  <ProtectedRoute>
+                    <ReferralsPage />
+                  </ProtectedRoute>
+                } />
                 
                 {/* Admin Routes */}
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
                 
-                {/* Nova rota para página de convite */}
+                {/* Rotas de convite - ambas funcionam */}
                 <Route path="/convite/:referralCode" element={<ReferralPage />} />
+                <Route path="/r/:referralCode" element={<ReferralPage />} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>

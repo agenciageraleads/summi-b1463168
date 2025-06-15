@@ -59,12 +59,12 @@ export const useReferrals = () => {
         throw referralsError;
       }
 
-      // Montar dados de resposta
-      const referralLink = `${window.location.origin}/convite/${profile.referral_code}`;
+      // Montar dados de resposta com link mais curto
+      const shortReferralLink = `${window.location.origin}/r/${profile.referral_code}`;
       
       const data: ReferralData = {
         referralCode: profile.referral_code || '',
-        referralLink,
+        referralLink: shortReferralLink,
         referredByUserId: profile.referred_by_user_id,
         totalReferrals: referrals?.length || 0,
         referralsList: referrals || []

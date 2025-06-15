@@ -13,6 +13,7 @@ const navigation = [
   { name: 'Configurações', href: '/settings', icon: '⚙️' },
   { name: 'Assinatura', href: '/subscription', icon: '💳' },
   { name: 'Feedback', href: '/feedback', icon: '💬' },
+  { name: 'Indicações', href: '/referrals', icon: '🎁' },
 ];
 
 export const Sidebar = () => {
