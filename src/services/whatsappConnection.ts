@@ -1,4 +1,5 @@
-// Serviço unificado para conexão WhatsApp - consolida todas as operações
+
+// Serviço unificado para conexão WhatsApp - VERSÃO DEFINITIVA
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConnectionResult {
@@ -17,20 +18,26 @@ export interface StatusResult {
   error?: string;
 }
 
+// Função auxiliar para obter sessão
+const getSession = async () => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session) {
+    throw new Error('Usuário não autenticado');
+  }
+  return sessionData.session;
+};
+
 // Inicializar conexão WhatsApp
 export const initializeWhatsAppConnection = async (): Promise<ConnectionResult> => {
   console.log('[WhatsApp Connection] Inicializando conexão...');
   
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      throw new Error('Usuário não autenticado');
-    }
+    const session = await getSession();
 
     const response = await supabase.functions.invoke('evolution-api-handler', {
       body: { action: 'initialize-connection' },
       headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
       },
     });
 
@@ -67,15 +74,12 @@ export const generateQRCode = async (instanceName: string): Promise<ConnectionRe
   console.log('[WhatsApp Connection] Gerando QR Code para:', instanceName);
   
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      throw new Error('Usuário não autenticado');
-    }
+    const session = await getSession();
 
     const response = await supabase.functions.invoke('evolution-generate-qr', {
       body: { instanceName },
       headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
       },
     });
 
@@ -98,7 +102,7 @@ export const generateQRCode = async (instanceName: string): Promise<ConnectionRe
         qrCode: result.qrCode,
         message: 'QR Code gerado com sucesso'
       };
-    } else if (result.state === 'already_connected') {
+    } else if (result.alreadyConnected) {
       return {
         success: true,
         state: 'already_connected',
@@ -126,15 +130,12 @@ export const checkConnectionStatus = async (instanceName: string): Promise<Statu
   console.log('[WhatsApp Connection] Verificando status de:', instanceName);
   
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      throw new Error('Usuário não autenticado');
-    }
+    const session = await getSession();
 
     const response = await supabase.functions.invoke('evolution-connection-state', {
       body: { instanceName },
       headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
       },
     });
 
@@ -165,76 +166,17 @@ export const checkConnectionStatus = async (instanceName: string): Promise<Statu
   }
 };
 
-// Desconectar WhatsApp
-export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
-  console.log('[WhatsApp Service] Desconectando WhatsApp...');
-  
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) throw new Error('Usuário não autenticado');
-
-    const { data, error } = await supabase.functions.invoke('evolution-delete-instance', {
-      headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
-      },
-    });
-
-    if (error) {
-      console.error('[WhatsApp Service] Erro na desconexão:', error);
-      // Erro de autenticação
-      if (error.status === 401 || (error.message && error.message.includes("expirada"))) {
-        return {
-          success: false,
-          state: 'error',
-          error: 'Sessão expirada. Por favor, faça login novamente.'
-        };
-      }
-      return {
-        success: false,
-        state: 'error',
-        error: error.message || 'Erro ao desconectar'
-      };
-    }
-    
-    if (data && !data.success && data.error && /sessão|expirada|inválida|autentic/.test(data.error)) {
-      // Trata erro explícito de sessão do backend
-      return {
-        success: false,
-        state: 'error',
-        error: 'Sessão expirada ou inválida. Faça login novamente.'
-      };
-    }
-
-    console.log('[WhatsApp Service] Desconectado com sucesso');
-    return {
-      success: true,
-      state: 'needs_phone_number', // Volta ao estado inicial
-      message: data?.message || 'WhatsApp desconectado com sucesso'
-    };
-  } catch (error) {
-    console.error('[WhatsApp Service] Erro na desconexão:', error);
-    return {
-      success: false,
-      state: 'error',
-      error: error instanceof Error ? error.message : 'Erro ao desconectar'
-    };
-  }
-};
-
 // Reiniciar instância
 export const restartInstance = async (instanceName: string): Promise<ConnectionResult> => {
   console.log('[WhatsApp Connection] Reiniciando instância:', instanceName);
   
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      throw new Error('Usuário não autenticado');
-    }
+    const session = await getSession();
 
     const response = await supabase.functions.invoke('evolution-restart-instance', {
       body: { instanceName },
       headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
       },
     });
 
@@ -262,6 +204,97 @@ export const restartInstance = async (instanceName: string): Promise<ConnectionR
       success: false,
       state: 'error',
       error: error instanceof Error ? error.message : 'Erro inesperado'
+    };
+  }
+};
+
+// Desconectar WhatsApp (apenas logout)
+export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
+  console.log('[WhatsApp Service] Desconectando WhatsApp...');
+  
+  try {
+    const session = await getSession();
+
+    const { data, error } = await supabase.functions.invoke('evolution-logout-instance', {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (error) {
+      console.error('[WhatsApp Service] Erro na desconexão:', error);
+      if (error.status === 401 || (error.message && error.message.includes("expirada"))) {
+        return {
+          success: false,
+          state: 'error',
+          error: 'Sessão expirada. Por favor, faça login novamente.'
+        };
+      }
+      return {
+        success: false,
+        state: 'error',
+        error: error.message || 'Erro ao desconectar'
+      };
+    }
+    
+    if (data && !data.success && data.error && /sessão|expirada|inválida|autentic/.test(data.error)) {
+      return {
+        success: false,
+        state: 'error',
+        error: 'Sessão expirada ou inválida. Faça login novamente.'
+      };
+    }
+
+    console.log('[WhatsApp Service] Desconectado com sucesso');
+    return {
+      success: true,
+      state: 'needs_phone_number',
+      message: data?.message || 'WhatsApp desconectado com sucesso'
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Erro na desconexão:', error);
+    return {
+      success: false,
+      state: 'error',
+      error: error instanceof Error ? error.message : 'Erro ao desconectar'
+    };
+  }
+};
+
+// Deletar instância (para quando deletar conta)
+export const deleteWhatsAppInstance = async (): Promise<ConnectionResult> => {
+  console.log('[WhatsApp Service] Deletando instância WhatsApp...');
+  
+  try {
+    const session = await getSession();
+
+    const { data, error } = await supabase.functions.invoke('evolution-delete-instance', {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (error) {
+      console.error('[WhatsApp Service] Erro ao deletar instância:', error);
+      return {
+        success: false,
+        state: 'error',
+        error: error.message || 'Erro ao deletar instância'
+      };
+    }
+
+    console.log('[WhatsApp Service] Instância deletada com sucesso');
+    return {
+      success: true,
+      state: 'needs_phone_number',
+      message: data?.message || 'Instância WhatsApp deletada com sucesso'
+    };
+  } catch (error) {
+    console.error('[WhatsApp Service] Erro ao deletar instância:', error);
+    return {
+      success: false,
+      state: 'error',
+      error: error instanceof Error ? error.message : 'Erro ao deletar instância'
     };
   }
 };

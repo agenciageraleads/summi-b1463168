@@ -1,4 +1,5 @@
-// Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO CORRIGIDA
+
+// Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO UNIFICADA
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
@@ -207,9 +208,8 @@ export const useWhatsAppManager = () => {
     }
   }, [startPolling, refreshProfile]);
 
-  // Inicializar conexão - CORRIGIDO para evitar loops
+  // Inicializar conexão
   const initializeConnection = useCallback(async () => {
-    // Evitar múltiplas inicializações simultâneas
     if (isInitializingRef.current || hasInitializedRef.current) {
       console.log('[WhatsApp Manager] Inicialização já em andamento ou concluída');
       return;
@@ -236,7 +236,6 @@ export const useWhatsAppManager = () => {
           isLoading: false
         }));
 
-        // Se precisa de QR Code, gerar automaticamente apenas se não já conectado
         if (result.state === 'needs_qr_code' && result.instanceName) {
           await handleGenerateQR(result.instanceName);
         }
@@ -262,7 +261,7 @@ export const useWhatsAppManager = () => {
     }
   }, [handleGenerateQR]);
 
-  // Conectar WhatsApp - CORRIGIDO
+  // Conectar WhatsApp
   const handleConnect = useCallback(async () => {
     console.log('[WhatsApp Manager] Tentativa de conexão iniciada');
 
@@ -290,20 +289,13 @@ export const useWhatsAppManager = () => {
       qrCode: null
     }));
 
-    // Sempre obtenha a instância corretamente do profile (apenas se já existe)
-    // NÃO gerar "user_${profile.id}", use apenas o nome correto persistido
     if (!profile.instance_name) {
-      // Força nova inicialização (vai persistir o instance_name correto)
       await initializeConnection();
-      // Após initializeConnection, atualize o profile!
       await refreshProfile();
     } else {
-      // Com instance_name já salvo, TRABALHE SEMPRE com ele!
       await handleGenerateQR(profile.instance_name);
     }
-  }, [
-    profile, toast, stopPolling, state.isLoading, initializeConnection, refreshProfile, handleGenerateQR
-  ]);
+  }, [profile, toast, stopPolling, state.isLoading, initializeConnection, refreshProfile, handleGenerateQR]);
 
   // Desconectar WhatsApp
   const handleDisconnect = useCallback(async () => {
@@ -324,7 +316,6 @@ export const useWhatsAppManager = () => {
           isPolling: false
         });
 
-        // Reset da flag de inicialização para permitir nova conexão
         hasInitializedRef.current = false;
         isInitializingRef.current = false;
 
@@ -341,7 +332,6 @@ export const useWhatsAppManager = () => {
           isLoading: false
         }));
 
-        // Verifica erro de autenticação (sessão expirada)
         if (result.error && /sessão|expirada|inválida|autentic/.test(result.error.toLowerCase())) {
           toast({
             title: "Sessão expirada",
@@ -390,7 +380,7 @@ export const useWhatsAppManager = () => {
     }
   };
 
-  // Atualizar estado baseado no perfil - SEM inicialização automática
+  // Atualizar estado baseado no perfil
   useEffect(() => {
     if (profile && !hasInitializedRef.current && !isInitializingRef.current) {
       const initialState = getInitialStateFromProfile();

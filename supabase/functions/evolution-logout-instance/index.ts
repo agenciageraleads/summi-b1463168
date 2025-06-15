@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[EVOLUTION-DELETE] ${step}${detailsStr}`);
+  console.log(`[EVOLUTION-LOGOUT] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -63,7 +63,7 @@ serve(async (req) => {
       logStep("No instance found for user", { userId: user.id, profileError });
       return new Response(JSON.stringify({ 
         success: true,
-        message: 'Nenhuma instância encontrada para deletar'
+        message: 'Nenhuma instância encontrada para desconectar'
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -80,9 +80,9 @@ serve(async (req) => {
       throw new Error("Evolution API credentials not configured");
     }
 
-    logStep("Attempting to delete instance", { instanceName });
+    logStep("Attempting to logout instance", { instanceName });
 
-    // Primeiro fazer logout
+    // Fazer logout na Evolution API
     try {
       const logoutResponse = await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
         method: 'DELETE',
@@ -90,40 +90,18 @@ serve(async (req) => {
           'apikey': evolutionApiKey
         }
       });
+      
       logStep("Logout attempt", { status: logoutResponse.status });
-    } catch (logoutError) {
-      logStep("Logout failed, continuing with delete", logoutError);
-    }
-
-    // Depois deletar a instância
-    try {
-      const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
-        method: 'DELETE',
-        headers: {
-          'apikey': evolutionApiKey
-        }
-      });
       
-      logStep("Delete attempt", { status: deleteResponse.status });
-      
-      if (!deleteResponse.ok) {
-        const errorText = await deleteResponse.text();
-        logStep("Delete failed", { status: deleteResponse.status, error: errorText });
-        throw new Error(`Falha ao deletar instância: ${deleteResponse.status} - ${errorText}`);
+      if (!logoutResponse.ok) {
+        const errorText = await logoutResponse.text();
+        logStep("Logout failed", { status: logoutResponse.status, error: errorText });
       }
-      
-    } catch (deleteError) {
-      logStep("Delete failed", deleteError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Erro ao deletar instância da Evolution API'
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      });
+    } catch (logoutError) {
+      logStep("Logout request failed", logoutError);
     }
 
-    // Limpar dados do usuário no banco
+    // IMPORTANTE: Apenas limpar instance_name do perfil, NÃO deletar a instância
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ instance_name: null })
@@ -131,15 +109,22 @@ serve(async (req) => {
 
     if (updateError) {
       logStep("Failed to clear instance_name", updateError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Erro ao atualizar perfil'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     } else {
       logStep("Successfully cleared instance_name from profile");
     }
 
-    logStep("Delete process completed successfully");
+    logStep("Logout process completed successfully");
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Instância WhatsApp deletada com sucesso'
+      message: 'WhatsApp desconectado com sucesso'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -147,11 +132,11 @@ serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in evolution-delete-instance", { message: errorMessage });
+    logStep("ERROR in evolution-logout-instance", { message: errorMessage });
     
     return new Response(JSON.stringify({ 
       success: false,
-      error: `Erro ao deletar instância: ${errorMessage}`
+      error: `Erro ao desconectar: ${errorMessage}`
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

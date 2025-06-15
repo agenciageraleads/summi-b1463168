@@ -1,5 +1,5 @@
 
-// Componente simplificado que usa apenas o hook principal - VERSÃO CORRIGIDA
+// Componente simplificado que usa apenas o hook unificado - VERSÃO FINAL
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,81 +10,96 @@ import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 import { MessageSquare, Loader2, Wifi, WifiOff, QrCode, Phone, CheckCircle, AlertCircle, Unlink, Settings } from 'lucide-react';
 
 export const WhatsAppConnectionManager: React.FC = () => {
-  const {
-    profile
-  } = useProfile();
+  const { profile } = useProfile();
   const navigate = useNavigate();
-  const {
-    state,
-    handleConnect,
-    handleDisconnect
-  } = useWhatsAppManager();
+  const { state, handleConnect, handleDisconnect } = useWhatsAppManager();
 
   // Renderizar badge de status
   const renderStatusBadge = () => {
     switch (state.connectionState) {
       case 'already_connected':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">
+        return (
+          <Badge className="bg-green-100 text-green-800 border-green-200">
             <CheckCircle className="w-3 h-3 mr-1" />
             Conectado
-          </Badge>;
+          </Badge>
+        );
       case 'is_connecting':
       case 'needs_qr_code':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
             <Loader2 className="w-3 h-3 mr-1 animate-spin" />
             {state.connectionState === 'is_connecting' ? 'Conectando' : 'Aguardando'}
-          </Badge>;
+          </Badge>
+        );
       case 'error':
-        return <Badge className="bg-red-100 text-red-800 border-red-200">
+        return (
+          <Badge className="bg-red-100 text-red-800 border-red-200">
             <AlertCircle className="w-3 h-3 mr-1" />
             Erro
-          </Badge>;
+          </Badge>
+        );
       default:
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">
+        return (
+          <Badge className="bg-gray-100 text-gray-800 border-gray-200">
             <WifiOff className="w-3 h-3 mr-1" />
             Desconectado
-          </Badge>;
+          </Badge>
+        );
     }
   };
 
   // Renderizar botões de ação
   const renderActionButtons = () => {
-    // Se está carregando, mostrar botão desabilitado
     if (state.isLoading) {
-      return <Button disabled size="sm">
+      return (
+        <Button disabled size="sm">
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           Processando...
-        </Button>;
+        </Button>
+      );
     }
+
     switch (state.connectionState) {
       case 'needs_phone_number':
-        return <Button variant="outline" size="sm" onClick={() => navigate('/settings')}>
+        return (
+          <Button variant="outline" size="sm" onClick={() => navigate('/settings')}>
             <Settings className="w-4 h-4 mr-2" />
             Configurar Telefone
-          </Button>;
+          </Button>
+        );
       case 'needs_qr_code':
-        return <Button onClick={handleConnect} size="sm">
+        return (
+          <Button onClick={handleConnect} size="sm">
             <QrCode className="w-4 h-4 mr-2" />
             Conectar WhatsApp
-          </Button>;
+          </Button>
+        );
       case 'already_connected':
-        return <Button onClick={handleDisconnect} variant="destructive" size="sm">
+        return (
+          <Button onClick={handleDisconnect} variant="destructive" size="sm">
             <Unlink className="w-4 h-4 mr-2" />
             Desconectar
-          </Button>;
+          </Button>
+        );
       case 'error':
-        return <Button onClick={handleConnect} variant="outline" size="sm">
+        return (
+          <Button onClick={handleConnect} variant="outline" size="sm">
             Tentar Novamente
-          </Button>;
+          </Button>
+        );
       default:
-        return <Button onClick={handleConnect} size="sm">
+        return (
+          <Button onClick={handleConnect} size="sm">
             <QrCode className="w-4 h-4 mr-2" />
             Conectar WhatsApp
-          </Button>;
+          </Button>
+        );
     }
   };
 
-  return <Card>
+  return (
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-center space-x-2">
           <MessageSquare className="w-5 h-5 text-green-600" />
@@ -98,17 +113,20 @@ export const WhatsAppConnectionManager: React.FC = () => {
             {renderStatusBadge()}
           </div>
           
-          {state.isPolling && <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          {state.isPolling && (
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span>Monitorando...</span>
-            </div>}
+            </div>
+          )}
         </div>
 
         {/* Mensagem de Status */}
         <p className="text-sm text-muted-foreground text-center">{state.message}</p>
 
         {/* Número de Telefone (se conectado) */}
-        {state.connectionState === 'already_connected' && profile?.numero && <div className="flex justify-center">
+        {state.connectionState === 'already_connected' && profile?.numero && (
+          <div className="flex justify-center">
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center space-x-2">
                 <Phone className="w-4 h-4 text-green-600" />
@@ -117,7 +135,8 @@ export const WhatsAppConnectionManager: React.FC = () => {
                 </span>
               </div>
             </div>
-          </div>}
+          </div>
+        )}
 
         {/* Botões de Ação */}
         <div className="flex justify-center">
@@ -125,7 +144,8 @@ export const WhatsAppConnectionManager: React.FC = () => {
         </div>
 
         {/* QR Code */}
-        {state.qrCode && state.connectionState === 'needs_qr_code' && <Card>
+        {state.qrCode && state.connectionState === 'needs_qr_code' && (
+          <Card>
             <CardContent className="p-4">
               <div className="text-center space-y-3">
                 <h3 className="font-medium">Escaneie o QR Code</h3>
@@ -133,14 +153,20 @@ export const WhatsAppConnectionManager: React.FC = () => {
                   Abra o WhatsApp → Menu → Dispositivos conectados → Conectar dispositivo
                 </p>
                 <div className="flex justify-center">
-                  <img src={state.qrCode} alt="QR Code para conectar WhatsApp" className="max-w-[200px] max-h-[200px] border rounded-lg" />
+                  <img 
+                    src={state.qrCode} 
+                    alt="QR Code para conectar WhatsApp" 
+                    className="max-w-[200px] max-h-[200px] border rounded-lg" 
+                  />
                 </div>
                 <p className="text-xs text-muted-foreground">
                   O QR Code expira em 30 segundos
                 </p>
               </div>
             </CardContent>
-          </Card>}
+          </Card>
+        )}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 };
