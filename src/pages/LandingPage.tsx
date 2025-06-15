@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,22 @@ import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRigh
 import { Link } from "react-router-dom";
 
 const LandingPage = () => {
+  // Lista de funcionalidades incluídas em ambos os planos
+  const planFeatures = [
+    "Resumo inteligente de mensagens importantes",
+    "Transcrição automática de áudios",
+    "Resumo de mensagens de áudio longas", 
+    "Análise de conversas e métricas",
+    "Alertas prioritários personalizáveis",
+    "Privacidade e criptografia garantidas",
+    "Conexão segura com WhatsApp",
+    "Dashboard completo de análises",
+    "Notificações em tempo real",
+    "Suporte prioritário",
+    "Configuração em 5 minutos",
+    "Sem limite de mensagens analisadas"
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
@@ -201,64 +218,167 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Um plano simples, todas as funcionalidades
+              Planos Simples e Transparentes
             </h2>
-            <p className="text-xl text-gray-600">
-              Comece com 7 dias de teste gratuito. Cancele quando quiser.
+            <p className="text-xl text-gray-600 mb-8">
+              Todas as funcionalidades incluídas em ambos os planos. Comece com 7 dias grátis.
             </p>
+            
+            {/* Funcionalidades incluídas - visível em ambos os planos */}
+            <div className="max-w-4xl mx-auto mb-12">
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">✨ Funcionalidades incluídas em todos os planos:</h3>
+              <div className="grid md:grid-cols-2 gap-3 text-left">
+                {planFeatures.map((feature, index) => (
+                  <div key={index} className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600 shrink-0" />
+                    <span className="text-gray-700">{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <Card className="border-gray-200 hover:shadow-xl transition-all duration-300">
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Plano Mensal */}
+            <Card className="border-gray-200 hover:shadow-xl transition-all duration-300 relative">
               <CardHeader className="text-center pb-8">
                 <CardTitle className="text-2xl text-gray-900">Plano Mensal</CardTitle>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-gray-900">R$ 29,90</span>
-                  <span className="text-gray-500 ml-2">por mês</span>
+                <div className="mt-6">
+                  <span className="text-5xl font-bold text-gray-900">R$ 29,90</span>
+                  <span className="text-gray-500 ml-2 text-lg">por mês</span>
                 </div>
-                <CardDescription className="mt-2 text-gray-600">
-                  Acesso completo com a flexibilidade do pagamento mensal.
+                <CardDescription className="mt-4 text-gray-600 text-base">
+                  Flexibilidade total com pagamento mensal. Cancele quando quiser.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="text-center">
-                <Link to="/register">
-                  <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white">
-                    Assinar Plano Mensal
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span>7 dias de teste gratuito</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span>Todas as funcionalidades incluídas</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span>Suporte prioritário</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span>Cancele a qualquer momento</span>
+                  </div>
+                </div>
+                
+                <Link to="/register" className="block">
+                  <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 text-lg">
+                    Começar Teste Gratuito
                   </Button>
                 </Link>
               </CardContent>
             </Card>
 
-            <Card className="border-green-500 shadow-lg relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <Badge className="bg-green-600 text-white">Melhor Oferta</Badge>
+            {/* Plano Anual */}
+            <Card className="border-green-500 shadow-2xl relative bg-gradient-to-br from-white to-green-50 transform scale-105">
+              {/* Badge de melhor oferta */}
+              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
+                <Badge className="bg-green-600 text-white px-6 py-2 text-sm font-semibold shadow-lg">
+                  🏆 MELHOR OFERTA
+                </Badge>
               </div>
-              <CardHeader className="text-center pb-8">
+              
+              {/* Badge de desconto no canto */}
+              <div className="absolute top-4 right-4">
+                <Badge className="bg-red-500 text-white px-3 py-1 text-xs font-bold">
+                  ECONOMIZE 33%
+                </Badge>
+              </div>
+
+              <CardHeader className="text-center pb-8 pt-8">
                 <CardTitle className="text-2xl text-gray-900">Plano Anual</CardTitle>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-gray-900">R$ 19,90</span>
-                  <span className="text-gray-500 ml-2">por mês</span>
+                <div className="mt-6">
+                  <div className="flex items-center justify-center space-x-2">
+                    <span className="text-2xl text-gray-400 line-through">R$ 29,90</span>
+                    <span className="text-5xl font-bold text-green-600">R$ 19,90</span>
+                  </div>
+                  <span className="text-gray-500 text-lg">por mês</span>
+                  
+                  <div className="mt-4 p-3 bg-green-100 rounded-lg border border-green-200">
+                    <p className="text-green-800 font-semibold text-lg">
+                      💰 Economia de R$ 119,88 por ano!
+                    </p>
+                    <p className="text-green-700 text-sm">
+                      Equivale a mais de 4 meses grátis
+                    </p>
+                  </div>
                 </div>
-                <div className="text-sm text-green-600 font-medium">
-                  33% de desconto • Cobrado anualmente
-                </div>
-                <CardDescription className="mt-2 text-gray-600">
-                  O melhor custo-benefício com desconto anual.
+                <CardDescription className="mt-4 text-gray-600 text-base">
+                  <strong>O melhor custo-benefício!</strong> Pague apenas R$ 238,80 por ano.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="text-center">
-                <Link to="/register">
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-                    Assinar Plano Anual
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span>7 dias de teste gratuito</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span>Todas as funcionalidades incluídas</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span>Suporte prioritário premium</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span><strong>33% de desconto garantido</strong></span>
+                  </div>
+                  <div className="flex items-center text-sm text-green-700 font-medium">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span>🎁 Bônus: Acesso antecipado a novas funcionalidades</span>
+                  </div>
+                </div>
+                
+                <Link to="/register" className="block">
+                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg shadow-lg transform hover:scale-[1.02] transition-all">
+                    Garantir Desconto Anual
+                    <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                 </Link>
               </CardContent>
             </Card>
           </div>
 
-          <p className="text-center text-gray-500 mt-8">
-            Ambos os planos incluem todas as funcionalidades e suporte prioritário.
-          </p>
+          {/* Informações adicionais */}
+          <div className="text-center mt-12 space-y-4">
+            <p className="text-gray-600 text-lg">
+              🔒 <strong>Sem compromisso:</strong> Cancele quando quiser, sem taxas ou multas
+            </p>
+            <p className="text-gray-500">
+              💳 Aceitamos todos os cartões de crédito • 🔐 Pagamento 100% seguro via Stripe
+            </p>
+            
+            <div className="flex flex-wrap justify-center gap-6 mt-8 text-sm text-gray-500">
+              <div className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Teste gratuito de 7 dias
+              </div>
+              <div className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Sem cartão de crédito necessário
+              </div>
+              <div className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Ativação imediata
+              </div>
+              <div className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Suporte em português
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
