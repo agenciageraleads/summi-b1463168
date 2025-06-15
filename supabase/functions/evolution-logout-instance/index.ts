@@ -25,7 +25,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verificar autenticação
+    // Verificar autenticação com melhor tratamento
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       logStep("No authorization header");
@@ -39,10 +39,13 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    logStep("Attempting to verify token");
+    
+    // Usar o service key para verificar o token do usuário
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
-      logStep("Authentication failed", authError);
+      logStep("Authentication failed", { error: authError?.message, hasUser: !!user });
       return new Response(JSON.stringify({ 
         success: false,
         error: 'Sessão expirada ou inválida. Faça login novamente.' 
@@ -51,6 +54,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    logStep("User authenticated successfully", { userId: user.id });
 
     // Buscar dados do usuário (instance_name)
     const { data: profile, error: profileError } = await supabase

@@ -1,5 +1,5 @@
 
-// Serviço unificado para conexão WhatsApp - VERSÃO DEFINITIVA
+// Serviço unificado para conexão WhatsApp - VERSÃO COM MELHOR TRATAMENTO DE ERROS
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConnectionResult {
@@ -18,12 +18,24 @@ export interface StatusResult {
   error?: string;
 }
 
-// Função auxiliar para obter sessão
+// Função auxiliar para obter sessão válida
 const getSession = async () => {
   const { data: sessionData } = await supabase.auth.getSession();
   if (!sessionData.session) {
     throw new Error('Usuário não autenticado');
   }
+  
+  // Verificar se o token não está expirado
+  const now = Math.floor(Date.now() / 1000);
+  if (sessionData.session.expires_at && sessionData.session.expires_at < now) {
+    // Tentar renovar o token
+    const { data: refreshData, error } = await supabase.auth.refreshSession();
+    if (error || !refreshData.session) {
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+    return refreshData.session;
+  }
+  
   return sessionData.session;
 };
 
@@ -223,13 +235,6 @@ export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
 
     if (error) {
       console.error('[WhatsApp Service] Erro na desconexão:', error);
-      if (error.status === 401 || (error.message && error.message.includes("expirada"))) {
-        return {
-          success: false,
-          state: 'error',
-          error: 'Sessão expirada. Por favor, faça login novamente.'
-        };
-      }
       return {
         success: false,
         state: 'error',
@@ -237,11 +242,12 @@ export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
       };
     }
     
-    if (data && !data.success && data.error && /sessão|expirada|inválida|autentic/.test(data.error)) {
+    if (data && !data.success) {
+      console.error('[WhatsApp Service] Erro retornado pela função:', data.error);
       return {
         success: false,
         state: 'error',
-        error: 'Sessão expirada ou inválida. Faça login novamente.'
+        error: data.error || 'Erro ao desconectar'
       };
     }
 

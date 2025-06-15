@@ -1,5 +1,5 @@
 
-// Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO UNIFICADA
+// Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO COM TRATAMENTO MELHORADO
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
@@ -332,19 +332,11 @@ export const useWhatsAppManager = () => {
           isLoading: false
         }));
 
-        if (result.error && /sessão|expirada|inválida|autentic/.test(result.error.toLowerCase())) {
-          toast({
-            title: "Sessão expirada",
-            description: "Faça login novamente para continuar.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Erro na Desconexão",
-            description: result.error || 'Erro ao desconectar WhatsApp',
-            variant: "destructive"
-          });
-        }
+        toast({
+          title: "Erro na Desconexão",
+          description: result.error || 'Erro ao desconectar WhatsApp',
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('[WhatsApp Manager] Erro na desconexão:', error);
