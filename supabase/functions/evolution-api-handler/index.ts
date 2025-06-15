@@ -176,12 +176,17 @@ serve(async (req) => {
             if (statusData.state === 'open') {
               // Garantir que o perfil tem o instance_name salvo
               if (!profile.instance_name) {
-                await supabaseServiceRole
+                const { error: updateError } = await supabaseServiceRole
                   .from('profiles')
                   .update({ instance_name: instanceNameToUse })
                   .eq('id', user.id);
+                if (updateError) {
+                  console.error("[EVOLUTION-HANDLER] Erro ao atualizar instance_name no profile:", updateError);
+                } else {
+                  console.log(`[EVOLUTION-HANDLER] instance_name atualizado no profile para: ${instanceNameToUse}`);
+                }
+                // Adicione mais logging
               }
-
               return new Response(JSON.stringify({ 
                 success: true,
                 state: 'already_connected',

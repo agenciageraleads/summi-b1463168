@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +30,7 @@ export const useConnectionActions = ({
   stopPolling,
   resetConnectionState,
 }: UseConnectionActionsProps) => {
-  const { profile } = useProfile();
+  const { profile, refreshProfile } = useProfile(); // <--- ADICIONADO refreshProfile, se já não tinha
   const { toast } = useToast();
 
   // Função para lidar com a conexão do WhatsApp
@@ -78,7 +77,11 @@ export const useConnectionActions = ({
         case 'already_connected':
           setConnectionStatus('CONNECTED');
           onStatusChange?.('CONNECTED');
-          // Exibe status conectado silenciosamente
+          // Atualiza imediatamente dados do profile ao conectar - garante sincronia
+          if (typeof refreshProfile === 'function') {
+            await refreshProfile();
+          }
+          // Não mostra toast, apenas badge/estado atualizado
           break;
 
         case 'needs_qr_code':
@@ -95,6 +98,9 @@ export const useConnectionActions = ({
             onStatusChange?.('CONNECTED');
             setQrCode(null);
             onQRCodeChange?.(null);
+            if (typeof refreshProfile === 'function') {
+              await refreshProfile();
+            }
             // Não mostra toast, apenas badge verde no front
             break;
           }
@@ -166,6 +172,7 @@ export const useConnectionActions = ({
     setConnectionStatus,
     setQrCode,
     setIsLoading,
+    refreshProfile, // ADD AS DEP!
   ]);
 
   // Função para lidar com a desconexão do WhatsApp
@@ -216,4 +223,3 @@ export const useConnectionActions = ({
     handleDisconnect,
   };
 };
-
