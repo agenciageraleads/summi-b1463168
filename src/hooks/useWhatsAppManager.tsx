@@ -232,7 +232,7 @@ export const useWhatsAppManager = () => {
         }));
         startPolling(instanceName);
       } else if (result.state === 'already_connected') {
-        // Garantir que para TUDO e SÓ exiba o toast se realmente mudou de estado!
+        // Garantir que para TUDO e SÓ exibe o toast se realmente mudou de estado!
         stopPolling();
         setState(prev => ({
           ...prev,
@@ -431,20 +431,21 @@ export const useWhatsAppManager = () => {
     }));
 
     try {
-      // Se já tem instância, checa status, senão inicializa.
+      // Se já tem instância, checa status primeiro
       if (profile.instance_name) {
         console.log('[WhatsApp Manager] Verificando se já está conectado...');
 
+        // CORREÇÃO: Aguardar o resultado antes de prosseguir
         const isAlreadyConnected = await checkConnectionAndUpdate(profile.instance_name);
 
         if (isAlreadyConnected) {
           console.log('[WhatsApp Manager] Já estava conectado!');
-          // Resetar retry
           autoRetryCountRef.current = 0;
-          return;
+          return; // Para aqui se já conectado - não tenta gerar QR
         }
 
-        // Se não está conectado, tentar gerar novo QR
+        // Se chegou aqui, não está conectado, então tenta gerar QR
+        console.log('[WhatsApp Manager] Não estava conectado, gerando QR...');
         const qrResult = await generateQRCode(profile.instance_name);
 
         // Detecta erro de "instance not found" vindo da função
@@ -458,6 +459,7 @@ export const useWhatsAppManager = () => {
           // Se ainda pode tentar, aguarda 3s e tenta de novo
           if (autoRetryCountRef.current < 2) {
             autoRetryCountRef.current += 1;
+            console.log('[WhatsApp Manager] Tentativa automática:', autoRetryCountRef.current);
             setTimeout(() => {
               // Só tenta se o componente ainda está montado
               if (isMountedRef.current) {
@@ -481,11 +483,11 @@ export const useWhatsAppManager = () => {
         // Resetar retry se não houve esse erro
         autoRetryCountRef.current = 0;
 
-        // Se já conectado, não prossegue
+        // Se já conectado durante geração do QR, não prossegue
         if (qrResult.state === 'already_connected') return;
-        // Se outro erro, já está tratado dentro do hook original (state será error)
+        
       } else {
-        // Se não tem instance_name, inicializa conexão (handle já inclui QR)
+        // Se não tem instance_name, inicializa conexão
         const result = await initializeWhatsAppConnection();
         if (
           isAutoRetry &&
@@ -497,6 +499,7 @@ export const useWhatsAppManager = () => {
           // Quando criar instância falha por "not found" (raro), re-tentar rápido
           if (autoRetryCountRef.current < 2) {
             autoRetryCountRef.current += 1;
+            console.log('[WhatsApp Manager] Tentativa automática (init):', autoRetryCountRef.current);
             setTimeout(() => {
               if (isMountedRef.current) {
                 handleConnect(true);
@@ -527,7 +530,7 @@ export const useWhatsAppManager = () => {
         message: 'Erro inesperado ao conectar. Tente novamente.'
       }));
     }
-  }, [profile, toast, stopPolling, state.isLoading, checkConnectionAndUpdate, refreshProfile, initializeWhatsAppConnection, setState]);
+  }, [profile, toast, stopPolling, state.isLoading, checkConnectionAndUpdate, refreshProfile, initializeConnection, setState]);
 
   // Desconectar WhatsApp
   const handleDisconnect = useCallback(async () => {
