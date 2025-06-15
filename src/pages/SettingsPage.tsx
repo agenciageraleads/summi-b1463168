@@ -1,8 +1,9 @@
+
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
-import { SubscriptionStatus } from '@/components/Settings/SubscriptionStatus';
+import { SubscriptionStatus } from '@/components/SubscriptionStatus';
 import ReferralSection from '@/components/Settings/ReferralSection';
 import { useState } from 'react';
 
