@@ -142,18 +142,19 @@ serve(async (req) => {
     logStep("Usuário criado com sucesso", { userId });
 
     try {
-      // Passo 2: Criar perfil do usuário com referência de indicação
-      logStep("Criando perfil do usuário");
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .update({
-          referred_by_user_id: referrerUserId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+      // Passo 2: O perfil é criado automaticamente pelo trigger, apenas precisamos atualizar referência
+      if (referrerUserId) {
+        logStep("Atualizando perfil com referência de indicação");
+        const { error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            referred_by_user_id: referrerUserId
+          })
+          .eq('id', userId);
 
-      if (profileError) {
-        logStep("Erro ao atualizar perfil com indicação", { error: profileError });
+        if (profileError) {
+          logStep("Erro ao atualizar perfil com indicação", { error: profileError });
+        }
       }
 
       // Passo 3: Criar customer no Stripe
