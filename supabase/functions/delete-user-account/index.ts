@@ -81,6 +81,7 @@ serve(async (req) => {
       });
     }
 
+    // Pega o body da request
     const body = await req.json();
     const targetUserId = body.target_user_id || user.id; // Se não especificado, assume própria conta
 
@@ -112,9 +113,9 @@ serve(async (req) => {
     // Validar se o usuário alvo existe
     const { data: targetProfile, error: profileError } = await supabaseServiceRole
       .from('profiles')
-      .select('id, nome, email')
+      .select('id, nome, email, instance_name')
       .eq('id', targetUserId)
-      .single();
+      .maybeSingle();
 
     if (profileError || !targetProfile) {
       auditLog("DELETE_NONEXISTENT_USER", user.id, { target: targetUserId });
@@ -122,6 +123,40 @@ serve(async (req) => {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
+    }
+
+    // Nova etapa: Deletar instância na Evolution API (se existir)
+    try {
+      if (targetProfile.instance_name) {
+        const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
+        const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
+        if (evolutionApiUrl && evolutionApiKey) {
+          const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
+          // Faz requisição para deletar a instância do usuário na Evolution API
+          const deleteInstanceRes = await fetch(`${cleanApiUrl}/instance/delete/${targetProfile.instance_name}`, {
+            method: 'GET',
+            headers: { 'apikey': evolutionApiKey }
+          });
+          auditLog("DELETE_EVOLUTION_INSTANCE", user.id, {
+            target_user: targetUserId,
+            evolution_instance: targetProfile.instance_name,
+            http_status: deleteInstanceRes.status
+          });
+          if (!deleteInstanceRes.ok) {
+            const delErr = await deleteInstanceRes.text();
+            console.error('[EDGE_FN][DELETE-USER] Falha ao remover instancia da Evolution API:', delErr);
+          }
+        } else {
+          console.warn('[EDGE_FN][DELETE-USER] Variáveis EVOLUTION_API_URL ou EVOLUTION_API_KEY não configuradas.');
+        }
+      }
+    } catch (evoErr) {
+      auditLog("DELETE_EVOLUTION_INSTANCE_ERROR", user.id, {
+        evolution_instance: targetProfile.instance_name,
+        error: evoErr.message
+      });
+      // Não impedir deleção do usuário se falhar a deleção da instance, apenas logar
+      console.error('[EDGE_FN][DELETE-USER] Erro ao deletar instance na evolution API:', evoErr);
     }
 
     // Deletar dados relacionados do usuário de forma segura
