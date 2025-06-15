@@ -1,4 +1,4 @@
-// Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO COM DETECÇÃO MELHORADA
+// Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO COM DETECÇÃO CORRIGIDA
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
@@ -44,7 +44,7 @@ export const useWhatsAppManager = () => {
 
   // Função para determinar estado inicial baseado no perfil
   const getInitialStateFromProfile = useCallback(() => {
-    console.log('[WhatsApp Manager] Determinando estado inicial do perfil:', profile);
+    console.log('[WhatsApp Manager] 🔍 Determinando estado inicial do perfil:', profile);
     
     if (!profile) {
       return {
@@ -88,33 +88,47 @@ export const useWhatsAppManager = () => {
 
   // Parar polling
   const stopPolling = useCallback(() => {
-    console.log('[WhatsApp Manager] Parando polling...');
+    console.log('[WhatsApp Manager] 🛑 Parando polling...');
     setState(prev => ({ ...prev, isPolling: false }));
     clearTimers();
   }, [clearTimers]);
 
-  // CORREÇÃO: Função melhorada para verificar status da conexão
+  // CORREÇÃO PRINCIPAL: Função melhorada para verificar status da conexão
   const checkConnectionAndUpdate = useCallback(async (instanceName: string) => {
     if (!isMountedRef.current) return false;
     
     try {
-      console.log('[WhatsApp Manager] Verificando status da conexão...');
+      console.log('[WhatsApp Manager] 🔍 Verificando status da conexão para:', instanceName);
       const statusResult = await checkConnectionStatus(instanceName);
       
-      console.log('[WhatsApp Manager] Status recebido:', statusResult);
+      console.log('[WhatsApp Manager] 📊 Status recebido:', {
+        success: statusResult.success,
+        status: statusResult.status,
+        rawResult: statusResult
+      });
       
-      if (statusResult.success && statusResult.status === 'open') {
-        console.log('[WhatsApp Manager] ✅ Conexão detectada! Atualizando estado...');
+      // CORREÇÃO: Verificar tanto 'open' quanto 'connected'
+      const isConnected = statusResult.success && (statusResult.status === 'open' || statusResult.status === 'connected');
+      
+      if (isConnected) {
+        console.log('[WhatsApp Manager] ✅ CONEXÃO DETECTADA! Atualizando estado...');
         
+        // Parar polling imediatamente
         stopPolling();
-        setState(prev => ({
-          ...prev,
-          connectionState: 'already_connected',
-          qrCode: null,
-          message: 'WhatsApp conectado com sucesso!',
-          isLoading: false,
-          isPolling: false
-        }));
+        
+        // Atualizar estado para conectado
+        setState(prev => {
+          console.log('[WhatsApp Manager] 🔄 Estado anterior:', prev.connectionState);
+          console.log('[WhatsApp Manager] 🔄 Novo estado: already_connected');
+          return {
+            ...prev,
+            connectionState: 'already_connected',
+            qrCode: null,
+            message: 'WhatsApp conectado com sucesso!',
+            isLoading: false,
+            isPolling: false
+          };
+        });
         
         // Atualizar perfil para garantir consistência
         await refreshProfile();
@@ -126,33 +140,38 @@ export const useWhatsAppManager = () => {
         });
         
         return true;
+      } else {
+        console.log('[WhatsApp Manager] ⏳ Ainda não conectado, status:', statusResult.status);
+        return false;
       }
-      
-      return false;
     } catch (error) {
-      console.error('[WhatsApp Manager] Erro ao verificar status:', error);
+      console.error('[WhatsApp Manager] ❌ Erro ao verificar status:', error);
       return false;
     }
   }, [stopPolling, refreshProfile, toast]);
 
-  // CORREÇÃO: Sistema de polling melhorado
+  // Sistema de polling otimizado
   const startPolling = useCallback((instanceName: string) => {
     if (!isMountedRef.current) return;
     
-    console.log('[WhatsApp Manager] 🔄 Iniciando polling melhorado para:', instanceName);
+    console.log('[WhatsApp Manager] 🔄 Iniciando polling otimizado para:', instanceName);
     setState(prev => ({ ...prev, isPolling: true }));
 
     // Limpar timers anteriores
     clearTimers();
 
-    // Primeira verificação imediata
-    checkConnectionAndUpdate(instanceName);
+    // PRIMEIRA verificação imediata (após 2 segundos para dar tempo do QR ser escaneado)
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        checkConnectionAndUpdate(instanceName);
+      }
+    }, 2000);
 
-    // Timer de 45 segundos para restart automático (aumentei de 30 para 45)
+    // Timer de 40 segundos para restart automático
     qrTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
       
-      console.log('[WhatsApp Manager] ⏰ Timeout de 45s - reiniciando instância...');
+      console.log('[WhatsApp Manager] ⏰ Timeout de 40s - reiniciando instância...');
       setState(prev => ({ ...prev, message: 'QR Code expirado, reiniciando...', qrCode: null }));
       
       const restartResult = await restartInstance(instanceName);
@@ -172,23 +191,24 @@ export const useWhatsAppManager = () => {
           isPolling: false
         }));
       }
-    }, 45000); // Aumentei para 45 segundos
+    }, 40000);
 
-    // CORREÇÃO: Polling mais frequente (a cada 3 segundos em vez de 4)
+    // Polling a cada 2 segundos (mais frequente)
     pollingIntervalRef.current = setInterval(async () => {
       if (!isMountedRef.current) return;
 
       const isConnected = await checkConnectionAndUpdate(instanceName);
       if (isConnected) {
-        // Se conectou, o polling já foi parado pela função checkConnectionAndUpdate
+        console.log('[WhatsApp Manager] 🎉 Conexão confirmada, polling será parado automaticamente');
+        // O polling já foi parado pela função checkConnectionAndUpdate
         return;
       }
-    }, 3000); // Reduzido para 3 segundos
+    }, 2000); // Intervalo reduzido para 2 segundos
   }, [clearTimers, checkConnectionAndUpdate]);
 
   // Gerar QR Code
   const handleGenerateQR = useCallback(async (instanceName: string) => {
-    console.log('[WhatsApp Manager] Gerando QR Code...');
+    console.log('[WhatsApp Manager] 📱 Gerando QR Code...');
     setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
     
     try {
@@ -203,11 +223,11 @@ export const useWhatsAppManager = () => {
           isLoading: false
         }));
         
-        // CORREÇÃO: Iniciar polling após gerar QR Code
-        console.log('[WhatsApp Manager] QR Code gerado, iniciando polling...');
+        // Iniciar polling após gerar QR Code
+        console.log('[WhatsApp Manager] 📱 QR Code gerado, iniciando polling...');
         startPolling(instanceName);
       } else if (result.state === 'already_connected') {
-        console.log('[WhatsApp Manager] Instância já conectada!');
+        console.log('[WhatsApp Manager] ✅ Instância já conectada!');
         setState(prev => ({
           ...prev,
           connectionState: 'already_connected',
@@ -232,7 +252,7 @@ export const useWhatsAppManager = () => {
         }));
       }
     } catch (error) {
-      console.error('[WhatsApp Manager] Erro ao gerar QR:', error);
+      console.error('[WhatsApp Manager] ❌ Erro ao gerar QR:', error);
       setState(prev => ({
         ...prev,
         connectionState: 'error',
@@ -324,7 +344,7 @@ export const useWhatsAppManager = () => {
       qrCode: null
     }));
 
-    // CORREÇÃO: Verificar primeiro se já está conectado
+    // Verificar primeiro se já está conectado
     if (profile.instance_name) {
       console.log('[WhatsApp Manager] Verificando se já está conectado...');
       const isAlreadyConnected = await checkConnectionAndUpdate(profile.instance_name);
@@ -428,9 +448,9 @@ export const useWhatsAppManager = () => {
         instanceName: initialState.instanceName || null
       }));
       
-      // CORREÇÃO: Se há instance_name, verificar status imediatamente
+      // Se há instance_name, verificar status imediatamente
       if (profile.instance_name) {
-        console.log('[WhatsApp Manager] Perfil carregado com instance_name, verificando status...');
+        console.log('[WhatsApp Manager] 🔍 Perfil carregado com instance_name, verificando status...');
         checkConnectionAndUpdate(profile.instance_name);
       }
     }
@@ -439,7 +459,7 @@ export const useWhatsAppManager = () => {
   // Cleanup ao desmontar
   useEffect(() => {
     return () => {
-      console.log('[WhatsApp Manager] Limpando recursos...');
+      console.log('[WhatsApp Manager] 🧹 Limpando recursos...');
       isMountedRef.current = false;
       clearTimers();
     };
