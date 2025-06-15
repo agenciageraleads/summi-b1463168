@@ -3,30 +3,24 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { useWhatsAppConnection } from '@/hooks/useWhatsAppConnection';
+import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 import { Loader2, Wifi, WifiOff, QrCode } from 'lucide-react';
 
 export const WhatsAppConnection = () => {
-  const {
-    connectionStatus,
-    qrCode,
-    isLoading,
-    polling,
-    handleConnect,
-    handleDisconnect,
-  } = useWhatsAppConnection({});
+  const { state, handleConnect, handleDisconnect } = useWhatsAppManager();
 
   // Função para renderizar o status com cor apropriada
   const renderStatus = () => {
-    switch (connectionStatus) {
-      case 'CONNECTED':
+    switch (state.connectionState) {
+      case 'already_connected':
         return (
           <Badge className="bg-green-100 text-green-800 border-green-200">
             <Wifi className="w-3 h-3 mr-1" />
             Conectado
           </Badge>
         );
-      case 'CONNECTING':
+      case 'is_connecting':
+      case 'needs_qr_code':
         return (
           <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
             <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -52,7 +46,7 @@ export const WhatsAppConnection = () => {
           {renderStatus()}
         </div>
         
-        {polling && (
+        {state.isPolling && (
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>Aguardando conexão...</span>
@@ -62,14 +56,14 @@ export const WhatsAppConnection = () => {
 
       {/* Botões de Ação */}
       <div className="flex space-x-2">
-        {connectionStatus === 'CONNECTED' ? (
+        {state.connectionState === 'already_connected' ? (
           <Button
             onClick={handleDisconnect}
-            disabled={isLoading}
+            disabled={state.isLoading}
             variant="destructive"
             size="sm"
           >
-            {isLoading ? (
+            {state.isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Desconectando...
@@ -84,10 +78,10 @@ export const WhatsAppConnection = () => {
         ) : (
           <Button
             onClick={handleConnect}
-            disabled={isLoading || polling}
+            disabled={state.isLoading || state.isPolling}
             size="sm"
           >
-            {isLoading ? (
+            {state.isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Conectando...
@@ -103,7 +97,7 @@ export const WhatsAppConnection = () => {
       </div>
 
       {/* QR Code */}
-      {qrCode && (
+      {state.qrCode && (
         <Card>
           <CardContent className="p-4">
             <div className="text-center space-y-3">
@@ -113,7 +107,7 @@ export const WhatsAppConnection = () => {
               </p>
               <div className="flex justify-center">
                 <img
-                  src={qrCode}
+                  src={state.qrCode}
                   alt="QR Code para conectar WhatsApp"
                   className="max-w-[200px] max-h-[200px] border rounded-lg"
                 />

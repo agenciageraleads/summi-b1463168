@@ -1,42 +1,33 @@
+
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useProfile } from '@/hooks/useProfile';
-import { useWhatsAppConnection } from '@/hooks/useWhatsAppConnection';
+import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 import { CheckCircle, AlertCircle, RotateCcw, Smartphone } from 'lucide-react';
 
 const WhatsAppConnectionV2Page = () => {
   const { profile } = useProfile();
-  const [currentStatus, setCurrentStatus] = useState<string>('DISCONNECTED');
-  const [currentQRCode, setCurrentQRCode] = useState<string | null>(null);
-
-  const {
-    isLoading,
-    polling,
-    handleConnect,
-    handleDisconnect
-  } = useWhatsAppConnection({
-    onStatusChange: setCurrentStatus,
-    onQRCodeChange: setCurrentQRCode
-  });
+  const { state, handleConnect, handleDisconnect } = useWhatsAppManager();
 
   // Função para obter informações de display do status
   const getStatusDisplay = () => {
-    switch (currentStatus) {
-      case 'CONNECTED':
+    switch (state.connectionState) {
+      case 'already_connected':
         return {
           color: 'text-green-600',
           bg: 'bg-green-100',
           icon: CheckCircle,
           text: 'Conectado'
         };
-      case 'CONNECTING':
+      case 'is_connecting':
+      case 'needs_qr_code':
         return {
           color: 'text-yellow-600',
           bg: 'bg-yellow-100',
           icon: RotateCcw,
-          text: polling ? 'Aguardando conexão...' : 'Conectando...'
+          text: state.isPolling ? 'Aguardando conexão...' : 'Conectando...'
         };
       default:
         return {
@@ -70,12 +61,12 @@ const WhatsAppConnectionV2Page = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div className={`w-12 h-12 rounded-full ${status.bg} flex items-center justify-center`}>
-                  <StatusIcon className={`w-6 h-6 ${status.color} ${currentStatus === 'CONNECTING' ? 'animate-spin' : ''}`} />
+                  <StatusIcon className={`w-6 h-6 ${status.color} ${state.connectionState === 'is_connecting' ? 'animate-spin' : ''}`} />
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">Status da Conexão</h3>
                   <p className={`font-medium ${status.color}`}>{status.text}</p>
-                  {polling && (
+                  {state.isPolling && (
                     <p className="text-sm text-muted-foreground">
                       Monitorando conexão...
                     </p>
@@ -84,13 +75,15 @@ const WhatsAppConnectionV2Page = () => {
               </div>
               
               <div className="flex space-x-2">
-                {currentStatus === 'DISCONNECTED' && (
+                {state.connectionState === 'needs_phone_number' ||
+                 state.connectionState === 'needs_qr_code' ||
+                 state.connectionState === 'error' ? (
                   <Button 
                     onClick={handleConnect}
-                    disabled={isLoading || !profile?.nome || !profile?.numero}
+                    disabled={state.isLoading || !profile?.nome || !profile?.numero}
                     className="flex items-center"
                   >
-                    {isLoading ? (
+                    {state.isLoading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Processando...
@@ -102,12 +95,12 @@ const WhatsAppConnectionV2Page = () => {
                       </>
                     )}
                   </Button>
-                )}
+                ) : null}
                 
-                {currentStatus === 'CONNECTED' && (
+                {state.connectionState === 'already_connected' && (
                   <Button 
                     onClick={handleDisconnect}
-                    disabled={isLoading}
+                    disabled={state.isLoading}
                     variant="destructive"
                   >
                     Desconectar
@@ -177,22 +170,22 @@ const WhatsAppConnectionV2Page = () => {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col items-center space-y-4">
-                {currentStatus === 'DISCONNECTED' && !currentQRCode ? (
+                {state.connectionState === 'needs_phone_number' && !state.qrCode ? (
                   <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
                     <div className="text-center text-muted-foreground">
                       <span className="text-4xl block mb-2">📱</span>
                       <p>Clique em "Conectar WhatsApp" para começar</p>
                     </div>
                   </div>
-                ) : currentStatus === 'CONNECTING' && currentQRCode ? (
+                ) : (state.connectionState === 'is_connecting' || state.connectionState === 'needs_qr_code') && state.qrCode ? (
                   <div className="w-64 h-64 bg-white border-2 border-border rounded-lg flex items-center justify-center relative overflow-hidden">
                     <img 
-                      src={currentQRCode} 
+                      src={state.qrCode} 
                       alt="QR Code" 
                       className="w-56 h-56 object-contain"
                     />
                   </div>
-                ) : currentStatus === 'CONNECTED' ? (
+                ) : state.connectionState === 'already_connected' ? (
                   <div className="w-64 h-64 bg-green-50 rounded-lg flex items-center justify-center">
                     <div className="text-center text-green-600">
                       <span className="text-6xl block mb-4">✅</span>
@@ -216,7 +209,7 @@ const WhatsAppConnectionV2Page = () => {
         </div>
 
         {/* Recursos Ativos */}
-        {currentStatus === 'CONNECTED' && (
+        {state.connectionState === 'already_connected' && (
           <Card className="card-hover animate-fade-in">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
