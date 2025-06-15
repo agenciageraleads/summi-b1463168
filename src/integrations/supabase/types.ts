@@ -83,6 +83,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          apenas_horario_comercial: boolean | null
           created_at: string | null
           email: string | null
           id: string
@@ -92,6 +93,7 @@ export type Database = {
           resume_audio: boolean | null
           role: string | null
           segundos_para_resumir: number | null
+          "Summi em Audio?": boolean | null
           temas_importantes: string | null
           temas_urgentes: string | null
           transcreve_audio_enviado: boolean | null
@@ -99,6 +101,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          apenas_horario_comercial?: boolean | null
           created_at?: string | null
           email?: string | null
           id: string
@@ -108,6 +111,7 @@ export type Database = {
           resume_audio?: boolean | null
           role?: string | null
           segundos_para_resumir?: number | null
+          "Summi em Audio?"?: boolean | null
           temas_importantes?: string | null
           temas_urgentes?: string | null
           transcreve_audio_enviado?: boolean | null
@@ -115,6 +119,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          apenas_horario_comercial?: boolean | null
           created_at?: string | null
           email?: string | null
           id?: string
@@ -124,6 +129,7 @@ export type Database = {
           resume_audio?: boolean | null
           role?: string | null
           segundos_para_resumir?: number | null
+          "Summi em Audio?"?: boolean | null
           temas_importantes?: string | null
           temas_urgentes?: string | null
           transcreve_audio_enviado?: boolean | null

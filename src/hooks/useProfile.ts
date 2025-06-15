@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-// Interface do perfil com validações de segurança
+// Interface do perfil com validações de segurança e novos campos
 export interface Profile {
   id: string;
   nome: string;
@@ -17,6 +17,8 @@ export interface Profile {
   transcreve_audio_enviado?: boolean;
   resume_audio?: boolean;
   segundos_para_resumir?: number;
+  'Summi em Audio?'?: boolean; // Novo campo
+  apenas_horario_comercial?: boolean; // Novo campo
 }
 
 // Função para validar número de telefone brasileiro

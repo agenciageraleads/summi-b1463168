@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { disconnectWhatsApp, checkConnectionStatus } from '@/services/whatsappService';
-import { AlertCircle, Phone, Unlink, User, Loader2 } from 'lucide-react';
+import { AlertCircle, Phone, Unlink, User, Loader2, Settings, Clock } from 'lucide-react';
 import type { Profile } from '@/hooks/useProfile';
 import { useEffect } from 'react';
 
@@ -36,6 +36,8 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
     transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
     resume_audio: profile.resume_audio ?? false,
     segundos_para_resumir: profile.segundos_para_resumir || 45,
+    'Summi em Audio?': profile['Summi em Audio?'] ?? false, // Novo campo
+    apenas_horario_comercial: profile.apenas_horario_comercial ?? true, // Novo campo
   });
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
@@ -57,6 +59,8 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
         transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
         resume_audio: profile.resume_audio ?? false,
         segundos_para_resumir: profile.segundos_para_resumir || 45,
+        'Summi em Audio?': profile['Summi em Audio?'] ?? false, // Novo campo
+        apenas_horario_comercial: profile.apenas_horario_comercial ?? true, // Novo campo
       });
     }
   }, [profile]);
@@ -341,6 +345,44 @@ export const ProfileForm = ({ profile, onSave, isUpdating }: ProfileFormProps) =
               value={formData.temas_urgentes}
               onChange={(e) => setFormData(prev => ({ ...prev, temas_urgentes: e.target.value }))}
               placeholder="Ex: urgente, emergência"
+            />
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Configurações Gerais */}
+        <div className="space-y-4">
+          <h3 className="font-medium flex items-center">
+            <Settings className="w-4 h-4 mr-2" />
+            Configurações Gerais
+          </h3>
+          
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="summi_audio">Summi em Audio</Label>
+              <p className="text-sm text-muted-foreground">
+                Ativar funcionalidade de resumo em áudio
+              </p>
+            </div>
+            <Switch
+              id="summi_audio"
+              checked={formData['Summi em Audio?']}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, 'Summi em Audio?': checked }))}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="horario_comercial">Apenas Horário Comercial</Label>
+              <p className="text-sm text-muted-foreground">
+                Processar mensagens apenas durante horário comercial
+              </p>
+            </div>
+            <Switch
+              id="horario_comercial"
+              checked={formData.apenas_horario_comercial}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, apenas_horario_comercial: checked }))}
             />
           </div>
         </div>
