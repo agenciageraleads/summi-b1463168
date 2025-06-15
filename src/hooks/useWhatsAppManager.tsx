@@ -54,6 +54,9 @@ export const useWhatsAppManager = () => {
   // Flag para garantir que a checagem automática só roda uma vez por sessão
   const didAutoCheckRef = useRef(false);
 
+  // NOVO: Ref para travar chamada automática única do handleConnect
+  const didAutoConnectRef = useRef(false);
+
   // Função para determinar estado inicial baseado no perfil
   const getInitialStateFromProfile = useCallback(() => {
     console.log('[WhatsApp Manager] 🔍 Determinando estado inicial do perfil:', profile);
@@ -314,7 +317,7 @@ export const useWhatsAppManager = () => {
       await checkConnectionAndUpdate(instanceName);
     }, 7000);
 
-    // Timer para expiração do QR Code (segue igual)
+    // Timer para expiração do QR Code (AUMENTADO para 65s, antes era 45s)
     qrTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
       stopPolling();
@@ -339,7 +342,7 @@ export const useWhatsAppManager = () => {
           isPolling: false,
         }));
       }
-    }, 45000);
+    }, 65000);
   }, [checkConnectionAndUpdate, stopPolling, handleGenerateQR, state.connectionState]);
 
   // Inicializar conexão
@@ -557,19 +560,19 @@ export const useWhatsAppManager = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, getInitialStateFromProfile]);
 
-  // Efeito para inicialização automática: 
-  // Se acessar a página e estiver em estado "needs_phone_number", "needs_qr_code" ou "error", dispara handleConnect
-  // (evita se já está carregando ou conectado, para não disparar múltiplas vezes)
+  // Efeito para inicialização automática otimizado:
+  // Só dispara handleConnect UMA ÚNICA VEZ por montagem/página, evitando disparo duplicado
   useEffect(() => {
     if (
       !state.isLoading &&
       !state.isPolling &&
+      !didAutoConnectRef.current && // Garante que SÓ INICIA UMA VEZ
       (state.connectionState === 'needs_phone_number' ||
         state.connectionState === 'needs_qr_code' ||
         state.connectionState === 'error')
     ) {
-      // Não roda se não houver número no perfil
       if (profile?.numero) {
+        didAutoConnectRef.current = true; // Travar para não duplicar
         handleConnect();
       }
     }
