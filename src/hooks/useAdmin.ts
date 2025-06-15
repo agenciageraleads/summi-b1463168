@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,12 +65,10 @@ export const useAdmin = () => {
     try {
       console.log(`[Admin] Verificando status real da instância: ${instanceName}`);
       
-      const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
+      // Usar a função evolution-connection-state que já existe e está funcionando
+      const { data, error } = await supabase.functions.invoke('evolution-connection-state', {
         body: { 
-          action: 'get-status'
-        },
-        headers: {
-          'instance-name': instanceName,
+          instanceName 
         },
       });
 
@@ -80,9 +77,10 @@ export const useAdmin = () => {
         return 'disconnected';
       }
 
-      // Verificar se o status é "OPEN" (conectado)
-      const isConnected = data?.status === 'OPEN';
-      console.log(`[Admin] Status de ${instanceName}: ${data?.status} - ${isConnected ? 'conectado' : 'desconectado'}`);
+      // Verificar o campo 'state' que é retornado pela API Evolution
+      // Os possíveis valores são: 'open' (conectado), 'close' (desconectado), etc.
+      const isConnected = data?.state === 'open';
+      console.log(`[Admin] Status de ${instanceName}: state=${data?.state} - ${isConnected ? 'conectado' : 'desconectado'}`);
       
       return isConnected ? 'connected' : 'disconnected';
     } catch (error) {
