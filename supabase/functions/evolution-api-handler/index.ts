@@ -18,7 +18,7 @@ const sanitizeInput = (input: string): string => {
   return input.replace(/[<>\"']/g, '').trim();
 };
 
-// Função para criar nome de instância válido
+// Função para criar nome de instância válido e mais curto
 const createValidInstanceName = (nome: string, numero: string): string => {
   // Limpar nome: remover acentos, espaços e caracteres especiais
   const cleanName = nome
@@ -26,23 +26,26 @@ const createValidInstanceName = (nome: string, numero: string): string => {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
     .replace(/[^a-z0-9]/g, '') // Remove tudo exceto letras e números
-    .substring(0, 12); // Máximo 12 caracteres para o nome
+    .substring(0, 8); // REDUZIDO: Máximo 8 caracteres para o nome
   
   // Pegar últimos 4 dígitos do número
   const lastDigits = numero.slice(-4);
   
-  // Combinar: nome + últimos 4 dígitos = máximo 16 caracteres
-  const instanceName = `${cleanName}_${lastDigits}`;
+  // Combinar: nome + últimos 4 dígitos = máximo 12 caracteres
+  const instanceName = `${cleanName}${lastDigits}`; // REMOVIDO o underscore
   
   console.log(`[EVOLUTION-HANDLER] Nome da instância criado: ${instanceName} (${instanceName.length} caracteres)`);
   
   return instanceName;
 };
 
+// Função para validar número de telefone
 const validatePhoneNumber = (phone: string): boolean => {
-  // Validação para números brasileiros
+  // Validação para números brasileiros - deve ter exatamente 13 dígitos
   const phoneRegex = /^55[1-9][1-9][0-9]{8,9}$/;
-  return phoneRegex.test(phone.replace(/\D/g, ''));
+  const cleanPhone = phone.replace(/\D/g, '');
+  console.log(`[EVOLUTION-HANDLER] Validando telefone: ${cleanPhone} - Válido: ${phoneRegex.test(cleanPhone)}`);
+  return phoneRegex.test(cleanPhone);
 };
 
 serve(async (req) => {
@@ -154,7 +157,7 @@ serve(async (req) => {
           });
         }
 
-        // Criar nome de instância válido e curto
+        // Criar nome de instância válido e mais curto
         const instanceNameToUse = profile.instance_name || createValidInstanceName(profile.nome, profile.numero);
         
         console.log(`[EVOLUTION-HANDLER] Instance name: ${instanceNameToUse}`);
@@ -206,6 +209,7 @@ serve(async (req) => {
         console.log(`[EVOLUTION-HANDLER] Criando nova instância: ${instanceNameToUse}`);
         
         try {
+          // PAYLOAD SIMPLIFICADO para reduzir chances de erro
           const createPayload = {
             instanceName: instanceNameToUse,
             token: evolutionApiKey,
@@ -217,17 +221,7 @@ serve(async (req) => {
               by_events: false,
               base64: true
             },
-            settings: {
-              reject_call: false,
-              msg_call: "",
-              groups_ignore: true,
-              always_online: false,
-              read_messages: false,
-              read_status: false
-            },
-            events: [
-              "MESSAGES_UPSERT"
-            ]
+            events: ["MESSAGES_UPSERT"]
           };
 
           console.log(`[EVOLUTION-HANDLER] Payload de criação:`, JSON.stringify(createPayload, null, 2));
