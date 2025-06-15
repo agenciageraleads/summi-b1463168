@@ -18,7 +18,8 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const webhookUrl = Deno.env.get('WEBHOOK_ANALISA_MENSAGENS');
+    // Buscar webhook URL da chave secreta correta
+    const webhookUrl = Deno.env.get('WEBHOOK_N8N_ANALISA_MENSAGENS');
     
     if (!webhookUrl) {
       console.error('Webhook URL not configured');
