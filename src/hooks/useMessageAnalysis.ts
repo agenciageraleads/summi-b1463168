@@ -25,20 +25,26 @@ export const useMessageAnalysis = () => {
     console.log('[MESSAGE_ANALYSIS] Iniciando análise para usuário:', user.id);
 
     try {
-      // Payload simples com apenas o userId
+      // Payload com apenas o userId necessário
       const payload = { userId: user.id };
       console.log('[MESSAGE_ANALYSIS] Enviando payload:', payload);
 
-      // Chamar edge function
+      // Chamar edge function com timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
+
       const { data, error } = await supabase.functions.invoke('analyze-messages', {
-        body: payload
+        body: payload,
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       console.log('[MESSAGE_ANALYSIS] Resposta da edge function:', { data, error });
 
       if (error) {
         console.error('[MESSAGE_ANALYSIS] Erro na edge function:', error);
-        throw new Error(error.message || 'Erro na comunicação com o servidor');
+        throw new Error(`Erro na comunicação: ${error.message}`);
       }
 
       if (data && !data.success) {
@@ -71,7 +77,15 @@ export const useMessageAnalysis = () => {
       console.error('[MESSAGE_ANALYSIS] Erro ao iniciar análise:', error);
       setIsAnalyzing(false);
       
-      const errorMessage = error instanceof Error ? error.message : 'Falha ao iniciar a classificação das mensagens';
+      let errorMessage = 'Falha ao iniciar a classificação das mensagens';
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = 'Timeout na comunicação com o servidor';
+        } else {
+          errorMessage = error.message;
+        }
+      }
       
       toast({
         title: "Erro na Análise",

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -243,9 +244,9 @@ export const ChatsList = () => {
               return (
                 <div
                   key={chat.id}
-                  className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center space-x-2">
                       <span className="font-medium text-sm">{chat.nome}</span>
                       <Badge className={`text-xs ${priorityInfo.color}`}>
@@ -255,41 +256,35 @@ export const ChatsList = () => {
                         </div>
                       </Badge>
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {formatDistanceToNow(new Date(chat.modificado_em), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </span>
-                  </div>
-                  
-                  {chat.contexto && (
-                    <div className="mb-3">
-                      <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded border-l-2 border-gray-300">
-                        {chat.contexto}
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col space-y-1">
-                      <span className="text-xs text-gray-500">
-                        {formattedNumber}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {chat.conversa?.length || 0} mensagem(s)
-                      </span>
-                    </div>
-                    
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex items-center space-x-1"
+                      className="flex items-center space-x-1 text-xs px-2 py-1 h-auto"
                       onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
                     >
                       <MessageSquare className="w-3 h-3" />
                       <span>Responder</span>
                     </Button>
+                  </div>
+                  
+                  {chat.contexto && (
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-700 bg-gray-50 p-2 rounded border-l-2 border-gray-300 line-clamp-2">
+                        {chat.contexto}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                      {formattedNumber} | {chat.conversa?.length || 0} mensagem(s)
+                    </span>
+                    <span>
+                      {formatDistanceToNow(new Date(chat.modificado_em), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
+                    </span>
                   </div>
                 </div>
               );
