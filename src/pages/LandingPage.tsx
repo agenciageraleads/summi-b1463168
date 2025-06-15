@@ -1,7 +1,7 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -255,6 +255,138 @@ const LandingPage = () => {
           <p className="text-center text-summi-gray-500 mt-8">
             Ambos os planos incluem todas as funcionalidades e suporte prioritário.
           </p>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-summi-gray-900 mb-4">
+              Perguntas Frequentes
+            </h2>
+            <p className="text-xl text-summi-gray-600">
+              Tire suas dúvidas sobre o Summi e como nossa IA pode transformar sua gestão do WhatsApp.
+            </p>
+          </div>
+
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="item-1" className="border border-summi-gray-200 rounded-lg px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="text-lg font-medium text-summi-gray-900">
+                  Como o Summi funciona com meu WhatsApp?
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="text-summi-gray-600 pb-4">
+                O Summi se conecta ao seu WhatsApp através de uma API segura e analisa suas conversas em tempo real. 
+                Nossa IA identifica mensagens importantes, transcreve áudios e gera resumos personalizados que são 
+                entregues periodicamente no horário que você escolher.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-2" className="border border-summi-gray-200 rounded-lg px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="text-lg font-medium text-summi-gray-900">
+                  Meus dados estão seguros?
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="text-summi-gray-600 pb-4">
+                Sim! Levamos a privacidade muito a sério. Todas as suas conversas são criptografadas end-to-end, 
+                nunca armazenamos o conteúdo das suas mensagens permanentemente, e jamais compartilhamos seus dados 
+                com terceiros. Estamos em conformidade com a LGPD e outras regulamentações de proteção de dados.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-3" className="border border-summi-gray-200 rounded-lg px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="text-lg font-medium text-summi-gray-900">
+                  O Summi responde mensagens automaticamente?
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="text-summi-gray-600 pb-4">
+                Atualmente, o Summi foca em análise e resumos das suas conversas. A funcionalidade de resposta 
+                automática está em desenvolvimento e será liberada em breve. Por enquanto, nossa IA te ajuda a 
+                priorizar e organizar suas mensagens mais importantes.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-4" className="border border-summi-gray-200 rounded-lg px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="text-lg font-medium text-summi-gray-900">
+                  Como funciona o período de teste gratuito?
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="text-summi-gray-600 pb-4">
+                Oferecemos 7 dias de teste gratuito com acesso completo a todas as funcionalidades. 
+                Não é necessário cartão de crédito para começar. Após o período de teste, você pode 
+                escolher entre nossos planos mensais ou anuais.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-5" className="border border-summi-gray-200 rounded-lg px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="text-lg font-medium text-summi-gray-900">
+                  Posso usar o Summi em múltiplos números de WhatsApp?
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="text-summi-gray-600 pb-4">
+                Atualmente, cada conta do Summi suporta um número de WhatsApp. Se você precisar gerenciar 
+                múltiplos números, será necessário criar contas separadas para cada um. Estamos trabalhando 
+                em uma solução para empresas que precisam gerenciar múltiplos números.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-6" className="border border-summi-gray-200 rounded-lg px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="text-lg font-medium text-summi-gray-900">
+                  Como cancelo minha assinatura?
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="text-summi-gray-600 pb-4">
+                Você pode cancelar sua assinatura a qualquer momento através das configurações da sua conta. 
+                O cancelamento é imediato e você continuará tendo acesso aos recursos até o final do período 
+                já pago. Não há taxas de cancelamento ou multas.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-7" className="border border-summi-gray-200 rounded-lg px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="text-lg font-medium text-summi-gray-900">
+                  O Summi funciona com WhatsApp Business?
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="text-summi-gray-600 pb-4">
+                Sim! O Summi é compatível tanto com WhatsApp pessoal quanto com WhatsApp Business. 
+                Na verdade, é especialmente útil para quem usa WhatsApp Business, ajudando a organizar 
+                e priorizar conversas com clientes de forma mais eficiente.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-8" className="border border-summi-gray-200 rounded-lg px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="text-lg font-medium text-summi-gray-900">
+                  Preciso instalar algum aplicativo no meu celular?
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="text-summi-gray-600 pb-4">
+                Não! O Summi funciona 100% na web. Você apenas precisa escanear um QR Code uma única vez 
+                para conectar seu WhatsApp, similar a como você faria para usar o WhatsApp Web. 
+                Depois disso, tudo funciona automaticamente.
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          <div className="text-center mt-12">
+            <p className="text-summi-gray-600 mb-6">
+              Ainda tem dúvidas? Entre em contato conosco!
+            </p>
+            <Link to="/register">
+              <Button size="lg" className="bg-summi-gradient hover:opacity-90 text-white">
+                Começar Teste Gratuito
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
