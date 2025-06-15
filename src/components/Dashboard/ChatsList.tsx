@@ -48,9 +48,10 @@ export const ChatsList = () => {
 
       console.log('[CHATS] Dados brutos retornados:', data);
 
-      // Transformar dados sem mexer na conversa
+      // Transformar dados garantindo que conversa seja sempre um array
       const transformedData = (data || []).map(chat => ({
         ...chat,
+        conversa: Array.isArray(chat.conversa) ? chat.conversa : [],
         prioridade: chat.prioridade || '0'
       }));
 
