@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-// Interface do perfil com validações de segurança e novos campos
+// Interface do perfil com novos campos de indicação
 export interface Profile {
   id: string;
   nome: string;
@@ -17,8 +16,10 @@ export interface Profile {
   transcreve_audio_enviado?: boolean;
   resume_audio?: boolean;
   segundos_para_resumir?: number;
-  'Summi em Audio?'?: boolean; // Novo campo
-  apenas_horario_comercial?: boolean; // Novo campo
+  'Summi em Audio?'?: boolean;
+  apenas_horario_comercial?: boolean;
+  referral_code?: string; // Novo campo
+  referred_by_user_id?: string; // Novo campo
 }
 
 // Função para validar número de telefone brasileiro
@@ -183,6 +184,9 @@ export const useProfile = () => {
       if (sanitizedUpdates.segundos_para_resumir !== undefined) updateData.segundos_para_resumir = sanitizedUpdates.segundos_para_resumir;
       if (sanitizedUpdates['Summi em Audio?'] !== undefined) updateData['Summi em Audio?'] = sanitizedUpdates['Summi em Audio?'];
       if (sanitizedUpdates.apenas_horario_comercial !== undefined) updateData.apenas_horario_comercial = sanitizedUpdates.apenas_horario_comercial;
+      
+      // Novos campos de indicação (somente leitura - não podem ser alterados pelo usuário)
+      // referral_code e referred_by_user_id são gerenciados automaticamente pelo sistema
 
       console.log('[PROFILE] Final update data being sent to database:', updateData);
 

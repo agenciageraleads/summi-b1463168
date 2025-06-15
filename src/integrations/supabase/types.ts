@@ -90,6 +90,8 @@ export type Database = {
           instance_name: string | null
           nome: string
           numero: string | null
+          referral_code: string | null
+          referred_by_user_id: string | null
           resume_audio: boolean | null
           role: string | null
           segundos_para_resumir: number | null
@@ -108,6 +110,8 @@ export type Database = {
           instance_name?: string | null
           nome: string
           numero?: string | null
+          referral_code?: string | null
+          referred_by_user_id?: string | null
           resume_audio?: boolean | null
           role?: string | null
           segundos_para_resumir?: number | null
@@ -126,6 +130,8 @@ export type Database = {
           instance_name?: string | null
           nome?: string
           numero?: string | null
+          referral_code?: string | null
+          referred_by_user_id?: string | null
           resume_audio?: boolean | null
           role?: string | null
           segundos_para_resumir?: number | null
@@ -136,7 +142,15 @@ export type Database = {
           transcreve_audio_recebido?: boolean | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_user_id_fkey"
+            columns: ["referred_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscribers: {
         Row: {
@@ -150,6 +164,7 @@ export type Database = {
           subscription_end: string | null
           subscription_start: string | null
           subscription_status: string | null
+          trial_ends_at: string | null
           updated_at: string
           user_id: string | null
         }
@@ -164,6 +179,7 @@ export type Database = {
           subscription_end?: string | null
           subscription_start?: string | null
           subscription_status?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -178,6 +194,7 @@ export type Database = {
           subscription_end?: string | null
           subscription_start?: string | null
           subscription_status?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -188,6 +205,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_referral_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       is_admin: {
         Args: { user_id: string }
         Returns: boolean

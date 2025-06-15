@@ -1,8 +1,9 @@
-
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
+import { SubscriptionStatus } from '@/components/Settings/SubscriptionStatus';
+import ReferralSection from '@/components/Settings/ReferralSection';
 import { useState } from 'react';
 
 const SettingsPage = () => {
@@ -41,24 +42,25 @@ const SettingsPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Configurações ⚙️
-          </h1>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
           <p className="text-muted-foreground">
-            Gerencie suas preferências e configurações da conta
+            Gerencie suas configurações de perfil e conta.
           </p>
         </div>
 
-        <div className="grid gap-6">
-          <ProfileForm 
-            profile={profile}
-            onSave={handleSaveProfile}
-            isUpdating={isUpdating}
-          />
-          <AccountDeletion />
-        </div>
+        {/* Seção de Indicação */}
+        <ReferralSection />
+
+        {/* Existing components */}
+        <ProfileForm 
+          profile={profile}
+          onSave={handleSaveProfile}
+          isUpdating={isUpdating}
+        />
+        <SubscriptionStatus />
+        <AccountDeletion />
       </div>
     </DashboardLayout>
   );
