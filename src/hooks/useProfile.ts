@@ -166,12 +166,33 @@ export const useProfile = () => {
         return { success: false, error: 'Alteração de email não permitida' };
       }
 
+      // Preparar objeto de atualização com campos corretos da tabela
+      const updateData = {
+        nome: sanitizedUpdates.nome,
+        numero: sanitizedUpdates.numero,
+        temas_importantes: sanitizedUpdates.temas_importantes,
+        temas_urgentes: sanitizedUpdates.temas_urgentes,
+        transcreve_audio_recebido: sanitizedUpdates.transcreve_audio_recebido,
+        transcreve_audio_enviado: sanitizedUpdates.transcreve_audio_enviado,
+        resume_audio: sanitizedUpdates.resume_audio,
+        segundos_para_resumir: sanitizedUpdates.segundos_para_resumir,
+        'Summi em Audio?': sanitizedUpdates['Summi em Audio?'],
+        apenas_horario_comercial: sanitizedUpdates.apenas_horario_comercial,
+        updated_at: new Date().toISOString()
+      };
+
+      // Remover campos undefined para evitar problemas
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key as keyof typeof updateData] === undefined) {
+          delete updateData[key as keyof typeof updateData];
+        }
+      });
+
+      console.log('[PROFILE] Prepared update data:', updateData);
+
       const { data, error } = await supabase
         .from('profiles')
-        .update({ 
-          ...sanitizedUpdates, 
-          updated_at: new Date().toISOString() 
-        })
+        .update(updateData)
         .eq('id', user.id)
         .select()
         .single();
@@ -186,6 +207,8 @@ export const useProfile = () => {
           errorMessage = "Email já está em uso por outro usuário";
         } else if (error.code === '23514') {
           errorMessage = "Dados fornecidos não atendem aos critérios de segurança";
+        } else if (error.code === '42501') {
+          errorMessage = "Erro de permissão. Verifique se você está logado corretamente.";
         }
         
         toast({
@@ -196,8 +219,9 @@ export const useProfile = () => {
         return { success: false, error: error.message };
       }
 
+      // Atualizar o estado local com os dados retornados do banco
       setProfile(data);
-      console.log('[PROFILE] Profile updated successfully');
+      console.log('[PROFILE] Profile updated successfully:', data);
       
       toast({
         title: "Sucesso",
