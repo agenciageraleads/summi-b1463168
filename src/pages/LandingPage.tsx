@@ -1,14 +1,11 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
-
 const LandingPage = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
+  return <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
       <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -432,31 +429,7 @@ Cancele quando quiser.</CardDescription>
           {/* Informações adicionais aprimoradas */}
           <div className="text-center mt-12 space-y-6">
             {/* Seção principal de garantias */}
-            <div className="bg-white rounded-xl p-6 max-w-4xl mx-auto border border-green-200 shadow-sm">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                ✨ Sem Riscos, Sem Complicações
-              </h3>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="text-left">
-                  <h4 className="font-medium text-gray-900 mb-2 flex items-center">
-                    <Check className="w-5 h-5 text-green-600 mr-2" />
-                    Teste Gratuito Completo
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    7 dias com acesso total às funcionalidades, sem necessidade de cartão de crédito.
-                  </p>
-                </div>
-                <div className="text-left">
-                  <h4 className="font-medium text-gray-900 mb-2 flex items-center">
-                    <Check className="w-5 h-5 text-green-600 mr-2" />
-                    Cancelamento Simples
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    Cancele a qualquer momento com apenas 1 clique. Sem taxas, multas ou burocracia.
-                  </p>
-                </div>
-              </div>
-            </div>
+            
 
             <p className="text-gray-500">
               💳 Aceitamos todos os cartões de crédito • 🔐 Pagamento 100% seguro via Stripe
@@ -661,8 +634,6 @@ Cancele quando quiser.</CardDescription>
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default LandingPage;
