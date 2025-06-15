@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface InstanceData {
@@ -20,16 +19,17 @@ export interface InstanceCheckResult {
   instanceData?: any;
 }
 
-// Função para criar uma nova instância
+// Função para criar uma nova instância - CORRIGIDA para chamar evolution-api-handler
 export const createInstance = async (instanceName: string): Promise<InstanceData> => {
-  console.log(`[Evolution API] Criando instância: ${instanceName}`);
+  console.log(`[Evolution API] Criando instância via evolution-api-handler: ${instanceName}`);
   
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) throw new Error('Usuário não autenticado');
 
-    const { data, error } = await supabase.functions.invoke('evolution-create-instance', {
-      body: { instanceName },
+    // CORREÇÃO: Chamar evolution-api-handler com action "initialize-connection" em vez da função inexistente
+    const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
+      body: { action: 'initialize-connection' },
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
@@ -38,13 +38,13 @@ export const createInstance = async (instanceName: string): Promise<InstanceData
     if (error) throw error;
     if (!data.success) throw new Error(data.error || 'Erro ao criar instância');
 
-    console.log(`[Evolution API] Instância criada com sucesso:`, data);
+    console.log(`[Evolution API] Instância criada com sucesso via handler:`, data);
     return {
-      instanceName: data.instanceName,
-      status: data.status
+      instanceName: data.instanceName || instanceName,
+      status: data.state
     };
   } catch (error) {
-    console.error(`[Evolution API] Erro na criação da instância:`, error);
+    console.error(`[Evolution API] Erro na criação da instância via handler:`, error);
     throw error;
   }
 };

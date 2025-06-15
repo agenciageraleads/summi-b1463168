@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -10,6 +9,19 @@ const corsHeaders = {
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[EVOLUTION-QR] ${step}${detailsStr}`);
+};
+
+// NOVO: Log específico para payloads de criação
+const logInstanceCreationPayload = (payload: any) => {
+  console.log(`[EVOLUTION-QR] 🚨 PAYLOAD DE CRIAÇÃO DA INSTÂNCIA:`);
+  console.log(`[EVOLUTION-QR] instanceName: ${payload.instanceName}`);
+  console.log(`[EVOLUTION-QR] settings.groups_ignore: ${payload.settings?.groups_ignore}`);
+  console.log(`[EVOLUTION-QR] settings.always_online: ${payload.settings?.always_online}`);
+  console.log(`[EVOLUTION-QR] settings.read_messages: ${payload.settings?.read_messages}`);
+  console.log(`[EVOLUTION-QR] webhook.url: ${payload.webhook?.url}`);
+  console.log(`[EVOLUTION-QR] webhook.byEvents: ${payload.webhook?.byEvents}`);
+  console.log(`[EVOLUTION-QR] integration: ${payload.integration}`);
+  console.log(`[EVOLUTION-QR] PAYLOAD COMPLETO:`, JSON.stringify(payload, null, 2));
 };
 
 serve(async (req) => {
@@ -94,7 +106,7 @@ serve(async (req) => {
 
     // 2. Se a instância não existe, criar ela primeiro
     if (!instanceExists) {
-      logStep("Creating new instance", { instanceName });
+      logStep("🚨 CRIANDO NOVA INSTÂNCIA - MONITORANDO PAYLOAD", { instanceName });
       
       const { data: profile, error: profileError } = await supabaseClient
         .from('profiles')
@@ -131,6 +143,9 @@ serve(async (req) => {
         }
       };
 
+      // LOG DETALHADO DO PAYLOAD
+      logInstanceCreationPayload(createPayload);
+
       const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
@@ -139,7 +154,11 @@ serve(async (req) => {
 
       if (!createResponse.ok) {
         const errorText = await createResponse.text();
-        logStep("Error creating instance", { status: createResponse.status, error: errorText });
+        logStep("🚨 ERRO NA CRIAÇÃO - Response details", { 
+          status: createResponse.status, 
+          error: errorText,
+          payloadUsed: createPayload 
+        });
         
         // Se o erro for que a instância já existe, não é um erro fatal. Apenas continue.
         if (errorText && errorText.toLowerCase().includes("instance already exists")) {
@@ -149,7 +168,10 @@ serve(async (req) => {
         }
       } else {
         const creationData = await createResponse.json();
-        logStep("Instance creation response received", { instance: creationData.instance?.instanceName });
+        logStep("✅ SUCESSO NA CRIAÇÃO - Response data", { 
+          instance: creationData.instance?.instanceName,
+          responseData: creationData 
+        });
         
         // Otimização: Se o QR Code veio na resposta da criação, retorna imediatamente
         let qrCodeDataFromCreate = creationData.qrcode?.base64 || creationData.base64 || creationData.qrcode?.code || creationData.code;
