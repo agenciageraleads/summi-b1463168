@@ -69,7 +69,7 @@ export const useWhatsAppManager = () => {
     }
   }, []);
   
-  // CORREÇÃO PRINCIPAL: Define o estado como conectado de forma definitiva
+  // CORREÇÃO CRÍTICA: Define o estado como conectado de forma definitiva e protegida
   const setConnectedStateDefinitively = useCallback(() => {
     console.log('[WA Manager] ✅ Definindo como conectado definitivamente');
     isDefinitivelyConnectedRef.current = true;
@@ -77,7 +77,7 @@ export const useWhatsAppManager = () => {
     if (isMountedRef.current) {
       setState(prev => ({
         ...prev,
-        connectionState: 'already_connected', // CORREÇÃO: Garantir que o estado seja atualizado
+        connectionState: 'already_connected',
         qrCode: null,
         message: 'WhatsApp conectado e funcionando!',
         isLoading: false,
@@ -96,7 +96,6 @@ export const useWhatsAppManager = () => {
       const statusResult = await checkConnectionStatus(instanceName);
       
       // CORREÇÃO: Mapear corretamente os estados da API Evolution
-      // A API retorna state: "open" quando conectado, mas precisamos mapear para nosso estado
       const apiState = statusResult.state;
       const isConnected = statusResult.success && ['open', 'connected'].includes(apiState || '');
       
@@ -337,9 +336,15 @@ export const useWhatsAppManager = () => {
     }
   }, [profile, stopPolling, toast]);
 
-  // Estado inicial baseado no perfil
+  // CORREÇÃO CRÍTICA: Estado inicial baseado no perfil - com proteção contra sobrescrita
   useEffect(() => {
     if (!profile) return;
+    
+    // IMPORTANTE: Não atualizar o estado se já estamos definitivamente conectados
+    if (isDefinitivelyConnectedRef.current) {
+      console.log('[WA Manager] 🛡️ Perfil carregado mas já conectado - mantendo estado atual');
+      return;
+    }
     
     console.log('[WA Manager] 👤 Perfil carregado:', {
       numero: profile.numero,
