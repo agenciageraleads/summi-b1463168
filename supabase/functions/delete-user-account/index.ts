@@ -20,7 +20,6 @@ serve(async (req) => {
   try {
     // Verificar se há token de autorização
     const authHeader = req.headers.get("Authorization");
-    // Log para debug: Printar token recebido
     console.log('[EDGE_FN][DEBUG] Authorization header recebido:', authHeader);
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -32,9 +31,7 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '').trim();
-
-    // Printar token (corte para evitar leak, só 15 primeiros chars)
-    console.log('[EDGE_FN][DEBUG] access_token:', token.substring(0, 15) + '...');
+    console.log('[EDGE_FN][DEBUG] access_token recebido (primeiros 20 chars):', token.substring(0, 20) + '...');
 
     if (!token) {
       return new Response(JSON.stringify({ success: false, error: "Token está vazio" }), {
@@ -43,22 +40,42 @@ serve(async (req) => {
       });
     }
 
-    // Configurar cliente Supabase com service role (para validação do token e operações administrativas)
+    // Cliente Supabase para validações
     const supabaseServiceRole = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
-    // Tentar obter o usuário autenticado pelo token recebido
+    // VALIDAR TOKEN: Checar se não expirou e existe sessão
     const { data: { user }, error: authError } = await supabaseServiceRole.auth.getUser(token);
 
-    // Log de debug: user e erro
-    console.log('[EDGE_FN][DEBUG] Resultado getUser:', user, authError);
+    // Mais logs para debug do token e erro
+    console.log('[EDGE_FN][DEBUG] Resultado getUser: user:', user, 'authError:', authError?.message ?? null);
 
+    // Ajuda extra: printar o tipo do erro e dica de como proceder
     if (authError || !user) {
-      auditLog("INVALID_TOKEN", "unknown", { error: authError?.message });
-      return new Response(JSON.stringify({ success: false, error: "Token inválido ou sessão expirada" }), {
+      // Tenta extrair um session_id do token JWT
+      try {
+        const [, payloadB64] = token.split(".");
+        const payloadJSON = new TextDecoder().decode(Uint8Array.from(atob(payloadB64), c => c.charCodeAt(0)));
+        const payload = JSON.parse(payloadJSON);
+        const sessionId = payload?.session_id ?? '[N/A]';
+        console.error('[EDGE_FN][DEBUG] Token payload session_id:', sessionId);
+      } catch (e) {
+        console.error('[EDGE_FN][DEBUG] Não foi possível decodificar JWT para session_id.');
+      }
+      auditLog("INVALID_TOKEN", "unknown", {
+        error: authError?.message,
+        dica: "O token pode estar expirado ou revogado. Por favor, faça login novamente antes de tentar apagar o usuário."
+      });
+      return new Response(JSON.stringify({
+        success: false,
+        error:
+          "Token inválido, expirado ou sessão não encontrada. " +
+          "Se você é admin, tente sair e entrar novamente antes de apagar usuários. " +
+          "[DEBUG: " + (authError?.message || "Sem detalhes") + " ]"
+      }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
