@@ -23,27 +23,45 @@ export const useMessageAnalysis = () => {
 
     setIsAnalyzing(true);
     console.log('[MESSAGE_ANALYSIS] Iniciando análise para usuário:', user.id);
+    console.log('[MESSAGE_ANALYSIS] Supabase URL:', supabase.supabaseUrl);
 
     try {
       // Payload com apenas o userId necessário
       const payload = { userId: user.id };
       console.log('[MESSAGE_ANALYSIS] Enviando payload:', payload);
 
-      // Chamar edge function sem signal (não suportado pelo Supabase)
+      // Chamar edge function - verificar se função existe
+      console.log('[MESSAGE_ANALYSIS] Tentando chamar função analyze-messages...');
+      
       const { data, error } = await supabase.functions.invoke('analyze-messages', {
         body: payload
       });
 
-      console.log('[MESSAGE_ANALYSIS] Resposta da edge function:', { data, error });
+      console.log('[MESSAGE_ANALYSIS] Resposta completa:', { data, error });
 
+      // Verificar se houve erro na chamada da função
       if (error) {
-        console.error('[MESSAGE_ANALYSIS] Erro na edge function:', error);
-        throw new Error(`Erro na comunicação: ${error.message}`);
+        console.error('[MESSAGE_ANALYSIS] Erro detalhado na edge function:', {
+          message: error.message,
+          status: error.status,
+          statusText: error.statusText,
+          details: error
+        });
+        
+        // Tratar diferentes tipos de erro
+        if (error.message?.includes('Function not found') || error.status === 404) {
+          throw new Error('Função de análise não encontrada. Verifique se ela foi deployada corretamente.');
+        } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+          throw new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+        } else {
+          throw new Error(`Erro na comunicação: ${error.message || 'Erro desconhecido'}`);
+        }
       }
 
+      // Verificar resposta da função
       if (data && !data.success) {
         console.error('[MESSAGE_ANALYSIS] Falha retornada pela função:', data);
-        throw new Error(data.error || 'Falha na análise');
+        throw new Error(data.error || 'Falha na análise das mensagens');
       }
 
       console.log('[MESSAGE_ANALYSIS] Análise iniciada com sucesso');
@@ -68,7 +86,12 @@ export const useMessageAnalysis = () => {
       }, 60000); // 60 segundos
 
     } catch (error) {
-      console.error('[MESSAGE_ANALYSIS] Erro ao iniciar análise:', error);
+      console.error('[MESSAGE_ANALYSIS] Erro completo ao iniciar análise:', {
+        error,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
       setIsAnalyzing(false);
       
       let errorMessage = 'Falha ao iniciar a classificação das mensagens';
