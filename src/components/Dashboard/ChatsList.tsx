@@ -141,31 +141,48 @@ export const ChatsList = () => {
     }
   };
 
-  // CORREÇÃO: Função melhorada para contar mensagens
-  const getMessageCount = (conversa: any[]) => {
-    console.log('[CHATS] Contando mensagens para conversa:', conversa);
+  // CORREÇÃO: Função para contar mensagens que funciona com strings
+  const getMessageCount = (conversa: any) => {
+    console.log('[CHATS] Contando mensagens para conversa:', {
+      tipo: typeof conversa,
+      eh_array: Array.isArray(conversa),
+      valor: conversa
+    });
     
-    if (!conversa || !Array.isArray(conversa)) {
-      console.log('[CHATS] Conversa não é um array válido');
+    // Se conversa é null/undefined
+    if (!conversa) {
+      console.log('[CHATS] Conversa é null/undefined');
       return 0;
     }
     
-    if (conversa.length === 0) {
-      console.log('[CHATS] Array de conversa está vazio');
-      return 0;
+    // Se conversa é uma string (formato atual nos dados)
+    if (typeof conversa === 'string') {
+      if (conversa.trim() === '') {
+        console.log('[CHATS] String de conversa está vazia');
+        return 0;
+      }
+      
+      // Contar quebras de linha para estimar número de mensagens
+      const lineBreaks = (conversa.match(/\n/g) || []).length;
+      const messageCount = lineBreaks + 1; // +1 porque última linha não tem \n
+      console.log('[CHATS] Contando mensagens por quebras de linha:', messageCount);
+      return messageCount;
     }
     
-    // Se o primeiro elemento é uma string, pode ser que todas as mensagens estejam concatenadas
-    if (typeof conversa[0] === 'string') {
-      // Tentar contar por quebras de linha como antes
-      const lineBreaks = (conversa[0].match(/\n/g) || []).length;
-      console.log('[CHATS] Contando por quebras de linha:', lineBreaks + 1);
-      return lineBreaks > 0 ? lineBreaks + 1 : 1;
+    // Se conversa é um array
+    if (Array.isArray(conversa)) {
+      if (conversa.length === 0) {
+        console.log('[CHATS] Array de conversa está vazio');
+        return 0;
+      }
+      
+      console.log('[CHATS] Contando elementos do array:', conversa.length);
+      return conversa.length;
     }
     
-    // Se são objetos, contar elementos do array
-    console.log('[CHATS] Contando elementos do array:', conversa.length);
-    return conversa.length;
+    // Fallback para outros tipos
+    console.log('[CHATS] Tipo de conversa não reconhecido, retornando 0');
+    return 0;
   };
 
   // Função para formatar número de telefone
