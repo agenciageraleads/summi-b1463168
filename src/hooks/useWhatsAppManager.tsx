@@ -263,37 +263,46 @@ export const useWhatsAppManager = () => {
   }, [refreshProfile, stopPolling, toast, state.isPolling]);
 
   /**
-   * Polling seguro: só permite 1 intervalo, respeita delay mínimo, 
-   * para 100% ao conectar.
+   * Polling só inicia quando explicitamente mandado por ação do usuário!
+   * Quando conecta, para TUDO e nunca mais faz polling automático enquanto usuário não clicar.
    */
   const startPolling = useCallback((instanceName: string) => {
     // Garante apenas 1 polling rodando
     if (!isMountedRef.current) return;
-    if (isPollingActiveRef.current) return;
-    if (prevConnectionStateRef.current === 'already_connected' || state.connectionState === 'already_connected') {
+    if (isPollingActiveRef.current) {
+      console.log('[WhatsApp Manager] Polling já ativo, não inicia novo.');
+      return;
+    }
+
+    // Se já está conectado, polling nunca roda
+    if (
+      prevConnectionStateRef.current === 'already_connected' ||
+      state.connectionState === 'already_connected'
+    ) {
       stopPolling();
       return;
     }
-    stopPolling(); // limpa qualquer lixo antes
+    stopPolling();
 
-    isPollingActiveRef.current = true; // Marca flag ativa
+    isPollingActiveRef.current = true;
     setState(prev => ({ ...prev, isPolling: true }));
-    // Primeira checagem com delay para UX
+    // Primeira checagem (com delay para UX)
     setTimeout(() => {
       if (isMountedRef.current && isPollingActiveRef.current) {
         checkConnectionAndUpdate(instanceName);
       }
     }, 3000);
 
-    // Polling regular A CADA 7 SEGUNDOS (1 polling por vez)
+    // Polling regular: a cada 7s (nunca executa se já conectado, checado no callback)
     pollingIntervalRef.current = setInterval(async () => {
-      if (!isMountedRef.current || !isPollingActiveRef.current) return;
-      // Nunca executa se já conectado
+      // Segurança extra: nunca roda polling se já conectado!
       if (
+        !isMountedRef.current ||
+        !isPollingActiveRef.current ||
         prevConnectionStateRef.current === 'already_connected' ||
-        state.connectionState === 'already_connected' ||
-        !isMountedRef.current
+        state.connectionState === 'already_connected'
       ) {
+        console.log('[WhatsApp Manager] Parando polling porque conectou! 🚦');
         stopPolling();
         return;
       }
@@ -502,24 +511,34 @@ export const useWhatsAppManager = () => {
     }
   };
 
-  // Atualizar estado baseado no perfil
+  // Atualizar estado baseado no perfil - CORRIGIDO PARA NÃO INICIAR POLLING INDEVIDO!
   useEffect(() => {
-    if (profile && !hasInitializedRef.current && !isInitializingRef.current) {
-      const initialState = getInitialStateFromProfile();
-      setState(prev => ({
-        ...prev,
-        connectionState: initialState.connectionState,
-        message: initialState.message,
-        instanceName: initialState.instanceName || null
-      }));
+    if (!profile || hasInitializedRef.current || isInitializingRef.current) return;
 
-      // Só inicia uma verificação agora se o status não é already_connected
-      if (
-        profile.instance_name &&
-        state.connectionState !== 'already_connected'
-      ) {
-        checkConnectionAndUpdate(profile.instance_name);
-      }
+    const initialState = getInitialStateFromProfile();
+
+    setState(prev => ({
+      ...prev,
+      connectionState: initialState.connectionState,
+      message: initialState.message,
+      instanceName: initialState.instanceName || null
+    }));
+
+    // Se está conectado, não faz NADA! Nunca começa polling.
+    if (
+      profile.instance_name &&
+      initialState.connectionState !== 'already_connected' &&
+      state.connectionState !== 'already_connected'
+    ) {
+      // Aqui pode iniciar checagem APENAS se NÃO está conectado
+      checkConnectionAndUpdate(profile.instance_name);
+    }
+    // Caso já esteja connected, garante polling parado:
+    if (
+      initialState.connectionState === 'already_connected' ||
+      state.connectionState === 'already_connected'
+    ) {
+      stopPolling();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, getInitialStateFromProfile, checkConnectionAndUpdate]);
