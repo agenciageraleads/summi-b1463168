@@ -60,7 +60,7 @@ const RegisterPage = () => {
     const result = await register(formData.name, formData.email, formData.password);
     
     if (!result.error) {
-      navigate('/login');
+      navigate('/dashboard');
     }
     
     setIsSubmitting(false);
@@ -88,18 +88,30 @@ const RegisterPage = () => {
           <h2 className="mt-6 text-3xl font-bold text-summi-gray-900">
             Crie sua conta
           </h2>
-          <p className="mt-2 text-sm text-summi-gray-600">
-            Ou{' '}
-            <Link to="/login" className="font-medium text-summi-blue hover:underline">
-              faça login na sua conta existente
-            </Link>
-          </p>
+          <div className="mt-2 space-y-2">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm font-medium text-green-800">
+                🎉 Trial de 7 dias GRÁTIS
+              </p>
+              <p className="text-xs text-green-600">
+                Sem cartão de crédito • Acesso completo
+              </p>
+            </div>
+            <p className="text-sm text-summi-gray-600">
+              Ou{' '}
+              <Link to="/login" className="font-medium text-summi-blue hover:underline">
+                faça login na sua conta existente
+              </Link>
+            </p>
+          </div>
         </div>
 
         {/* Form */}
         <Card className="card-hover">
           <CardHeader>
-            <CardTitle className="text-center">Cadastro Gratuito</CardTitle>
+            <CardTitle className="text-center">
+              Trial Gratuito de 7 Dias
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -172,8 +184,12 @@ const RegisterPage = () => {
                 className="btn-primary w-full"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Criando conta...' : 'Criar conta'}
+                {isSubmitting ? 'Criando conta e ativando trial...' : 'Começar trial gratuito'}
               </Button>
+              
+              <p className="text-xs text-center text-summi-gray-500">
+                Ao criar sua conta, você concorda com nossos termos de uso
+              </p>
             </form>
           </CardContent>
         </Card>

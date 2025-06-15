@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -125,20 +126,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (name: string, email: string, password: string) => {
     setLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/`;
+      console.log('[AUTH] Iniciando registro com trial automático');
       
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            nome: name,
-          }
-        }
+      // Chamar a Edge Function para criar usuário + trial
+      const { data, error } = await supabase.functions.invoke('handle-signup', {
+        body: { name, email, password }
       });
 
       if (error) {
+        console.error('[AUTH] Erro na Edge Function:', error);
         toast({
           title: "Erro no cadastro",
           description: error.message,
@@ -147,11 +143,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: error.message };
       }
 
-      toast({
-        title: "Cadastro realizado!",
-        description: "Verifique seu e-mail para confirmar a conta.",
-      });
+      if (!data.success) {
+        console.error('[AUTH] Erro retornado pela função:', data.error);
+        toast({
+          title: "Erro no cadastro",
+          description: data.error,
+          variant: "destructive",
+        });
+        return { error: data.error };
+      }
+
+      // Se o usuário foi criado com sucesso, fazer login automático
+      if (data.user && data.session) {
+        setUser(data.user);
+        setSession(data.session);
+        
+        toast({
+          title: "Conta criada com sucesso! 🎉",
+          description: "Seu trial de 7 dias foi ativado automaticamente.",
+        });
+      } else {
+        toast({
+          title: "Cadastro realizado!",
+          description: "Verifique seu e-mail para confirmar a conta.",
+        });
+      }
+      
       return {};
+    } catch (error) {
+      console.error('[AUTH] Erro inesperado no registro:', error);
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast({
+        title: "Erro no cadastro",
+        description: message,
+        variant: "destructive",
+      });
+      return { error: message };
     } finally {
       setLoading(false);
     }
