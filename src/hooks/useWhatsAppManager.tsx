@@ -88,8 +88,7 @@ export const useWhatsAppManager = () => {
   }, []);
 
   /**
-   * Função para interromper todo polling/timers de maneira INFALÍVEL.
-   * Só deve ser chamado quando conexão estável for confirmada OU ao desconectar.
+   * Para polling/timers de forma confiável
    */
   const stopPolling = useCallback(() => {
     console.log('[WhatsApp Manager] 🛑 Parando polling (definitivo)...');
@@ -108,16 +107,13 @@ export const useWhatsAppManager = () => {
   }, []);
 
   /**
-   * Gerar QR Code
-   * ATENÇÃO: AGORA ANTES por conta da ordem dos hooks!
+   * Gera QR Code e dispara polling
    */
   const handleGenerateQR = useCallback(async (instanceName: string) => {
-    console.log('[WhatsApp Manager] 📱 Gerando QR Code...');
     setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
-    
     try {
       const result = await generateQRCode(instanceName);
-      
+
       if (result.success && result.qrCode) {
         setState(prev => ({
           ...prev,
@@ -126,26 +122,29 @@ export const useWhatsAppManager = () => {
           message: 'Escaneie o QR Code com seu WhatsApp',
           isLoading: false
         }));
-        
-        console.log('[WhatsApp Manager] 📱 QR Code gerado, iniciando polling...');
         startPolling(instanceName);
       } else if (result.state === 'already_connected') {
-        console.log('[WhatsApp Manager] ✅ Instância já conectada!');
+        // Garantir que para TUDO e SÓ exiba o toast se realmente mudou de estado!
+        stopPolling();
         setState(prev => ({
           ...prev,
           connectionState: 'already_connected',
           message: result.message || 'WhatsApp já conectado',
           isLoading: false,
-          qrCode: null
+          qrCode: null,
+          isPolling: false
         }));
-        
+
         await refreshProfile();
-        
-        toast({
-          title: "✅ Já Conectado",
-          description: "WhatsApp já estava conectado",
-          duration: 3000
-        });
+
+        // Só notifica se não estava estável!
+        if (state.connectionState !== 'already_connected') {
+          toast({
+            title: "✅ Já Conectado",
+            description: "WhatsApp já estava conectado",
+            duration: 3000
+          });
+        }
       } else {
         setState(prev => ({
           ...prev,
@@ -155,7 +154,6 @@ export const useWhatsAppManager = () => {
         }));
       }
     } catch (error) {
-      console.error('[WhatsApp Manager] ❌ Erro ao gerar QR:', error);
       setState(prev => ({
         ...prev,
         connectionState: 'error',
@@ -163,36 +161,35 @@ export const useWhatsAppManager = () => {
         isLoading: false
       }));
     }
-    // removido startPolling das dependências para evitar looping circular
-  }, [refreshProfile, toast]);
+  // state.connectionState depende do valor anterior, mas no polling isso é ok pois já vai ficar estável
+  // deps: stopPolling, refreshProfile, toast, state.connectionState
+  }, [stopPolling, refreshProfile, toast, state.connectionState]);
 
   /**
-   * Função para verificar via API se está conectado.
-   * Agora impede update redundante de estado e múltiplos toasts/loops!
+   * Checa conexão e para polling/atualiza de forma segura
    */
   const checkConnectionAndUpdate = useCallback(async (instanceName: string) => {
-    if (!isMountedRef.current || isCheckingConnectionRef.current) {
-      return false;
-    }
+    if (!isMountedRef.current || isCheckingConnectionRef.current) return false;
     isCheckingConnectionRef.current = true;
     try {
       const statusResult = await checkConnectionStatus(instanceName);
       const connectionState = statusResult.state || statusResult.status;
       const isConnected = statusResult.success && ['open', 'connected'].includes(connectionState);
 
-      // Se JÁ está conectado, para polling e evita duplos toasts/updates!
+      // Corrigido: se já está conectado E NÃO ESTAVA, notifica uma VÊZ e para polling
       if (isConnected) {
-        // Evita update redundante de estado e duplo toast!
-        if (state.connectionState !== 'already_connected' || state.isPolling) {
-          stopPolling();
-          setState(prev => ({
-            ...prev,
-            connectionState: 'already_connected',
-            qrCode: null,
-            message: 'WhatsApp conectado e funcionando!',
-            isLoading: false,
-            isPolling: false,
-          }));
+        const wasNotConnected = state.connectionState !== 'already_connected';
+        // Para polling 100%!
+        stopPolling();
+        setState(prev => ({
+          ...prev,
+          connectionState: 'already_connected',
+          qrCode: null,
+          message: 'WhatsApp conectado e funcionando!',
+          isLoading: false,
+          isPolling: false,
+        }));
+        if (wasNotConnected) {
           await refreshProfile();
           toast({
             title: "✅ Conectado!",
@@ -202,32 +199,30 @@ export const useWhatsAppManager = () => {
         }
         return true;
       }
-      // Caso não esteja conectado retorna false, polling continuará rodando.
+      // Se NAO conectado, permite continuar polling
       return false;
     } catch (error) {
-      console.error('[WhatsApp Manager] ❌ Erro ao verificar status:', error);
       return false;
     } finally {
       isCheckingConnectionRef.current = false;
     }
-  }, [refreshProfile, stopPolling, state.connectionState, state.isPolling, toast]);
+  }, [refreshProfile, stopPolling, state.connectionState, toast]);
 
-  // Sistema de polling centralizado e SEGURO!
-  // Garante que só 1 polling rode por vez e para no momento correto.
+  /**
+   * Polling seguro: nunca roda mais de uma vez, para ao conectar
+   */
   const startPolling = useCallback((instanceName: string) => {
     if (!isMountedRef.current) return;
-
-    stopPolling(); // Limpa qualquer polling antigo!
+    stopPolling(); // Garante: nunca dois intervalos
     setState(prev => ({ ...prev, isPolling: true }));
 
-    // Checagem rápida após 3s
+    // Verificação rápida após 3s
     setTimeout(() => {
       if (isMountedRef.current) {
         checkConnectionAndUpdate(instanceName);
       }
     }, 3000);
 
-    // Timer para QR expirar em 45s, reiniciar instância depois disso
     qrTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
       stopPolling();
@@ -254,12 +249,19 @@ export const useWhatsAppManager = () => {
       }
     }, 45000);
 
-    // Polling central, a cada 7 segundos, para evitar sobrecarga
     pollingIntervalRef.current = setInterval(async () => {
       if (!isMountedRef.current) return;
+      // Corrigida: para polling se já está conectado!
+      if (
+        state.connectionState === 'already_connected' ||
+        !isMountedRef.current
+      ) {
+        stopPolling();
+        return;
+      }
       await checkConnectionAndUpdate(instanceName);
     }, 7000);
-  }, [checkConnectionAndUpdate, stopPolling, handleGenerateQR]); // aqui handleGenerateQR já foi definido
+  }, [checkConnectionAndUpdate, stopPolling, handleGenerateQR, state.connectionState]);
 
   // Inicializar conexão
   const initializeConnection = useCallback(async () => {
