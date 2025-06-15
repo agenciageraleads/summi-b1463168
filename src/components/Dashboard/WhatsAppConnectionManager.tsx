@@ -1,4 +1,3 @@
-
 // Componente simplificado que usa apenas o hook unificado - VERSÃO FINAL
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -160,7 +159,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  O QR Code expira em 30 segundos
+                  O QR Code expira em aproximadamente 45 segundos
                 </p>
               </div>
             </CardContent>

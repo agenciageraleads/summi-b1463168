@@ -113,7 +113,7 @@ export const WhatsAppConnection = () => {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                O QR Code expira em 30 segundos
+                O QR Code expira em aproximadamente 45 segundos
               </p>
             </div>
           </CardContent>

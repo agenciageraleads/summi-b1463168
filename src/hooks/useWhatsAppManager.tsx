@@ -1,4 +1,3 @@
-
 // Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO COM REFS E TIMERS AJUSTADOS
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -163,19 +162,19 @@ export const useWhatsAppManager = () => {
 
     clearTimers();
 
-    // Verificação imediata após 3 segundos
+    // Verificação inicial após 5 segundos para dar tempo à API
     setTimeout(() => {
       if (isMountedRef.current && checkConnectionCallbackRef.current) {
-        console.log('[WhatsApp Manager] 🔫 Verificação inicial (3s)...');
+        console.log('[WhatsApp Manager] 🔫 Verificação inicial (5s)...');
         checkConnectionCallbackRef.current(instanceName);
       }
-    }, 3000);
+    }, 5000);
 
-    // Timeout de 45 segundos para restart
+    // Timeout de 45 segundos para o QR Code expirar e reiniciar a instância
     qrTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current || !generateQRCallbackRef.current) return;
       
-      console.log('[WhatsApp Manager] ⏰ Timeout de 45s - reiniciando instância...');
+      console.log('[WhatsApp Manager] ⏰ Timeout de 45s do QR Code - reiniciando instância...');
       stopPolling(); // Para o polling antigo antes de reiniciar
       setState(prev => ({ ...prev, message: 'QR Code expirado, reiniciando...', qrCode: null }));
       
@@ -195,9 +194,9 @@ export const useWhatsAppManager = () => {
           isPolling: false
         }));
       }
-    }, 45000); // Aumentado para 45 segundos
+    }, 45000); // Timeout mantido em 45 segundos
 
-    // Polling a cada 3 segundos
+    // Polling a cada 7 segundos para reduzir a carga na aplicação
     pollingIntervalRef.current = setInterval(async () => {
       if (!isMountedRef.current || !checkConnectionCallbackRef.current) return;
 
@@ -206,7 +205,7 @@ export const useWhatsAppManager = () => {
         console.log('[WhatsApp Manager] 🎉 Conexão confirmada pelo polling, parando...');
         // A parada já ocorre dentro de checkConnectionAndUpdate
       }
-    }, 3000); // Intervalo de 3 segundos
+    }, 7000); // Intervalo aumentado para 7 segundos
   }, [clearTimers, stopPolling]);
 
   // Gerar QR Code
