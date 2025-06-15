@@ -46,7 +46,6 @@ export const useConnectionActions = ({
       return;
     }
 
-    // Primeiro, limpar qualquer estado anterior
     console.log('[useConnectionActions] INICIANDO CONEXÃO - limpando estado anterior');
     stopPolling();
     resetConnectionState();
@@ -79,19 +78,26 @@ export const useConnectionActions = ({
         case 'already_connected':
           setConnectionStatus('CONNECTED');
           onStatusChange?.('CONNECTED');
-          toast({
-            title: 'Já Conectado',
-            description: 'Seu WhatsApp já está conectado.',
-          });
+          // Exibe status conectado silenciosamente
           break;
 
         case 'needs_qr_code':
           if (!initResult.instanceName) {
             throw new Error('Nome da instância não foi retornado pela API.');
           }
-          
+
           console.log('[useConnectionActions] Gerando QR Code para:', initResult.instanceName);
           const qrResult = await getQRCode(initResult.instanceName);
+
+          // NOVA LÓGICA: Se a resposta indica que já está conectado, trata como sucesso silencioso
+          if (qrResult.alreadyConnected) {
+            setConnectionStatus('CONNECTED');
+            onStatusChange?.('CONNECTED');
+            setQrCode(null);
+            onQRCodeChange?.(null);
+            // Não mostra toast, apenas badge verde no front
+            break;
+          }
 
           if (!qrResult.success || !qrResult.qrCode) {
             throw new Error(qrResult.error || 'Erro ao obter QR Code');
@@ -210,3 +216,4 @@ export const useConnectionActions = ({
     handleDisconnect,
   };
 };
+
