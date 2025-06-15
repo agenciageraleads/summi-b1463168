@@ -48,22 +48,11 @@ export const ChatsList = () => {
 
       console.log('[CHATS] Dados brutos retornados:', data);
 
-      // Transformar dados e fazer debug da estrutura
-      const transformedData = (data || []).map(chat => {
-        console.log(`[CHATS] Processando chat ${chat.nome}:`, {
-          id: chat.id,
-          conversa: chat.conversa,
-          tipo_conversa: typeof chat.conversa,
-          eh_array: Array.isArray(chat.conversa),
-          tamanho: chat.conversa ? (Array.isArray(chat.conversa) ? chat.conversa.length : 'não é array') : 'null/undefined'
-        });
-
-        return {
-          ...chat,
-          conversa: Array.isArray(chat.conversa) ? chat.conversa : [],
-          prioridade: chat.prioridade || '0'
-        };
-      });
+      // Transformar dados sem mexer na conversa
+      const transformedData = (data || []).map(chat => ({
+        ...chat,
+        prioridade: chat.prioridade || '0'
+      }));
 
       // Ordenar: Com prioridade primeiro, depois por data
       const sortedChats = transformedData.sort((a, b) => {
@@ -139,50 +128,6 @@ export const ChatsList = () => {
         icon: <MessageCircle className="w-3 h-3" />
       };
     }
-  };
-
-  // CORREÇÃO: Função para contar mensagens que funciona com strings
-  const getMessageCount = (conversa: any) => {
-    console.log('[CHATS] Contando mensagens para conversa:', {
-      tipo: typeof conversa,
-      eh_array: Array.isArray(conversa),
-      valor: conversa
-    });
-    
-    // Se conversa é null/undefined
-    if (!conversa) {
-      console.log('[CHATS] Conversa é null/undefined');
-      return 0;
-    }
-    
-    // Se conversa é uma string (formato atual nos dados)
-    if (typeof conversa === 'string') {
-      if (conversa.trim() === '') {
-        console.log('[CHATS] String de conversa está vazia');
-        return 0;
-      }
-      
-      // Contar quebras de linha para estimar número de mensagens
-      const lineBreaks = (conversa.match(/\n/g) || []).length;
-      const messageCount = lineBreaks + 1; // +1 porque última linha não tem \n
-      console.log('[CHATS] Contando mensagens por quebras de linha:', messageCount);
-      return messageCount;
-    }
-    
-    // Se conversa é um array
-    if (Array.isArray(conversa)) {
-      if (conversa.length === 0) {
-        console.log('[CHATS] Array de conversa está vazio');
-        return 0;
-      }
-      
-      console.log('[CHATS] Contando elementos do array:', conversa.length);
-      return conversa.length;
-    }
-    
-    // Fallback para outros tipos
-    console.log('[CHATS] Tipo de conversa não reconhecido, retornando 0');
-    return 0;
   };
 
   // Função para formatar número de telefone
@@ -263,9 +208,6 @@ export const ChatsList = () => {
             <p className="text-sm text-gray-400 mt-1">
               Clique em "Analisar Mensagens" para classificar suas conversas
             </p>
-            <p className="text-xs text-gray-400 mt-2">
-              Debug: {user ? `Usuário: ${user.id}` : 'Usuário não logado'}
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -299,7 +241,6 @@ export const ChatsList = () => {
               const priorityInfo = getPriorityInfo(chat.prioridade);
               const formattedNumber = formatPhoneNumber(chat.remote_jid);
               const whatsappNumber = getWhatsAppNumber(chat.remote_jid);
-              const messageCount = getMessageCount(chat.conversa);
               
               return (
                 <div
@@ -336,9 +277,7 @@ export const ChatsList = () => {
                   )}
                   
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>
-                      {formattedNumber} | {messageCount} mensagem(s)
-                    </span>
+                    <span>{formattedNumber}</span>
                     <span>
                       {formatDistanceToNow(new Date(chat.modificado_em), {
                         addSuffix: true,
