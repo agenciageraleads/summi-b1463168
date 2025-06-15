@@ -46,6 +46,9 @@ export const useWhatsAppManager = () => {
   // Estado simples, sempre atualizado para conferir transições
   const prevConnectionStateRef = useRef<ConnectionState>('needs_phone_number');
 
+  // NOVO: Flag para garantir polling seguro (evita múltiplos intervalos)
+  const isPollingActiveRef = useRef(false);
+
   // Função para determinar estado inicial baseado no perfil
   const getInitialStateFromProfile = useCallback(() => {
     console.log('[WhatsApp Manager] 🔍 Determinando estado inicial do perfil:', profile);
@@ -103,6 +106,7 @@ export const useWhatsAppManager = () => {
       clearTimeout(qrTimeoutRef.current);
       qrTimeoutRef.current = null;
     }
+    isPollingActiveRef.current = false;
     setState(prev => ({
       ...prev,
       isPolling: false,
@@ -259,24 +263,44 @@ export const useWhatsAppManager = () => {
   }, [refreshProfile, stopPolling, toast, state.isPolling]);
 
   /**
-   * Polling seguro: nunca roda mais de uma vez, para ao conectar
+   * Polling seguro: só permite 1 intervalo, respeita delay mínimo, 
+   * para 100% ao conectar.
    */
   const startPolling = useCallback((instanceName: string) => {
+    // Garante apenas 1 polling rodando
     if (!isMountedRef.current) return;
-    // Nunca roda polling se já connected
+    if (isPollingActiveRef.current) return;
     if (prevConnectionStateRef.current === 'already_connected' || state.connectionState === 'already_connected') {
       stopPolling();
       return;
     }
-    stopPolling();
-    setState(prev => ({ ...prev, isPolling: true }));
+    stopPolling(); // limpa qualquer lixo antes
 
+    isPollingActiveRef.current = true; // Marca flag ativa
+    setState(prev => ({ ...prev, isPolling: true }));
+    // Primeira checagem com delay para UX
     setTimeout(() => {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && isPollingActiveRef.current) {
         checkConnectionAndUpdate(instanceName);
       }
     }, 3000);
 
+    // Polling regular A CADA 7 SEGUNDOS (1 polling por vez)
+    pollingIntervalRef.current = setInterval(async () => {
+      if (!isMountedRef.current || !isPollingActiveRef.current) return;
+      // Nunca executa se já conectado
+      if (
+        prevConnectionStateRef.current === 'already_connected' ||
+        state.connectionState === 'already_connected' ||
+        !isMountedRef.current
+      ) {
+        stopPolling();
+        return;
+      }
+      await checkConnectionAndUpdate(instanceName);
+    }, 7000);
+
+    // Timer para expiração do QR Code (segue igual)
     qrTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
       stopPolling();
@@ -302,20 +326,6 @@ export const useWhatsAppManager = () => {
         }));
       }
     }, 45000);
-
-    pollingIntervalRef.current = setInterval(async () => {
-      if (!isMountedRef.current) return;
-      // NUNCA roda polling se já conectado!
-      if (
-        prevConnectionStateRef.current === 'already_connected' ||
-        state.connectionState === 'already_connected' ||
-        !isMountedRef.current
-      ) {
-        stopPolling();
-        return;
-      }
-      await checkConnectionAndUpdate(instanceName);
-    }, 7000);
   }, [checkConnectionAndUpdate, stopPolling, handleGenerateQR, state.connectionState]);
 
   // Inicializar conexão
