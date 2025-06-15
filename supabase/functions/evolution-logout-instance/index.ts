@@ -92,6 +92,7 @@ serve(async (req) => {
     logStep("Attempting to logout instance", { instanceName, logoutUrl });
 
     // Fazer logout na Evolution API
+    let logoutSuccess = false;
     try {
       const logoutResponse = await fetch(logoutUrl, {
         method: 'DELETE',
@@ -109,6 +110,7 @@ serve(async (req) => {
       
       if (logoutResponse.ok) {
         logStep("Logout successful in Evolution API");
+        logoutSuccess = true;
       } else {
         const errorText = await logoutResponse.text();
         logStep("Logout failed in Evolution API", { 
@@ -116,41 +118,28 @@ serve(async (req) => {
           error: errorText 
         });
         
-        // Mesmo se o logout falhar na API, vamos limpar o perfil
-        // pois pode ser que a instância já não exista mais
+        // Mesmo se der 404, consideramos sucesso pois pode ser que já esteja desconectado
         if (logoutResponse.status === 404) {
-          logStep("Instance not found in Evolution API (404) - proceeding with profile cleanup");
+          logStep("Instance not found in Evolution API (404) - considering as successful logout");
+          logoutSuccess = true;
         }
       }
     } catch (logoutError) {
       logStep("Logout request failed", { error: logoutError.message });
-      // Continuar mesmo com erro, pois vamos limpar o perfil
+      // Consideramos falha apenas se houve erro de rede/conexão
     }
 
-    // IMPORTANTE: Sempre limpar instance_name do perfil, independente do resultado do logout
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ instance_name: null })
-      .eq('id', user.id);
-
-    if (updateError) {
-      logStep("Failed to clear instance_name", updateError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Erro ao atualizar perfil'
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      });
-    } else {
-      logStep("Successfully cleared instance_name from profile");
-    }
-
-    logStep("Logout process completed successfully");
+    // IMPORTANTE: NÃO limpar instance_name do perfil no logout
+    // O instance_name deve permanecer para permitir reconexões futuras
+    // Só deve ser removido quando a conta for deletada
+    
+    logStep("Logout process completed", { success: logoutSuccess });
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'WhatsApp desconectado com sucesso'
+      message: logoutSuccess 
+        ? 'WhatsApp desconectado com sucesso' 
+        : 'Processo de desconexão executado (instância pode já estar desconectada)'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

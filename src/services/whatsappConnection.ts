@@ -1,4 +1,3 @@
-
 // Serviço unificado para conexão WhatsApp - VERSÃO COM MELHOR TRATAMENTO DE ERROS
 import { supabase } from '@/integrations/supabase/client';
 
@@ -220,7 +219,7 @@ export const restartInstance = async (instanceName: string): Promise<ConnectionR
   }
 };
 
-// Desconectar WhatsApp (apenas logout)
+// Desconectar WhatsApp (apenas logout, mantém instance_name no perfil)
 export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
   console.log('[WhatsApp Service] Desconectando WhatsApp...');
   
@@ -251,10 +250,10 @@ export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
       };
     }
 
-    console.log('[WhatsApp Service] Desconectado com sucesso');
+    console.log('[WhatsApp Service] Desconectado com sucesso (instance_name mantido no perfil)');
     return {
       success: true,
-      state: 'needs_phone_number',
+      state: 'needs_qr_code', // Após logout, pode reconectar usando o mesmo instance_name
       message: data?.message || 'WhatsApp desconectado com sucesso'
     };
   } catch (error) {

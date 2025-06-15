@@ -1,4 +1,3 @@
-
 // Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO COM TRATAMENTO MELHORADO
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -63,8 +62,8 @@ export const useWhatsAppManager = () => {
 
     if (profile.instance_name) {
       return {
-        connectionState: 'already_connected' as ConnectionState,
-        message: 'WhatsApp conectado e funcionando',
+        connectionState: 'needs_qr_code' as ConnectionState,
+        message: 'Clique em "Conectar WhatsApp" para verificar conexão',
         instanceName: profile.instance_name
       };
     }
@@ -297,7 +296,7 @@ export const useWhatsAppManager = () => {
     }
   }, [profile, toast, stopPolling, state.isLoading, initializeConnection, refreshProfile, handleGenerateQR]);
 
-  // Desconectar WhatsApp
+  // Desconectar WhatsApp (apenas logout, mantém instance_name)
   const handleDisconnect = useCallback(async () => {
     console.log('[WhatsApp Manager] Iniciando desconexão...');
     setState(prev => ({ ...prev, isLoading: true, message: 'Desconectando...' }));
@@ -307,19 +306,18 @@ export const useWhatsAppManager = () => {
       const result = await disconnectWhatsApp();
 
       if (result.success) {
-        setState({
-          connectionState: 'needs_phone_number',
+        // Após logout bem-sucedido, mantém instance_name mas altera estado para needs_qr_code
+        setState(prev => ({
+          ...prev,
+          connectionState: 'needs_qr_code',
           isLoading: false,
           qrCode: null,
-          instanceName: null,
-          message: result.message || 'WhatsApp desconectado com sucesso',
+          message: 'WhatsApp desconectado. Clique em "Conectar" para reconectar.',
           isPolling: false
-        });
+        }));
 
         hasInitializedRef.current = false;
         isInitializingRef.current = false;
-
-        await refreshProfile();
 
         toast({
           title: "Desconectado",
@@ -352,7 +350,7 @@ export const useWhatsAppManager = () => {
         variant: "destructive"
       });
     }
-  }, [stopPolling, refreshProfile, toast]);
+  }, [stopPolling, toast]);
 
   // Obter mensagem padrão para cada estado
   const getStateMessage = (connectionState: ConnectionState): string => {
@@ -360,7 +358,7 @@ export const useWhatsAppManager = () => {
       case 'needs_phone_number':
         return 'Configure seu número de telefone nas configurações';
       case 'needs_qr_code':
-        return 'Clique em "Conectar WhatsApp" para gerar o QR Code';
+        return 'Clique em "Conectar WhatsApp" para verificar conexão';
       case 'is_connecting':
         return 'WhatsApp está conectando...';
       case 'already_connected':
