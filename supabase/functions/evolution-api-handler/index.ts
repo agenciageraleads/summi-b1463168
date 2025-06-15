@@ -115,12 +115,13 @@ serve(async (req) => {
     // Verificar configuração das variáveis de ambiente
     const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
     const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
+    const webhookUrl = Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
 
-    if (!evolutionApiUrl || !evolutionApiKey) {
+    if (!evolutionApiUrl || !evolutionApiKey || !webhookUrl) {
       auditLog("MISSING_ENV_VARS", user.id, { action });
       return new Response(JSON.stringify({ 
         success: false, 
-        error: "Configuração da API Evolution não encontrada" 
+        error: "Configuração da API Evolution ou Webhook não encontrada" 
       }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -217,7 +218,7 @@ serve(async (req) => {
             number: profile.numero,
             integration: "WHATSAPP-BAILEYS",
             webhook: {
-              url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
+              url: webhookUrl, // Usando a variável correta do N8N
               byEvents: false,
               base64: true,
               headers: {
