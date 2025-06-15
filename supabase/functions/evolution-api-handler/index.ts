@@ -351,73 +351,150 @@ serve(async (req) => {
       }
       
       case "logout": {
+        // LOGOUT SÓ LIMPA PERFIL SE A EVOLUTION CONFIRMAR QUE DESCONECTOU
         if (!instanceName) {
           return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
-      
+
         try {
+          // Solicita logout na Evolution
           const logoutResponse = await fetch(`${cleanApiUrl}/instance/logout/${instanceName}`, {
             method: 'GET',
             headers: { 'apikey': evolutionApiKey }
           });
-      
+
           if (!logoutResponse.ok) {
-            throw new Error(`HTTP ${logoutResponse.status}: ${await logoutResponse.text()}`);
+            const errorTxt = await logoutResponse.text();
+            auditLog("LOGOUT_ERROR", user.id, { instanceName, status: logoutResponse.status, error: errorTxt });
+            return new Response(JSON.stringify({ success: false, error: `Erro ao deslogar: ${logoutResponse.status} - ${errorTxt}` }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
           }
-      
-          console.log(`[EVOLUTION-HANDLER] Instância ${instanceName} deslogada com sucesso.`);
-          return new Response(JSON.stringify({ success: true, message: "Instância deslogada com sucesso" }), {
+
+          // VERIFICA SE SAIU MESMO: consulta novamente o status
+          const checkStatusRes = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
+            headers: { 'apikey': evolutionApiKey }
+          });
+          let disconnected = false;
+          if (!checkStatusRes.ok) {
+            // Evolution não retornou status, considera como erro
+            auditLog("LOGOUT_STATUS_CHECK_ERROR", user.id, { instanceName, status: checkStatusRes.status });
+          } else {
+            const statusData = await checkStatusRes.json();
+            // Evolution retorna { state: ... }
+            disconnected = statusData.state === 'disconnected' || statusData.state === 'closed';
+          }
+
+          if (!disconnected) {
+            // Não desconectou de fato, não limpar o perfil
+            auditLog("LOGOUT_INCOMPLETE", user.id, { instanceName });
+            return new Response(JSON.stringify({ success: false, error: "Falha ao desconectar. Tente novamente." }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+
+          // Logout everificado => limpando o instance_name no perfil
+          await supabaseServiceRole
+            .from('profiles')
+            .update({ instance_name: null })
+            .eq('id', user.id);
+
+          auditLog("LOGOUT_SUCCESS", user.id, { instanceName });
+
+          return new Response(JSON.stringify({ success: true, message: "WhatsApp desconectado com sucesso" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } catch (error) {
-          console.error(`[EVOLUTION-HANDLER] Erro ao deslogar instância ${instanceName}:`, error);
-          return new Response(JSON.stringify({ success: false, error: "Erro ao deslogar instância" }), {
+          auditLog("LOGOUT_EXCEPTION", user.id, { instanceName, error: error.message });
+          return new Response(JSON.stringify({ success: false, error: `Erro ao deslogar: ${error.message}` }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
       }
-      
+
       case "delete": {
+        // DELETE: sempre faz logout antes de deletar e só limpa perfil se confirmadamente deletado
         if (!instanceName) {
           return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
-      
+
         try {
+          // Tenta logout antes de deletar (best practice Evolution)
+          const logoutResponse = await fetch(`${cleanApiUrl}/instance/logout/${instanceName}`, {
+            method: 'GET',
+            headers: { 'apikey': evolutionApiKey }
+          });
+          // (Mesmo que dê erro ignora, pois podemos deletar mesmo assim)
+          if (!logoutResponse.ok) {
+            auditLog("DELETE_LOGOUT_WARNING", user.id, { instanceName, status: logoutResponse.status });
+          }
+
+          // Tenta deletar
           const deleteResponse = await fetch(`${cleanApiUrl}/instance/delete/${instanceName}`, {
             method: 'GET',
             headers: { 'apikey': evolutionApiKey }
           });
-      
+
           if (!deleteResponse.ok) {
-            throw new Error(`HTTP ${deleteResponse.status}: ${await deleteResponse.text()}`);
+            const errorTxt = await deleteResponse.text();
+            auditLog("DELETE_ERROR", user.id, { instanceName, status: deleteResponse.status, error: errorTxt });
+            return new Response(JSON.stringify({ success: false, error: `Erro ao deletar: ${deleteResponse.status} - ${errorTxt}` }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
           }
-      
-          // Limpar instance_name no perfil
+
+          // Checa se deletou mesmo
+          const checkStatusRes = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
+            headers: { 'apikey': evolutionApiKey }
+          });
+          let deleted = false;
+          if (!checkStatusRes.ok) {
+            // Status não encontrado já é indicador de sucesso!
+            deleted = true;
+          } else {
+            const statusData = await checkStatusRes.json();
+            // Instância não pode mais estar open/connected, só pode ser disconnected/null
+            deleted = !statusData.state || statusData.state === 'disconnected' || statusData.state === 'closed';
+          }
+
+          if (!deleted) {
+            // Instância ainda existe, não limpar perfil
+            auditLog("DELETE_INCOMPLETE", user.id, { instanceName });
+            return new Response(JSON.stringify({ success: false, error: "Falha ao remover instância. Tente novamente." }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+
+          // Só chega aqui se realmente deletou!
           await supabaseServiceRole
             .from('profiles')
             .update({ instance_name: null })
             .eq('id', user.id);
-      
-          console.log(`[EVOLUTION-HANDLER] Instância ${instanceName} deletada com sucesso.`);
+
+          auditLog("DELETE_SUCCESS", user.id, { instanceName });
           return new Response(JSON.stringify({ success: true, message: "Instância deletada com sucesso" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } catch (error) {
-          console.error(`[EVOLUTION-HANDLER] Erro ao deletar instância ${instanceName}:`, error);
-          return new Response(JSON.stringify({ success: false, error: "Erro ao deletar instância" }), {
+          auditLog("DELETE_EXCEPTION", user.id, { instanceName, error: error.message });
+          return new Response(JSON.stringify({ success: false, error: `Erro ao deletar: ${error.message}` }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
       }
-      
+
       default:
         auditLog("UNKNOWN_ACTION", user.id, { action });
         return new Response(JSON.stringify({ 
