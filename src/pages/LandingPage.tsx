@@ -1,11 +1,14 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight } from "lucide-react";
+import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
+
 const LandingPage = () => {
-  return <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
       <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -61,10 +64,10 @@ const LandingPage = () => {
             
             <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6">
               Automatize seu{" "}
-              <span className="bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent">
-WhatsApp</span>
               <br />
-              com IA
+              <span className="bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent">
+                WhatsApp com IA
+              </span>
             </h1>
             
             <p className="text-xl text-gray-600 mb-8 leading-relaxed">
@@ -86,6 +89,74 @@ WhatsApp</span>
                 Configuração em 5 min
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Como Funciona Section */}
+      <section id="como-funciona" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Como Funciona</h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Em apenas 3 passos simples, você terá sua assistente de IA funcionando no WhatsApp
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {/* Passo 1 */}
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <QrCode className="w-8 h-8 text-green-600" />
+                </div>
+                <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">
+                  1
+                </div>
+                <CardTitle className="text-gray-900 text-xl">Conecte seu WhatsApp</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-gray-600 text-base">
+                  Escaneie o QR Code para conectar seu WhatsApp de forma segura com a Summi. É rápido e simples!
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            {/* Passo 2 */}
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Settings className="w-8 h-8 text-green-600" />
+                </div>
+                <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">
+                  2
+                </div>
+                <CardTitle className="text-gray-900 text-xl">Configure sua Assistente</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-gray-600 text-base">
+                  Defina palavras-chave e parâmetros importantes. Ensine a Summi como trabalhar especificamente para você.
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            {/* Passo 3 */}
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Zap className="w-8 h-8 text-green-600" />
+                </div>
+                <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">
+                  3
+                </div>
+                <CardTitle className="text-gray-900 text-xl">Aumente sua Produtividade</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-gray-600 text-base">
+                  Use o WhatsApp com a Summi como sua assistente pessoal e nunca mais perca mensagens importantes!
+                </CardDescription>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
@@ -523,6 +594,8 @@ Cancele quando quiser.</CardDescription>
           </div>
         </div>
       </footer>
-    </div>;
+    </div>
+  );
 };
+
 export default LandingPage;
