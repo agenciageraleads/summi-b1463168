@@ -60,6 +60,9 @@ export const useWhatsAppManager = () => {
   // Ref para limitar tentativas automáticas de retry
   const autoRetryCountRef = useRef(0);
 
+  // CORREÇÃO: Flag para evitar que useEffect do profile sobrescreva estado conectado
+  const isDefinitivelyConnectedRef = useRef(false);
+
   // Função para determinar estado inicial baseado no perfil
   const getInitialStateFromProfile = useCallback(() => {
     console.log('[WhatsApp Manager] 🔍 Determinando estado inicial do perfil:', profile);
@@ -125,6 +128,25 @@ export const useWhatsAppManager = () => {
   }, []);
 
   /**
+   * CORREÇÃO: Função para atualizar estado de forma definitiva quando conectado
+   */
+  const setConnectedStateDefinitively = useCallback(() => {
+    console.log('[WhatsApp Manager] ✅ Definindo estado conectado de forma definitiva');
+    isDefinitivelyConnectedRef.current = true;
+    prevConnectionStateRef.current = 'already_connected';
+    
+    stopPolling();
+    setState(prev => ({
+      ...prev,
+      connectionState: 'already_connected',
+      qrCode: null,
+      message: 'WhatsApp conectado e funcionando!',
+      isLoading: false,
+      isPolling: false,
+    }));
+  }, [stopPolling]);
+
+  /**
    * Checa conexão/estado e para polling se já conectado, nunca repete toast.
    */
   const checkConnectionAndUpdate = useCallback(async (instanceName: string) => {
@@ -146,19 +168,8 @@ export const useWhatsAppManager = () => {
       if (isConnected) {
         // Se não estava conectado antes, mudamos para conectado (transição real)
         if (prevConnectionStateRef.current !== 'already_connected') {
-          // Parar polling ANTES de atualizar o state!
-          stopPolling();
-          prevConnectionStateRef.current = 'already_connected';
-
-          setState(prev => ({
-            ...prev,
-            connectionState: 'already_connected',
-            qrCode: null,
-            message: 'WhatsApp conectado e funcionando!',
-            isLoading: false,
-            isPolling: false,
-          }));
-
+          // CORREÇÃO: Usar função definitiva para conectar
+          setConnectedStateDefinitively();
           await refreshProfile();
 
           toast({
@@ -167,25 +178,17 @@ export const useWhatsAppManager = () => {
             duration: 3000,
           });
 
-          // Nunca mais roda polling para esse ciclo enquanto continuar conectado
           return true;
         } else {
           // Já conectado anteriormente, apenas garante que polling está parado
-          stopPolling();
-          setState(prev => ({
-            ...prev,
-            connectionState: 'already_connected',
-            qrCode: null,
-            message: 'WhatsApp conectado e funcionando!',
-            isLoading: false,
-            isPolling: false,
-          }));
+          setConnectedStateDefinitively();
           return true;
         }
       } else {
         // Se perdeu conexão, registra isso no ref para não exibir toast de novo ao reconectar depois
         if (prevConnectionStateRef.current === 'already_connected') {
           prevConnectionStateRef.current = 'needs_qr_code';
+          isDefinitivelyConnectedRef.current = false;
         }
         // Atualiza para permitir reconectar
         setState(prev => ({
@@ -212,11 +215,9 @@ export const useWhatsAppManager = () => {
     } finally {
       isCheckingConnectionRef.current = false;
     }
-  }, [refreshProfile, stopPolling, toast, state.isPolling]);
+  }, [refreshProfile, stopPolling, toast, state.isPolling, setConnectedStateDefinitively]);
 
-  /**
-   * Gera QR Code e dispara polling
-   */
+  // Gera QR Code e dispara polling
   const handleGenerateQR = useCallback(async (instanceName: string) => {
     setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
     try {
@@ -232,17 +233,8 @@ export const useWhatsAppManager = () => {
         }));
         startPolling(instanceName);
       } else if (result.state === 'already_connected') {
-        // Garantir que para TUDO e SÓ exibe o toast se realmente mudou de estado!
-        stopPolling();
-        setState(prev => ({
-          ...prev,
-          connectionState: 'already_connected',
-          message: result.message || 'WhatsApp já conectado',
-          isLoading: false,
-          qrCode: null,
-          isPolling: false
-        }));
-
+        // CORREÇÃO: Usar função definitiva
+        setConnectedStateDefinitively();
         await refreshProfile();
 
         // Só notifica se não estava estável!
@@ -269,9 +261,7 @@ export const useWhatsAppManager = () => {
         isLoading: false
       }));
     }
-  // state.connectionState depende do valor anterior, mas no polling isso é ok pois já vai ficar estável
-  // deps: stopPolling, refreshProfile, toast, state.connectionState
-  }, [stopPolling, refreshProfile, toast, state.connectionState]);
+  }, [stopPolling, refreshProfile, toast, state.connectionState, setConnectedStateDefinitively]);
 
   /**
    * Polling só inicia quando explicitamente mandado por ação do usuário!
@@ -542,6 +532,10 @@ export const useWhatsAppManager = () => {
       const result = await disconnectWhatsApp();
 
       if (result.success) {
+        // CORREÇÃO: Resetar flag de conectado definitivamente
+        isDefinitivelyConnectedRef.current = false;
+        prevConnectionStateRef.current = 'needs_qr_code';
+        
         setState(prev => ({
           ...prev,
           connectionState: 'needs_qr_code',
@@ -605,11 +599,12 @@ export const useWhatsAppManager = () => {
     }
   };
 
-  // Atualizar estado baseado no perfil. 
-  // ATENÇÃO: Aqui, além de ajustar o estado, agora fazemos UMA tentativa automática de checagem da conexão com a Evolution API,
-  // mas só se o perfil tiver instance_name, ainda não estivermos conectados e ainda não tiver rodado essa verificação automática.
+  // CORREÇÃO: Atualizar estado baseado no perfil, mas NUNCA sobrescrever se já conectado definitivamente
   useEffect(() => {
     if (!profile || hasInitializedRef.current || isInitializingRef.current) return;
+
+    // CORREÇÃO: Se já está definitivamente conectado, não muda nada
+    if (isDefinitivelyConnectedRef.current) return;
 
     const initialState = getInitialStateFromProfile();
 
@@ -632,27 +627,19 @@ export const useWhatsAppManager = () => {
       checkConnectionAndUpdate(profile.instance_name).then(isConnected => {
         if (isConnected) {
           // Garante visual limpo quando já está conectado: sem mensagem de Polling
-          setState(prev => ({
-            ...prev,
-            connectionState: 'already_connected',
-            isPolling: false,
-            qrCode: null,
-            message: 'WhatsApp conectado e funcionando!',
-            isLoading: false
-          }));
+          setConnectedStateDefinitively();
         }
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, getInitialStateFromProfile]);
+  }, [profile, getInitialStateFromProfile, checkConnectionAndUpdate, setConnectedStateDefinitively]);
 
-  // Efeito para inicialização automática otimizado:
-  // Só dispara handleConnect UMA ÚNICA VEZ por montagem/página, evitando disparo duplicado
+  // CORREÇÃO: Efeito para inicialização automática - só roda se não está definitivamente conectado
   useEffect(() => {
     if (
       !state.isLoading &&
       !state.isPolling &&
       !didAutoConnectRef.current && // Garante que SÓ INICIA UMA VEZ
+      !isDefinitivelyConnectedRef.current && // NOVO: não roda se já conectado definitivamente
       (state.connectionState === 'needs_phone_number' ||
         state.connectionState === 'needs_qr_code' ||
         state.connectionState === 'error')
@@ -663,8 +650,7 @@ export const useWhatsAppManager = () => {
         handleConnect(true); // Marcando como automática (permitido retry)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.connectionState, profile?.numero]);
+  }, [state.connectionState, state.isLoading, state.isPolling, profile?.numero, handleConnect]);
 
   // Cleanup ao desmontar
   useEffect(() => {
