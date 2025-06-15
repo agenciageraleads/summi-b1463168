@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,14 +10,22 @@ import { useEffect } from 'react';
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, resetPassword, user, isLoading } = useAuth();
   const [formData, setFormData] = useState({
-    email: '',
+    email: location.state?.email || '',
     password: ''
   });
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Mostrar mensagem de sucesso se veio do registro
+  useEffect(() => {
+    if (location.state?.message) {
+      // Toast já é exibido pelo AuthContext, não precisa duplicar
+    }
+  }, [location.state]);
 
   // Efeito para redirecionar o usuário após o login bem-sucedido.
   // Isso garante que a navegação só ocorra quando o estado de 'user' for atualizado.
@@ -56,7 +64,7 @@ const LoginPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-summi-gray-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue"></div>
       </div>
     );
@@ -88,10 +96,19 @@ const LoginPage = () => {
           </p>
         </div>
 
+        {/* Mensagem de sucesso do registro */}
+        {location.state?.message && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-sm text-green-800 text-center">
+              {location.state.message}
+            </p>
+          </div>
+        )}
+
         {/* Form */}
         <Card className="card-hover">
           <CardHeader>
-            <CardTitle className="text-center">
+            <CardTitle className="text-center text-summi-gray-900">
               {showResetPassword ? 'Recuperar Acesso' : 'Fazer Login'}
             </CardTitle>
           </CardHeader>
@@ -99,7 +116,7 @@ const LoginPage = () => {
             {showResetPassword ? (
               <form onSubmit={handleResetPassword} className="space-y-4">
                 <div>
-                  <Label htmlFor="resetEmail">E-mail</Label>
+                  <Label htmlFor="resetEmail" className="text-summi-gray-700">E-mail</Label>
                   <Input
                     id="resetEmail"
                     type="email"
@@ -132,7 +149,7 @@ const LoginPage = () => {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="email">E-mail</Label>
+                  <Label htmlFor="email" className="text-summi-gray-700">E-mail</Label>
                   <Input
                     id="email"
                     type="email"
@@ -145,7 +162,7 @@ const LoginPage = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="password">Senha</Label>
+                  <Label htmlFor="password" className="text-summi-gray-700">Senha</Label>
                   <Input
                     id="password"
                     type="password"

@@ -68,7 +68,7 @@ const RegisterPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-summi-gray-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue"></div>
       </div>
     );
@@ -109,14 +109,14 @@ const RegisterPage = () => {
         {/* Form */}
         <Card className="card-hover">
           <CardHeader>
-            <CardTitle className="text-center">
+            <CardTitle className="text-center text-summi-gray-900">
               Trial Gratuito de 7 Dias
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="name">Nome completo</Label>
+                <Label htmlFor="name" className="text-summi-gray-700">Nome completo</Label>
                 <Input
                   id="name"
                   type="text"
@@ -132,7 +132,7 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="email">E-mail</Label>
+                <Label htmlFor="email" className="text-summi-gray-700">E-mail</Label>
                 <Input
                   id="email"
                   type="email"
@@ -148,7 +148,7 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="password" className="text-summi-gray-700">Senha</Label>
                 <Input
                   id="password"
                   type="password"
@@ -164,7 +164,7 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="confirmPassword">Confirmar senha</Label>
+                <Label htmlFor="confirmPassword" className="text-summi-gray-700">Confirmar senha</Label>
                 <Input
                   id="confirmPassword"
                   type="password"

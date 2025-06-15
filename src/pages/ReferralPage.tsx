@@ -31,6 +31,7 @@ const ReferralPage: React.FC = () => {
   useEffect(() => {
     const validateReferralCode = async () => {
       if (!referralCode) {
+        console.log('[REFERRAL-PAGE] Código não fornecido');
         setIsValidCode(false);
         setIsLoading(false);
         return;
@@ -39,14 +40,18 @@ const ReferralPage: React.FC = () => {
       try {
         console.log('[REFERRAL-PAGE] Validando código:', referralCode);
         
+        // Buscar perfil com o código de indicação (case insensitive)
         const { data, error } = await supabase
           .from('profiles')
           .select('nome')
-          .eq('referral_code', referralCode.toUpperCase())
+          .ilike('referral_code', referralCode)
           .single();
 
-        if (error || !data) {
-          console.error('[REFERRAL-PAGE] Código inválido:', error);
+        if (error) {
+          console.error('[REFERRAL-PAGE] Erro na query:', error);
+          setIsValidCode(false);
+        } else if (!data) {
+          console.log('[REFERRAL-PAGE] Código não encontrado');
           setIsValidCode(false);
         } else {
           console.log('[REFERRAL-PAGE] Código válido, referrer:', data.nome);
@@ -54,7 +59,7 @@ const ReferralPage: React.FC = () => {
           setIsValidCode(true);
         }
       } catch (error) {
-        console.error('[REFERRAL-PAGE] Erro ao validar código:', error);
+        console.error('[REFERRAL-PAGE] Erro inesperado:', error);
         setIsValidCode(false);
       } finally {
         setIsLoading(false);
@@ -89,7 +94,7 @@ const ReferralPage: React.FC = () => {
     setIsRegistering(true);
 
     try {
-      console.log('[REFERRAL-PAGE] Iniciando registro com indicação');
+      console.log('[REFERRAL-PAGE] Iniciando registro com indicação, código:', referralCode);
       
       // Chamar a função de signup com código de indicação
       const { data, error } = await supabase.functions.invoke('handle-signup', {
@@ -97,7 +102,7 @@ const ReferralPage: React.FC = () => {
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          referralCode: referralCode
+          referralCode: referralCode?.toUpperCase()
         }
       });
 
@@ -106,18 +111,18 @@ const ReferralPage: React.FC = () => {
         throw error;
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Erro no registro');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Erro no registro');
       }
 
       console.log('[REFERRAL-PAGE] Registro bem-sucedido');
       
       toast({
         title: "Conta criada com sucesso!",
-        description: data.message,
+        description: data.message || "Sua conta foi criada e você ganhou 10 dias de teste gratuito!",
       });
 
-      // Redirecionar para login ou dashboard
+      // Redirecionar para login com mensagem
       setTimeout(() => {
         navigate('/login', { 
           state: { 
@@ -141,12 +146,12 @@ const ReferralPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-summi-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="mt-4 text-gray-600">Validando convite...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue mx-auto"></div>
+              <p className="mt-4 text-summi-gray-600">Validando convite...</p>
             </div>
           </CardContent>
         </Card>
@@ -156,16 +161,22 @@ const ReferralPage: React.FC = () => {
 
   if (!isValidCode) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen bg-summi-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md card-hover">
           <CardHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-red-600 text-2xl">❌</span>
+            </div>
             <CardTitle className="text-red-600">Convite Inválido</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
-            <p className="text-gray-600">
+            <p className="text-summi-gray-600">
               Este link de convite não é válido ou pode ter expirado.
             </p>
-            <Button onClick={() => navigate('/register')} className="w-full">
+            <Button 
+              onClick={() => navigate('/register')} 
+              className="btn-primary w-full"
+            >
               Criar Conta Normalmente
             </Button>
           </CardContent>
@@ -175,14 +186,14 @@ const ReferralPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-summi-gray-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md card-hover">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
             <Gift className="h-8 w-8 text-green-600" />
           </div>
-          <CardTitle className="text-2xl">Você foi convidado!</CardTitle>
-          <p className="text-gray-600">
+          <CardTitle className="text-2xl text-summi-gray-900">Você foi convidado!</CardTitle>
+          <p className="text-summi-gray-600">
             <strong>{referrerName}</strong> te convidou para conhecer a Summi
           </p>
         </CardHeader>
@@ -221,6 +232,7 @@ const ReferralPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
                 placeholder="Seu nome completo"
+                className="mt-1"
               />
             </div>
 
@@ -233,6 +245,7 @@ const ReferralPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
                 placeholder="seu@email.com"
+                className="mt-1"
               />
             </div>
 
@@ -246,6 +259,7 @@ const ReferralPage: React.FC = () => {
                 required
                 placeholder="Mínimo 6 caracteres"
                 minLength={6}
+                className="mt-1"
               />
             </div>
 
@@ -258,12 +272,13 @@ const ReferralPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
                 placeholder="Confirme sua senha"
+                className="mt-1"
               />
             </div>
 
             <Button 
               type="submit" 
-              className="w-full" 
+              className="btn-primary w-full" 
               disabled={isRegistering}
             >
               {isRegistering ? (
@@ -277,11 +292,11 @@ const ReferralPage: React.FC = () => {
             </Button>
           </form>
 
-          <div className="text-center text-xs text-gray-500">
+          <div className="text-center text-xs text-summi-gray-500">
             Já tem uma conta?{' '}
             <Button 
               variant="link" 
-              className="p-0 h-auto text-xs"
+              className="p-0 h-auto text-xs text-summi-blue hover:underline"
               onClick={() => navigate('/login')}
             >
               Fazer login
