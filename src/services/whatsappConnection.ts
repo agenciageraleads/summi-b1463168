@@ -136,9 +136,9 @@ export const generateQRCode = async (instanceName: string): Promise<ConnectionRe
   }
 };
 
-// Verificar status da conexão
+// Verificar status da conexão - VERSÃO MELHORADA
 export const checkConnectionStatus = async (instanceName: string): Promise<StatusResult> => {
-  console.log('[WhatsApp Connection] Verificando status de:', instanceName);
+  console.log('[WhatsApp Connection] 🔍 Verificando status de:', instanceName);
   
   try {
     const session = await getSession();
@@ -150,8 +150,10 @@ export const checkConnectionStatus = async (instanceName: string): Promise<Statu
       },
     });
 
+    console.log('[WhatsApp Connection] 📡 Resposta da API:', response);
+
     if (response.error) {
-      console.error('[WhatsApp Connection] Erro ao verificar status:', response.error);
+      console.error('[WhatsApp Connection] ❌ Erro ao verificar status:', response.error);
       return {
         success: false,
         status: 'disconnected',
@@ -160,15 +162,22 @@ export const checkConnectionStatus = async (instanceName: string): Promise<Statu
     }
 
     const result = response.data;
-    console.log('[WhatsApp Connection] Status verificado:', result);
+    console.log('[WhatsApp Connection] 📊 Status detalhado:', {
+      rawResult: result,
+      status: result.state || 'disconnected',
+      success: result.success
+    });
 
+    // CORREÇÃO: Melhor tratamento do estado retornado
+    const status = result.state || result.status || 'disconnected';
+    
     return {
       success: true,
-      status: result.state || 'disconnected',
-      state: result.state
+      status: status,
+      state: status
     };
   } catch (error) {
-    console.error('[WhatsApp Connection] Erro inesperado ao verificar status:', error);
+    console.error('[WhatsApp Connection] 💥 Erro inesperado ao verificar status:', error);
     return {
       success: false,
       status: 'disconnected',
