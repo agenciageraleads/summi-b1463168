@@ -29,21 +29,15 @@ serve(async (req) => {
       });
     }
 
-    // Configurar cliente Supabase com service role
+    // Configurar cliente Supabase com service role (para validação do token e operações administrativas)
     const supabaseServiceRole = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
-    // Configurar cliente para verificação de usuário
-    const supabaseAuth = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    );
-
-    // Verificar token do usuário
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(
+    // Verificar token do usuário usando service role client
+    const { data: { user }, error: authError } = await supabaseServiceRole.auth.getUser(
       authHeader.replace('Bearer ', '')
     );
 
@@ -96,12 +90,6 @@ serve(async (req) => {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
-    }
-
-    // Rate limiting simples (máximo 3 deleções por hora por usuário admin)
-    if (!isSelfDeletion) {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      // Nota: Em produção, implementar rate limiting adequado com Redis/cache
     }
 
     // Deletar dados relacionados do usuário de forma segura
