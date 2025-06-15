@@ -38,13 +38,13 @@ export const Sidebar = () => {
     <>
       {/* Mobile Menu Button */}
       <button
-        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-white border border-summi-gray-200 rounded-lg shadow-lg"
+        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-white border border-gray-200 rounded-lg shadow-lg"
         onClick={toggleMobileMenu}
       >
         {isMobileMenuOpen ? (
-          <X className="w-5 h-5 text-summi-gray-600" />
+          <X className="w-5 h-5 text-gray-600" />
         ) : (
-          <Menu className="w-5 h-5 text-summi-gray-600" />
+          <Menu className="w-5 h-5 text-gray-600" />
         )}
       </button>
 
@@ -58,17 +58,21 @@ export const Sidebar = () => {
 
       {/* Sidebar */}
       <div className={cn(
-        "flex flex-col w-64 bg-white border-r border-summi-gray-200 h-full transition-transform duration-300 ease-in-out z-40",
+        "flex flex-col w-64 bg-white border-r border-gray-200 h-full transition-transform duration-300 ease-in-out z-40",
         "md:translate-x-0 md:static md:z-auto",
         isMobileMenuOpen ? "fixed translate-x-0" : "fixed -translate-x-full"
       )}>
         {/* Logo */}
-        <div className="flex items-center justify-center h-16 px-4 border-b border-summi-gray-200">
+        <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-summi-green rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">S</span>
+            <div className="w-8 h-8">
+              <img 
+                src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" 
+                alt="Summi Logo" 
+                className="w-full h-full object-contain"
+              />
             </div>
-            <span className="text-xl font-bold text-summi-green">Summi</span>
+            <span className="text-xl font-bold text-green-600">Summi</span>
           </div>
         </div>
 
@@ -82,8 +86,8 @@ export const Sidebar = () => {
               className={cn(
                 "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                 location.pathname === item.href
-                  ? "bg-summi-green text-white"
-                  : "text-summi-gray-600 hover:bg-summi-gray-100 hover:text-summi-green"
+                  ? "bg-green-600 text-white"
+                  : "text-gray-600 hover:bg-green-100 hover:text-green-600"
               )}
             >
               <span className="mr-3 text-lg">{item.icon}</span>
@@ -105,9 +109,9 @@ export const Sidebar = () => {
         </nav>
 
         {/* User Info & Logout */}
-        <div className="p-4 border-t border-summi-gray-200 mt-auto space-y-4">
+        <div className="p-4 border-t border-gray-200 mt-auto space-y-4">
           {/* Notifications */}
-          <Link to="/dashboard" className="relative p-2 text-summi-gray-600 hover:text-summi-green transition-colors flex items-center justify-between hover:bg-summi-gray-100 rounded-lg">
+          <Link to="/dashboard" className="relative p-2 text-gray-600 hover:text-green-600 transition-colors flex items-center justify-between hover:bg-green-100 rounded-lg">
             <div className="flex items-center">
               <Bell className="w-5 h-5 mr-3" />
               <span className="text-sm font-medium">Notificações</span>
@@ -120,15 +124,15 @@ export const Sidebar = () => {
           </Link>
           
           {/* User Avatar & Info */}
-          <div className="flex items-center space-x-3 pt-4 border-t border-summi-gray-100">
-            <div className="w-10 h-10 bg-summi-green rounded-full flex items-center justify-center shrink-0">
+          <div className="flex items-center space-x-3 pt-4 border-t border-gray-100">
+            <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center shrink-0">
               <span className="text-white font-medium">
                 {displayName.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="text-sm overflow-hidden">
-              <p className="font-medium text-summi-gray-900 truncate" title={displayName}>{displayName}</p>
-              <p className="text-summi-gray-600 truncate" title={user?.email}>{user?.email}</p>
+              <p className="font-medium text-gray-900 truncate" title={displayName}>{displayName}</p>
+              <p className="text-gray-600 truncate" title={user?.email}>{user?.email}</p>
               {isAdmin && (
                 <p className="text-red-600 text-xs font-medium">ADMIN</p>
               )}
@@ -141,7 +145,7 @@ export const Sidebar = () => {
               logout();
               setIsMobileMenuOpen(false);
             }}
-            className="flex items-center w-full px-4 py-3 text-sm font-medium text-summi-gray-600 hover:bg-summi-gray-100 hover:text-red-600 rounded-lg transition-colors"
+            className="flex items-center w-full px-4 py-3 text-sm font-medium text-gray-600 hover:bg-green-100 hover:text-red-600 rounded-lg transition-colors"
           >
             <span className="mr-3 text-lg">🚪</span>
             Sair

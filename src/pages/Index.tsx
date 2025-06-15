@@ -19,12 +19,16 @@ const Index = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-summi-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-green-50">
         <div className="text-center">
-          <div className="w-12 h-12 bg-summi-blue rounded-lg flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-xl">S</span>
+          <div className="w-12 h-12 mb-4 mx-auto">
+            <img 
+              src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" 
+              alt="Summi Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
         </div>
       </div>
     );

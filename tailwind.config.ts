@@ -53,11 +53,11 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Cores da Summi
+        // Cores da Summi baseadas na logo
         summi: {
-          green: "#349461",
-          primary: "#6366f1", // Indigo
-          secondary: "#ec4899", // Pink
+          green: "#42AA6B", // Verde principal da logo
+          primary: "#42AA6B", // Verde principal
+          secondary: "#2E8B57", // Verde mais escuro
           gray: {
             50: "#f9fafb",
             100: "#f3f4f6",
@@ -92,7 +92,7 @@ const config: Config = {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       backgroundImage: {
-        'summi-gradient': 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)',
+        'summi-gradient': 'linear-gradient(135deg, #42AA6B 0%, #2E8B57 100%)',
       }
     },
   },
