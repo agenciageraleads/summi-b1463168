@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +28,9 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, isUpd
     'Summi em Audio?': profile['Summi em Audio?'] ?? false,
     apenas_horario_comercial: profile.apenas_horario_comercial ?? true
   });
+
+  // Verificar se o WhatsApp está conectado (tem instance_name)
+  const isWhatsAppConnected = Boolean(profile.instance_name);
 
   // Atualizar formData quando o profile mudar
   useEffect(() => {
@@ -94,7 +96,13 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, isUpd
               value={formData.numero}
               onChange={(e) => handleInputChange('numero', e.target.value)}
               placeholder="55 + DDD + número (ex: 5511999999999)"
+              disabled={isWhatsAppConnected}
             />
+            {isWhatsAppConnected && (
+              <p className="text-sm text-orange-600">
+                ⚠️ Para alterar o número, desconecte primeiro o WhatsApp na aba Conexão
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
