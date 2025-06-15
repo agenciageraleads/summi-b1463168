@@ -529,18 +529,31 @@ export const useWhatsAppManager = () => {
       instanceName: initialState.instanceName || null
     }));
 
-    // Realiza UMA tentativa automática de verificação de status se tem instance_name, não está conectado e não foi tentado ainda.
+    // Executa UMA tentativa automática de verificação de status se tem instance_name,
+    // não está conectado e ainda não rodou nenhuma tentativa.
     if (
       profile.instance_name &&
       initialState.connectionState !== 'already_connected' &&
       !didAutoCheckRef.current
     ) {
       didAutoCheckRef.current = true;
-      checkConnectionAndUpdate(profile.instance_name);
+      // Rodar checkConnectionAndUpdate e atualizar o estado corretamente (sem polling)
+      checkConnectionAndUpdate(profile.instance_name).then(isConnected => {
+        if (isConnected) {
+          // Garante visual limpo quando já está conectado: sem mensagem de Polling
+          setState(prev => ({
+            ...prev,
+            connectionState: 'already_connected',
+            isPolling: false,
+            qrCode: null,
+            message: 'WhatsApp conectado e funcionando!',
+            isLoading: false
+          }));
+        }
+      });
     }
-    // NÃO inicia polling, nem faz novas tentativas automáticas depois.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, getInitialStateFromProfile]); // mantido checkConnectionAndUpdate fora das deps para evitar loops
+  }, [profile, getInitialStateFromProfile]);
 
   // Cleanup ao desmontar
   useEffect(() => {
