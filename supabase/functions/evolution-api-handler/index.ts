@@ -18,7 +18,7 @@ const sanitizeInput = (input: string): string => {
   return input.replace(/[<>\"']/g, '').trim();
 };
 
-// Função para criar nome de instância válido e mais curto
+// Função para criar nome de instância válido
 const createValidInstanceName = (nome: string, numero: string): string => {
   // Limpar nome: remover acentos, espaços e caracteres especiais
   const cleanName = nome
@@ -26,13 +26,13 @@ const createValidInstanceName = (nome: string, numero: string): string => {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
     .replace(/[^a-z0-9]/g, '') // Remove tudo exceto letras e números
-    .substring(0, 8); // REDUZIDO: Máximo 8 caracteres para o nome
+    .substring(0, 12); // Máximo 12 caracteres para o nome
   
   // Pegar últimos 4 dígitos do número
   const lastDigits = numero.slice(-4);
   
-  // Combinar: nome + últimos 4 dígitos = máximo 12 caracteres
-  const instanceName = `${cleanName}${lastDigits}`; // REMOVIDO o underscore
+  // Combinar: nome + últimos 4 dígitos = máximo 16 caracteres
+  const instanceName = `${cleanName}_${lastDigits}`;
   
   console.log(`[EVOLUTION-HANDLER] Nome da instância criado: ${instanceName} (${instanceName.length} caracteres)`);
   
@@ -157,7 +157,7 @@ serve(async (req) => {
           });
         }
 
-        // Criar nome de instância válido e mais curto
+        // Criar nome de instância válido
         const instanceNameToUse = profile.instance_name || createValidInstanceName(profile.nome, profile.numero);
         
         console.log(`[EVOLUTION-HANDLER] Instance name: ${instanceNameToUse}`);
@@ -205,11 +205,11 @@ serve(async (req) => {
           console.log(`[EVOLUTION-HANDLER] Instance não existe, criando nova instância`);
         }
         
-        // Criar nova instância
+        // Criar nova instância com estrutura CORRETA conforme Evolution API v2.2.3
         console.log(`[EVOLUTION-HANDLER] Criando nova instância: ${instanceNameToUse}`);
         
         try {
-          // PAYLOAD SIMPLIFICADO para reduzir chances de erro
+          // PAYLOAD CORRIGIDO conforme documentação Evolution API v2.2.3
           const createPayload = {
             instanceName: instanceNameToUse,
             token: evolutionApiKey,
@@ -218,13 +218,24 @@ serve(async (req) => {
             integration: "WHATSAPP-BAILEYS",
             webhook: {
               url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
-              by_events: false,
-              base64: true
+              byEvents: false,
+              base64: true,
+              headers: {
+                "Content-Type": "application/json"
+              },
+              events: ["MESSAGES_UPSERT"] // Array obrigatório mesmo com byEvents: false
             },
-            events: ["MESSAGES_UPSERT"]
+            settings: {
+              reject_call: false,
+              msg_call: "",
+              groups_ignore: true,
+              always_online: false,
+              read_messages: false,
+              read_status: false
+            }
           };
 
-          console.log(`[EVOLUTION-HANDLER] Payload de criação:`, JSON.stringify(createPayload, null, 2));
+          console.log(`[EVOLUTION-HANDLER] Payload de criação (Evolution v2.2.3):`, JSON.stringify(createPayload, null, 2));
 
           const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
             method: 'POST',
