@@ -49,6 +49,9 @@ export const useWhatsAppManager = () => {
   // NOVO: Flag para garantir polling seguro (evita múltiplos intervalos)
   const isPollingActiveRef = useRef(false);
 
+  // Flag para garantir que a checagem automática só roda uma vez por sessão
+  const didAutoCheckRef = useRef(false);
+
   // Função para determinar estado inicial baseado no perfil
   const getInitialStateFromProfile = useCallback(() => {
     console.log('[WhatsApp Manager] 🔍 Determinando estado inicial do perfil:', profile);
@@ -512,8 +515,8 @@ export const useWhatsAppManager = () => {
   };
 
   // Atualizar estado baseado no perfil. 
-  // ATENÇÃO: NÃO fazer NENHUMA chamada à Evolution API aqui para evitar loops ou requisições indesejadas.
-  // Apenas ajusta o estado visual local. Todas as requisições serão feitas somente por ação explícita do usuário (handleConnect).
+  // ATENÇÃO: Aqui, além de ajustar o estado, agora fazemos UMA tentativa automática de checagem da conexão com a Evolution API,
+  // mas só se o perfil tiver instance_name, ainda não estivermos conectados e ainda não tiver rodado essa verificação automática.
   useEffect(() => {
     if (!profile || hasInitializedRef.current || isInitializingRef.current) return;
 
@@ -526,11 +529,18 @@ export const useWhatsAppManager = () => {
       instanceName: initialState.instanceName || null
     }));
 
-    // NÃO CHAMA MAIS checkConnectionAndUpdate NUNCA AUTOMATICAMENTE AQUI!
-    // Toda e qualquer verificação de status é apenas acionada pelo usuário manualmente.
-    // Isso acaba com o problema de flood de requisições/sobrecarregar a API.
+    // Realiza UMA tentativa automática de verificação de status se tem instance_name, não está conectado e não foi tentado ainda.
+    if (
+      profile.instance_name &&
+      initialState.connectionState !== 'already_connected' &&
+      !didAutoCheckRef.current
+    ) {
+      didAutoCheckRef.current = true;
+      checkConnectionAndUpdate(profile.instance_name);
+    }
+    // NÃO inicia polling, nem faz novas tentativas automáticas depois.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, getInitialStateFromProfile]); // removido checkConnectionAndUpdate das deps
+  }, [profile, getInitialStateFromProfile]); // mantido checkConnectionAndUpdate fora das deps para evitar loops
 
   // Cleanup ao desmontar
   useEffect(() => {
