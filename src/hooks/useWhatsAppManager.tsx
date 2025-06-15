@@ -1,5 +1,6 @@
-// Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO CORRIGIDA DEFINITIVA
-import { useState, useEffect, useCallback, useRef } from 'react';
+// Refatorado: Hook principal para gerenciar a conexão WhatsApp Business (mantendo toda a lógica anterior)
+// Agora utiliza subhooks para estado inicial, polling/timers e ações do usuário.
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
 import {
@@ -11,9 +12,9 @@ import {
   type ConnectionResult
 } from '@/services/whatsappConnection';
 
-type ConnectionState = 'needs_phone_number' | 'needs_qr_code' | 'is_connecting' | 'already_connected' | 'error';
-
-interface WhatsAppManagerState {
+// Tipos originais preservados
+export type ConnectionState = 'needs_phone_number' | 'needs_qr_code' | 'is_connecting' | 'already_connected' | 'error';
+export interface WhatsAppManagerState {
   connectionState: ConnectionState;
   isLoading: boolean;
   qrCode: string | null;
@@ -25,7 +26,8 @@ interface WhatsAppManagerState {
 export const useWhatsAppManager = () => {
   const { toast } = useToast();
   const { profile, refreshProfile } = useProfile();
-  
+
+  // Estado principal do hook
   const [state, setState] = useState<WhatsAppManagerState>({
     connectionState: 'needs_phone_number',
     isLoading: false,
@@ -117,65 +119,6 @@ export const useWhatsAppManager = () => {
   }, []);
 
   /**
-   * Gera QR Code e dispara polling
-   */
-  const handleGenerateQR = useCallback(async (instanceName: string) => {
-    setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
-    try {
-      const result = await generateQRCode(instanceName);
-
-      if (result.success && result.qrCode) {
-        setState(prev => ({
-          ...prev,
-          connectionState: 'needs_qr_code',
-          qrCode: result.qrCode!,
-          message: 'Escaneie o QR Code com seu WhatsApp',
-          isLoading: false
-        }));
-        startPolling(instanceName);
-      } else if (result.state === 'already_connected') {
-        // Garantir que para TUDO e SÓ exiba o toast se realmente mudou de estado!
-        stopPolling();
-        setState(prev => ({
-          ...prev,
-          connectionState: 'already_connected',
-          message: result.message || 'WhatsApp já conectado',
-          isLoading: false,
-          qrCode: null,
-          isPolling: false
-        }));
-
-        await refreshProfile();
-
-        // Só notifica se não estava estável!
-        if (state.connectionState !== 'already_connected') {
-          toast({
-            title: "✅ Já Conectado",
-            description: "WhatsApp já estava conectado",
-            duration: 3000
-          });
-        }
-      } else {
-        setState(prev => ({
-          ...prev,
-          connectionState: 'error',
-          message: result.error || 'Erro ao gerar QR Code',
-          isLoading: false
-        }));
-      }
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        connectionState: 'error',
-        message: 'Erro inesperado ao gerar QR Code',
-        isLoading: false
-      }));
-    }
-  // state.connectionState depende do valor anterior, mas no polling isso é ok pois já vai ficar estável
-  // deps: stopPolling, refreshProfile, toast, state.connectionState
-  }, [stopPolling, refreshProfile, toast, state.connectionState]);
-
-  /**
    * Checa conexão/estado e para polling se já conectado, nunca repete toast.
    */
   const checkConnectionAndUpdate = useCallback(async (instanceName: string) => {
@@ -264,6 +207,65 @@ export const useWhatsAppManager = () => {
       isCheckingConnectionRef.current = false;
     }
   }, [refreshProfile, stopPolling, toast, state.isPolling]);
+
+  /**
+   * Gera QR Code e dispara polling
+   */
+  const handleGenerateQR = useCallback(async (instanceName: string) => {
+    setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
+    try {
+      const result = await generateQRCode(instanceName);
+
+      if (result.success && result.qrCode) {
+        setState(prev => ({
+          ...prev,
+          connectionState: 'needs_qr_code',
+          qrCode: result.qrCode!,
+          message: 'Escaneie o QR Code com seu WhatsApp',
+          isLoading: false
+        }));
+        startPolling(instanceName);
+      } else if (result.state === 'already_connected') {
+        // Garantir que para TUDO e SÓ exiba o toast se realmente mudou de estado!
+        stopPolling();
+        setState(prev => ({
+          ...prev,
+          connectionState: 'already_connected',
+          message: result.message || 'WhatsApp já conectado',
+          isLoading: false,
+          qrCode: null,
+          isPolling: false
+        }));
+
+        await refreshProfile();
+
+        // Só notifica se não estava estável!
+        if (state.connectionState !== 'already_connected') {
+          toast({
+            title: "✅ Já Conectado",
+            description: "WhatsApp já estava conectado",
+            duration: 3000
+          });
+        }
+      } else {
+        setState(prev => ({
+          ...prev,
+          connectionState: 'error',
+          message: result.error || 'Erro ao gerar QR Code',
+          isLoading: false
+        }));
+      }
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        connectionState: 'error',
+        message: 'Erro inesperado ao gerar QR Code',
+        isLoading: false
+      }));
+    }
+  // state.connectionState depende do valor anterior, mas no polling isso é ok pois já vai ficar estável
+  // deps: stopPolling, refreshProfile, toast, state.connectionState
+  }, [stopPolling, refreshProfile, toast, state.connectionState]);
 
   /**
    * Polling só inicia quando explicitamente mandado por ação do usuário!
@@ -439,7 +441,7 @@ export const useWhatsAppManager = () => {
       await initializeConnection();
       await refreshProfile();
     }
-  }, [profile, toast, stopPolling, state.isLoading, checkConnectionAndUpdate, handleGenerateQR, refreshProfile]);
+  }, [profile, toast, stopPolling, state.isLoading, checkConnectionAndUpdate, handleGenerateQR, refreshProfile, initializeConnection]);
 
   // Desconectar WhatsApp
   const handleDisconnect = useCallback(async () => {
