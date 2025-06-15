@@ -79,12 +79,16 @@ serve(async (req) => {
             status: 200,
           });
         }
+      } else if (statusResponse.status === 404) {
+        logStep("Instance does not exist (404), will attempt to create.", { status: statusResponse.status });
+        instanceExists = false;
       } else {
-        logStep("Instance does not exist or error checking status", { status: statusResponse.status });
+        const errorText = await statusResponse.text();
+        logStep("Error checking instance status, assuming non-existent", { status: statusResponse.status, error: errorText });
         instanceExists = false;
       }
     } catch (error) {
-      logStep("Error checking instance status, assuming it's non-existent", { error: error.message });
+      logStep("Error during instance status check, assuming non-existent", { error: error.message });
       instanceExists = false;
     }
 
@@ -136,28 +140,34 @@ serve(async (req) => {
       if (!createResponse.ok) {
         const errorText = await createResponse.text();
         logStep("Error creating instance", { status: createResponse.status, error: errorText });
-        throw new Error(`Failed to create instance: ${createResponse.status} - ${errorText}`);
-      }
-
-      const creationData = await createResponse.json();
-      logStep("Instance creation response received", { instance: creationData.instance?.instanceName });
-      
-      // Otimização: Se o QR Code veio na resposta da criação, retorna imediatamente
-      let qrCodeDataFromCreate = creationData.qrcode?.base64 || creationData.base64 || creationData.qrcode?.code || creationData.code;
-
-      if (qrCodeDataFromCreate) {
-        logStep("QR Code found in creation response, returning directly.");
-        if (!qrCodeDataFromCreate.startsWith('data:image/')) {
-          qrCodeDataFromCreate = `data:image/png;base64,${qrCodeDataFromCreate}`;
+        
+        // Se o erro for que a instância já existe, não é um erro fatal. Apenas continue.
+        if (errorText && errorText.toLowerCase().includes("instance already exists")) {
+            logStep("Instance creation failed because it already exists. Proceeding to connect.");
+        } else {
+            throw new Error(`Failed to create instance: ${createResponse.status} - ${errorText}`);
         }
-        return new Response(JSON.stringify({ success: true, qrCode: qrCodeDataFromCreate }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
+      } else {
+        const creationData = await createResponse.json();
+        logStep("Instance creation response received", { instance: creationData.instance?.instanceName });
+        
+        // Otimização: Se o QR Code veio na resposta da criação, retorna imediatamente
+        let qrCodeDataFromCreate = creationData.qrcode?.base64 || creationData.base64 || creationData.qrcode?.code || creationData.code;
+
+        if (qrCodeDataFromCreate) {
+          logStep("QR Code found in creation response, returning directly.");
+          if (!qrCodeDataFromCreate.startsWith('data:image/')) {
+            qrCodeDataFromCreate = `data:image/png;base64,${qrCodeDataFromCreate}`;
+          }
+          return new Response(JSON.stringify({ success: true, qrCode: qrCodeDataFromCreate }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+        
+        logStep("QR Code not in creation response, will proceed to connect endpoint after a delay.");
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Espera 3s para a instância estabilizar
       }
-      
-      logStep("QR Code not in creation response, will proceed to connect endpoint after a delay.");
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Espera 3s para a instância estabilizar
     }
 
     // 3. Gerar o QR Code (para instâncias existentes ou se a criação não retornou o QR)
