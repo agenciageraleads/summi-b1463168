@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,22 +6,6 @@ import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRigh
 import { Link } from "react-router-dom";
 
 const LandingPage = () => {
-  // Lista de funcionalidades incluídas em ambos os planos
-  const planFeatures = [
-    "Resumo inteligente de mensagens importantes",
-    "Transcrição automática de áudios",
-    "Resumo de mensagens de áudio longas", 
-    "Análise de conversas e métricas",
-    "Alertas prioritários personalizáveis",
-    "Privacidade e criptografia garantidas",
-    "Conexão segura com WhatsApp",
-    "Dashboard completo de análises",
-    "Notificações em tempo real",
-    "Suporte prioritário",
-    "Configuração em 5 minutos",
-    "Sem limite de mensagens analisadas"
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
@@ -86,15 +69,13 @@ const LandingPage = () => {
               Automatize seu{" "}
               <span className="bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent">
                 WhatsApp
-              </span>{" "}
+              </span>
+              <br />
               com IA
             </h1>
             
             <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-              Summi analisa e prioriza suas conversas de WhatsApp para que você não perca nenhuma oportunidade. 
-              <em className="block mt-2 text-sm text-gray-500">
-                *A funcionalidade de responder automaticamente aos usuários está em desenvolvimento e será liberada em breve.
-              </em>
+              Summi analisa e prioriza suas conversas de WhatsApp para que você não perca nenhuma oportunidade.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
@@ -107,14 +88,6 @@ const LandingPage = () => {
             </div>
 
             <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-500">
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                7 dias grátis
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Sem cartão de crédito
-              </div>
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Configuração em 5 min
@@ -221,21 +194,8 @@ const LandingPage = () => {
               Planos Simples e Transparentes
             </h2>
             <p className="text-xl text-gray-600 mb-8">
-              Todas as funcionalidades incluídas em ambos os planos. Comece com 7 dias grátis.
+              Escolha o plano ideal para suas necessidades e comece a usar hoje mesmo.
             </p>
-            
-            {/* Funcionalidades incluídas - visível em ambos os planos */}
-            <div className="max-w-4xl mx-auto mb-12">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">✨ Funcionalidades incluídas em todos os planos:</h3>
-              <div className="grid md:grid-cols-2 gap-3 text-left">
-                {planFeatures.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-3">
-                    <Check className="w-5 h-5 text-green-600 shrink-0" />
-                    <span className="text-gray-700">{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -253,27 +213,35 @@ const LandingPage = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span>7 dias de teste gratuito</span>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Transcrição de áudio enviado</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span>Todas as funcionalidades incluídas</span>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Transcrição de áudio recebido</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span>Suporte prioritário</span>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Resumo de áudios longos</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span>Cancele a qualquer momento</span>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Análise e resumo de conversas importantes</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Resumo em áudio das conversas importantes</span>
+                  </div>
+                  <div className="flex items-center text-sm text-green-700 font-medium">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>7 dias para testar</span>
                   </div>
                 </div>
                 
                 <Link to="/register" className="block">
                   <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 text-lg">
-                    Começar Teste Gratuito
+                    Começar Agora
                   </Button>
                 </Link>
               </CardContent>
@@ -319,25 +287,37 @@ const LandingPage = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span>7 dias de teste gratuito</span>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Transcrição de áudio enviado</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span>Todas as funcionalidades incluídas</span>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Transcrição de áudio recebido</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span>Suporte prioritário premium</span>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Resumo de áudios longos</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Análise e resumo de conversas importantes</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>Resumo em áudio das conversas importantes</span>
+                  </div>
+                  <div className="flex items-center text-sm text-green-700 font-medium">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>30 dias para testar</span>
+                  </div>
+                  <div className="flex items-center text-sm text-green-700 font-medium">
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
                     <span><strong>33% de desconto garantido</strong></span>
                   </div>
                   <div className="flex items-center text-sm text-green-700 font-medium">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span>🎁 Bônus: Acesso antecipado a novas funcionalidades</span>
+                    <Check className="w-4 h-4 text-green-600 mr-3" />
+                    <span>🎁 Suporte premium prioritário</span>
                   </div>
                 </div>
                 
@@ -361,14 +341,6 @@ const LandingPage = () => {
             </p>
             
             <div className="flex flex-wrap justify-center gap-6 mt-8 text-sm text-gray-500">
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Teste gratuito de 7 dias
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Sem cartão de crédito necessário
-              </div>
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Ativação imediata
