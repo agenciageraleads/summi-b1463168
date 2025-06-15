@@ -146,6 +146,7 @@ export type Database = {
           stripe_customer_id: string | null
           stripe_price_id: string | null
           stripe_subscription_id: string | null
+          subscribed: boolean
           subscription_end: string | null
           subscription_start: string | null
           subscription_status: string | null
@@ -159,6 +160,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_price_id?: string | null
           stripe_subscription_id?: string | null
+          subscribed?: boolean
           subscription_end?: string | null
           subscription_start?: string | null
           subscription_status?: string | null
@@ -172,6 +174,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_price_id?: string | null
           stripe_subscription_id?: string | null
+          subscribed?: boolean
           subscription_end?: string | null
           subscription_start?: string | null
           subscription_status?: string | null
