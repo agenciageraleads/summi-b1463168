@@ -108,6 +108,65 @@ export const useWhatsAppManager = () => {
   }, []);
 
   /**
+   * Gerar QR Code
+   * ATENÇÃO: AGORA ANTES por conta da ordem dos hooks!
+   */
+  const handleGenerateQR = useCallback(async (instanceName: string) => {
+    console.log('[WhatsApp Manager] 📱 Gerando QR Code...');
+    setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
+    
+    try {
+      const result = await generateQRCode(instanceName);
+      
+      if (result.success && result.qrCode) {
+        setState(prev => ({
+          ...prev,
+          connectionState: 'needs_qr_code',
+          qrCode: result.qrCode!,
+          message: 'Escaneie o QR Code com seu WhatsApp',
+          isLoading: false
+        }));
+        
+        console.log('[WhatsApp Manager] 📱 QR Code gerado, iniciando polling...');
+        startPolling(instanceName);
+      } else if (result.state === 'already_connected') {
+        console.log('[WhatsApp Manager] ✅ Instância já conectada!');
+        setState(prev => ({
+          ...prev,
+          connectionState: 'already_connected',
+          message: result.message || 'WhatsApp já conectado',
+          isLoading: false,
+          qrCode: null
+        }));
+        
+        await refreshProfile();
+        
+        toast({
+          title: "✅ Já Conectado",
+          description: "WhatsApp já estava conectado",
+          duration: 3000
+        });
+      } else {
+        setState(prev => ({
+          ...prev,
+          connectionState: 'error',
+          message: result.error || 'Erro ao gerar QR Code',
+          isLoading: false
+        }));
+      }
+    } catch (error) {
+      console.error('[WhatsApp Manager] ❌ Erro ao gerar QR:', error);
+      setState(prev => ({
+        ...prev,
+        connectionState: 'error',
+        message: 'Erro inesperado ao gerar QR Code',
+        isLoading: false
+      }));
+    }
+    // removido startPolling das dependências para evitar looping circular
+  }, [refreshProfile, toast]);
+
+  /**
    * Função para verificar via API se está conectado.
    * Agora impede update redundante de estado e múltiplos toasts/loops!
    */
@@ -200,62 +259,7 @@ export const useWhatsAppManager = () => {
       if (!isMountedRef.current) return;
       await checkConnectionAndUpdate(instanceName);
     }, 7000);
-  }, [checkConnectionAndUpdate, stopPolling, handleGenerateQR]);
-
-  // Gerar QR Code
-  const handleGenerateQR = useCallback(async (instanceName: string) => {
-    console.log('[WhatsApp Manager] 📱 Gerando QR Code...');
-    setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
-    
-    try {
-      const result = await generateQRCode(instanceName);
-      
-      if (result.success && result.qrCode) {
-        setState(prev => ({
-          ...prev,
-          connectionState: 'needs_qr_code',
-          qrCode: result.qrCode!,
-          message: 'Escaneie o QR Code com seu WhatsApp',
-          isLoading: false
-        }));
-        
-        console.log('[WhatsApp Manager] 📱 QR Code gerado, iniciando polling...');
-        startPolling(instanceName);
-      } else if (result.state === 'already_connected') {
-        console.log('[WhatsApp Manager] ✅ Instância já conectada!');
-        setState(prev => ({
-          ...prev,
-          connectionState: 'already_connected',
-          message: result.message || 'WhatsApp já conectado',
-          isLoading: false,
-          qrCode: null
-        }));
-        
-        await refreshProfile();
-        
-        toast({
-          title: "✅ Já Conectado",
-          description: "WhatsApp já estava conectado",
-          duration: 3000
-        });
-      } else {
-        setState(prev => ({
-          ...prev,
-          connectionState: 'error',
-          message: result.error || 'Erro ao gerar QR Code',
-          isLoading: false
-        }));
-      }
-    } catch (error) {
-      console.error('[WhatsApp Manager] ❌ Erro ao gerar QR:', error);
-      setState(prev => ({
-        ...prev,
-        connectionState: 'error',
-        message: 'Erro inesperado ao gerar QR Code',
-        isLoading: false
-      }));
-    }
-  }, [startPolling, refreshProfile, toast]);
+  }, [checkConnectionAndUpdate, stopPolling, handleGenerateQR]); // aqui handleGenerateQR já foi definido
 
   // Inicializar conexão
   const initializeConnection = useCallback(async () => {
