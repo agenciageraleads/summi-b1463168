@@ -50,8 +50,112 @@ serve(async (req) => {
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
-    // Função simples: apenas gerar QR Code para instância existente
-    logStep("Generating QR Code for existing instance", { instanceName });
+    // Primeiro verificar se a instância existe e seu status
+    logStep("Checking instance status", { instanceName });
+    
+    let instanceExists = false;
+    let currentStatus = 'disconnected';
+    
+    try {
+      const statusResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
+        method: 'GET',
+        headers: {
+          'apikey': evolutionApiKey,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        instanceExists = true;
+        currentStatus = statusData.state || 'disconnected';
+        logStep("Instance exists with status", { status: currentStatus });
+        
+        // Se já está conectada, retornar erro
+        if (currentStatus === 'open') {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Instance is already connected. No QR Code needed.',
+            alreadyConnected: true
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      } else {
+        logStep("Instance does not exist or error checking status", { status: statusResponse.status });
+        instanceExists = false;
+      }
+    } catch (error) {
+      logStep("Error checking instance status, treating as non-existent", { error: error.message });
+      instanceExists = false;
+    }
+
+    // Se a instância não existe, criar ela primeiro
+    if (!instanceExists) {
+      logStep("Creating new instance", { instanceName });
+      
+      // Buscar dados do usuário para criar a instância
+      const { data: profile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('numero')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.numero) {
+        throw new Error("User phone number not found in profile");
+      }
+
+      const webhookUrl = Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
+      
+      const createPayload = {
+        instanceName: instanceName,
+        token: evolutionApiKey,
+        qrcode: true,
+        number: profile.numero,
+        integration: "WHATSAPP-BAILEYS",
+        webhook: {
+          url: webhookUrl,
+          byEvents: false,
+          base64: true,
+          headers: {
+            "Content-Type": "application/json"
+          },
+          events: ["MESSAGES_UPSERT"]
+        },
+        settings: {
+          reject_call: false,
+          msg_call: "",
+          groups_ignore: true,
+          always_online: false,
+          read_messages: false,
+          read_status: false
+        }
+      };
+
+      const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey
+        },
+        body: JSON.stringify(createPayload)
+      });
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        logStep("Error creating instance", { status: createResponse.status, error: errorText });
+        throw new Error(`Failed to create instance: ${createResponse.status} - ${errorText}`);
+      }
+
+      logStep("Instance created successfully");
+      
+      // Aguardar um pouco para a instância se estabelecer
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    // Agora gerar o QR Code
+    logStep("Generating QR Code for instance", { instanceName });
 
     const response = await fetch(`${cleanApiUrl}/instance/connect/${instanceName}`, {
       method: 'GET',
@@ -66,19 +170,6 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       logStep("Error generating QR", { status: response.status, error: errorText });
-      
-      // Se a instância não existe (404), retornar erro específico
-      if (response.status === 404) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: 'Instance not found. Please initialize connection first.',
-          instanceNotFound: true
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 404,
-        });
-      }
-      
       throw new Error(`Failed to generate QR Code: ${response.status} - ${errorText}`);
     }
 
