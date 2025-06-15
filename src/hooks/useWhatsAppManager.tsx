@@ -557,6 +557,25 @@ export const useWhatsAppManager = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, getInitialStateFromProfile]);
 
+  // Efeito para inicialização automática: 
+  // Se acessar a página e estiver em estado "needs_phone_number", "needs_qr_code" ou "error", dispara handleConnect
+  // (evita se já está carregando ou conectado, para não disparar múltiplas vezes)
+  useEffect(() => {
+    if (
+      !state.isLoading &&
+      !state.isPolling &&
+      (state.connectionState === 'needs_phone_number' ||
+        state.connectionState === 'needs_qr_code' ||
+        state.connectionState === 'error')
+    ) {
+      // Não roda se não houver número no perfil
+      if (profile?.numero) {
+        handleConnect();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.connectionState, profile?.numero]);
+
   // Cleanup ao desmontar
   useEffect(() => {
     isMountedRef.current = true;
