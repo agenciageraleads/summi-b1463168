@@ -288,6 +288,9 @@ serve(async (req) => {
       }
 
       case "get-status": {
+        // Consulta o status da instância usando o endpoint mais recente da Evolution API,
+        // igual ao utilizado no dashboard (mais robusto e compatível com v2.x).
+
         if (!instanceName) {
           return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
             status: 400,
@@ -296,24 +299,40 @@ serve(async (req) => {
         }
       
         try {
-          const statusResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
-            headers: { 'apikey': evolutionApiKey }
+          // Endpoint moderno: /instance/status/ (não mais /connectionState/)
+          const statusResponse = await fetch(`${cleanApiUrl}/instance/status/${instanceName}`, {
+            method: 'GET',
+            headers: { 'apikey': evolutionApiKey, 'Content-Type': 'application/json' }
           });
-      
+
+          // Log header para rastreabilidade
+          console.log(`[EVOLUTION-HANDLER][get-status] Resposta Evolution API: status=${statusResponse.status} ok=${statusResponse.ok}`);
+
+          // Se não OK (404 ou outro erro), retorna status "disconnected"
           if (!statusResponse.ok) {
-            throw new Error(`HTTP ${statusResponse.status}: ${await statusResponse.text()}`);
+            const errorText = await statusResponse.text();
+            console.log(`[EVOLUTION-HANDLER][get-status] Erro da Evolution API: ${errorText}`);
+            return new Response(JSON.stringify({ 
+              success: true, 
+              status: 'disconnected' 
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
           }
-      
+
+          // Extrai status conforme contrato da Evolution API v2.x
           const statusData = await statusResponse.json();
-          console.log(`[EVOLUTION-HANDLER] Status da instância ${instanceName}: ${statusData.state}`);
-      
-          return new Response(JSON.stringify({ success: true, status: statusData.state }), {
+
+          // Consistência: tenta pegar de data.instance.state, senão data.state, senão 'disconnected'
+          const connStatus = statusData.instance?.state || statusData.state || 'disconnected';
+          console.log(`[EVOLUTION-HANDLER][get-status] Status retornado: ${connStatus}`);
+
+          return new Response(JSON.stringify({ success: true, status: connStatus }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } catch (error) {
-          console.error(`[EVOLUTION-HANDLER] Erro ao obter status da instância ${instanceName}:`, error);
-          return new Response(JSON.stringify({ success: false, error: "Erro ao obter status da instância" }), {
-            status: 500,
+          console.error(`[EVOLUTION-HANDLER][get-status] Exceção ao obter status da instância ${instanceName}:`, error);
+          return new Response(JSON.stringify({ success: true, status: 'disconnected' }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
