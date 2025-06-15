@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,12 +46,24 @@ export const ChatsList = () => {
         return;
       }
 
-      // Transformar dados
-      const transformedData = (data || []).map(chat => ({
-        ...chat,
-        conversa: Array.isArray(chat.conversa) ? chat.conversa : [],
-        prioridade: chat.prioridade || '0'
-      }));
+      console.log('[CHATS] Dados brutos retornados:', data);
+
+      // Transformar dados e fazer debug da estrutura
+      const transformedData = (data || []).map(chat => {
+        console.log(`[CHATS] Processando chat ${chat.nome}:`, {
+          id: chat.id,
+          conversa: chat.conversa,
+          tipo_conversa: typeof chat.conversa,
+          eh_array: Array.isArray(chat.conversa),
+          tamanho: chat.conversa ? (Array.isArray(chat.conversa) ? chat.conversa.length : 'não é array') : 'null/undefined'
+        });
+
+        return {
+          ...chat,
+          conversa: Array.isArray(chat.conversa) ? chat.conversa : [],
+          prioridade: chat.prioridade || '0'
+        };
+      });
 
       // Ordenar: Com prioridade primeiro, depois por data
       const sortedChats = transformedData.sort((a, b) => {
@@ -77,7 +90,7 @@ export const ChatsList = () => {
       });
 
       setChats(sortedChats);
-      console.log('[CHATS] Carregados', sortedChats.length, 'chats');
+      console.log('[CHATS] Carregados', sortedChats.length, 'chats ordenados');
     } catch (error) {
       console.error('[CHATS] Erro inesperado:', error);
     } finally {
@@ -128,20 +141,31 @@ export const ChatsList = () => {
     }
   };
 
-  // Função para contar mensagens baseada nos \n na string conversa
+  // CORREÇÃO: Função melhorada para contar mensagens
   const getMessageCount = (conversa: any[]) => {
-    if (!conversa || conversa.length === 0) return 0;
+    console.log('[CHATS] Contando mensagens para conversa:', conversa);
     
-    // Se conversa é um array, pegar o primeiro item como string
-    const conversaString = Array.isArray(conversa) ? 
-      (typeof conversa[0] === 'string' ? conversa[0] : JSON.stringify(conversa[0] || '')) : 
-      JSON.stringify(conversa);
+    if (!conversa || !Array.isArray(conversa)) {
+      console.log('[CHATS] Conversa não é um array válido');
+      return 0;
+    }
     
-    // Contar quantidade de \n na string
-    const lineBreaks = (conversaString.match(/\n/g) || []).length;
+    if (conversa.length === 0) {
+      console.log('[CHATS] Array de conversa está vazio');
+      return 0;
+    }
     
-    // Retornar quantidade de quebras de linha (cada \n representa uma mensagem)
-    return lineBreaks > 0 ? lineBreaks : 1; // Mínimo 1 se tem conteúdo
+    // Se o primeiro elemento é uma string, pode ser que todas as mensagens estejam concatenadas
+    if (typeof conversa[0] === 'string') {
+      // Tentar contar por quebras de linha como antes
+      const lineBreaks = (conversa[0].match(/\n/g) || []).length;
+      console.log('[CHATS] Contando por quebras de linha:', lineBreaks + 1);
+      return lineBreaks > 0 ? lineBreaks + 1 : 1;
+    }
+    
+    // Se são objetos, contar elementos do array
+    console.log('[CHATS] Contando elementos do array:', conversa.length);
+    return conversa.length;
   };
 
   // Função para formatar número de telefone
@@ -221,6 +245,9 @@ export const ChatsList = () => {
             <p className="text-gray-500">Nenhuma mensagem encontrada</p>
             <p className="text-sm text-gray-400 mt-1">
               Clique em "Analisar Mensagens" para classificar suas conversas
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              Debug: {user ? `Usuário: ${user.id}` : 'Usuário não logado'}
             </p>
           </div>
         </CardContent>
