@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -71,9 +72,9 @@ serve(async (req) => {
     const action = sanitizeInput(body.action);
     const instanceName = sanitizeInput(req.headers.get("instance-name") || body.instanceName || '');
 
-    console.log(`[EVOLUTION-HANDLER] Action requested - ${JSON.stringify({ action })}`);
+    console.log(`[EVOLUTION-HANDLER] Action requested: ${action}`);
 
-    // Buscar perfil do usuário com validação de segurança
+    // Buscar perfil do usuário
     const { data: profile, error: profileError } = await supabaseServiceRole
       .from('profiles')
       .select('*')
@@ -103,120 +104,89 @@ serve(async (req) => {
       });
     }
 
+    const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
+
     // Processar ações baseadas no tipo
     switch (action) {
       case "initialize-connection": {
-        auditLog("INITIALIZE_CONNECTION", user.id, { instanceName: profile.instance_name });
+        auditLog("INITIALIZE_CONNECTION", user.id);
         
-        console.log(`[EVOLUTION-HANDLER] Starting initialize-connection flow - ${JSON.stringify({ userId: user.id })}`);
+        console.log(`[EVOLUTION-HANDLER] Iniciando initialize-connection - User: ${user.id}`);
         
-        // Validar número se fornecido
-        if (profile.numero && !validatePhoneNumber(profile.numero)) {
-          auditLog("INVALID_PHONE_NUMBER", user.id, { phone: profile.numero });
+        // Verificar se o número é válido
+        if (!profile.numero) {
+          return new Response(JSON.stringify({ 
+            success: true,
+            state: 'needs_phone_number',
+            message: 'Configure seu número de telefone nas configurações'
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        if (!validatePhoneNumber(profile.numero)) {
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "Número de telefone inválido" 
+            error: "Número de telefone inválido. Use formato brasileiro: 5511999999999" 
           }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
 
-        const hasInstanceName = !!profile.instance_name;
-        const instanceNameToUse = hasInstanceName ? profile.instance_name : `${profile.nome.toLowerCase().replace(/\s+/g, '')}_${profile.numero}`;
+        // Determinar nome da instância
+        const instanceNameToUse = profile.instance_name || `${profile.nome.toLowerCase().replace(/\s+/g, '')}_${profile.numero.slice(-4)}`;
         
-        console.log(`[EVOLUTION-HANDLER] Profile state analyzed - ${JSON.stringify({ 
-          hasInstanceName, 
-          instanceName: instanceNameToUse, 
-          numero: profile.numero 
-        })}`);
+        console.log(`[EVOLUTION-HANDLER] Instance name: ${instanceNameToUse}`);
 
-        if (hasInstanceName) {
-          // Cenário B: Instância existente - verificar estado
-          console.log(`[EVOLUTION-HANDLER] SCENARIO B: Existing instance - checking state - ${JSON.stringify({ instanceName: instanceNameToUse })}`);
+        // Verificar se a instância já existe
+        try {
+          const checkResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceNameToUse}`, {
+            headers: { 'apikey': evolutionApiKey }
+          });
           
-          try {
-            const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceNameToUse}`, {
-              headers: { 'apikey': evolutionApiKey }
-            });
-            
-            const statusData = await statusResponse.json();
-            console.log(`[EVOLUTION-HANDLER] Instance state retrieved - ${JSON.stringify({ connectionState: statusData.state })}`);
+          if (checkResponse.ok) {
+            const statusData = await checkResponse.json();
+            console.log(`[EVOLUTION-HANDLER] Instance exists with state: ${statusData.state}`);
             
             if (statusData.state === 'open') {
-              // Garantir que o webhook está configurado
-              console.log(`[EVOLUTION-HANDLER] Ensuring webhook is configured - ${JSON.stringify({ instanceName: instanceNameToUse })}`);
-              
-              try {
-                await fetch(`${evolutionApiUrl}/webhook/set/${instanceNameToUse}`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': evolutionApiKey
-                  },
-                  body: JSON.stringify({
-                    url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
-                    webhook_by_events: false,
-                    webhook_base64: false,
-                    events: [
-                      "APPLICATION_STARTUP",
-                      "QRCODE_UPDATED", 
-                      "CONNECTION_UPDATE",
-                      "MESSAGES_UPSERT",
-                      "MESSAGES_UPDATE"
-                    ]
-                  })
-                });
-              } catch (webhookError) {
-                console.log(`[EVOLUTION-HANDLER] WARNING: Failed to configure webhook - ${JSON.stringify({ status: 400 })}`);
+              // Garantir que o perfil tem o instance_name salvo
+              if (!profile.instance_name) {
+                await supabaseServiceRole
+                  .from('profiles')
+                  .update({ instance_name: instanceNameToUse })
+                  .eq('id', user.id);
               }
-              
+
               return new Response(JSON.stringify({ 
-                success: true, 
-                status: 'connected',
-                instanceName: instanceNameToUse
+                success: true,
+                state: 'already_connected',
+                instanceName: instanceNameToUse,
+                message: 'WhatsApp já está conectado'
+              }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              });
+            } else {
+              // Instância existe mas não está conectada
+              return new Response(JSON.stringify({ 
+                success: true,
+                state: 'needs_qr_code',
+                instanceName: instanceNameToUse,
+                message: 'Instância encontrada, gere o QR Code para conectar'
               }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               });
             }
-            
-            // Se não está conectado, gerar novo QR
-            const qrResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceNameToUse}`, {
-              method: 'GET',
-              headers: { 'apikey': evolutionApiKey }
-            });
-            
-            const qrData = await qrResponse.json();
-            
-            return new Response(JSON.stringify({ 
-              success: true,
-              qrCode: qrData.base64,
-              instanceName: instanceNameToUse,
-              status: 'awaiting_connection'
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
-            
-          } catch (error) {
-            auditLog("CONNECTION_CHECK_ERROR", user.id, { error: error.message });
-            console.error(`[EVOLUTION-HANDLER] Error checking instance state:`, error);
-            
-            return new Response(JSON.stringify({ 
-              success: false, 
-              error: "Erro ao verificar estado da conexão" 
-            }), {
-              status: 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
           }
+        } catch (error) {
+          console.log(`[EVOLUTION-HANDLER] Instance não existe, criando nova instância`);
         }
         
-        // Cenário A: Nova instância
-        console.log(`[EVOLUTION-HANDLER] SCENARIO A: New instance - creating - ${JSON.stringify({ instanceName: instanceNameToUse })}`);
+        // Criar nova instância
+        console.log(`[EVOLUTION-HANDLER] Criando nova instância: ${instanceNameToUse}`);
         
         try {
-          // Criar nova instância
-          const createResponse = await fetch(`${evolutionApiUrl}/instance/create`, {
+          const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -229,6 +199,7 @@ serve(async (req) => {
               number: profile.numero,
               webhook: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
               webhook_by_events: false,
+              webhook_base64: false,
               events: [
                 "APPLICATION_STARTUP",
                 "QRCODE_UPDATED", 
@@ -240,13 +211,15 @@ serve(async (req) => {
           });
           
           if (!createResponse.ok) {
-            throw new Error(`HTTP ${createResponse.status}: ${await createResponse.text()}`);
+            const errorText = await createResponse.text();
+            console.error(`[EVOLUTION-HANDLER] Erro ao criar instância: ${createResponse.status} - ${errorText}`);
+            throw new Error(`Falha ao criar instância: ${createResponse.status}`);
           }
           
           const createData = await createResponse.json();
-          console.log(`[EVOLUTION-HANDLER] Instance created successfully - ${JSON.stringify({ instanceName: instanceNameToUse })}`);
+          console.log(`[EVOLUTION-HANDLER] Instância criada com sucesso`);
           
-          // Atualizar perfil com instance_name
+          // Salvar instance_name no perfil
           await supabaseServiceRole
             .from('profiles')
             .update({ instance_name: instanceNameToUse })
@@ -256,20 +229,20 @@ serve(async (req) => {
           
           return new Response(JSON.stringify({ 
             success: true,
-            qrCode: createData.qrcode?.base64,
+            state: 'needs_qr_code',
             instanceName: instanceNameToUse,
-            status: 'created'
+            message: 'Instância criada com sucesso, gere o QR Code para conectar'
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
           
         } catch (error) {
           auditLog("INSTANCE_CREATION_ERROR", user.id, { error: error.message });
-          console.error(`[EVOLUTION-HANDLER] Error creating instance:`, error);
+          console.error(`[EVOLUTION-HANDLER] Erro ao criar instância:`, error);
           
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "Erro ao criar nova instância" 
+            error: `Erro ao criar instância: ${error.message}` 
           }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -279,17 +252,14 @@ serve(async (req) => {
 
       case "get-status": {
         if (!instanceName) {
-          auditLog("MISSING_INSTANCE_NAME", user.id, { action });
           return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
       
-        auditLog("GET_STATUS", user.id, { instanceName });
-      
         try {
-          const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
+          const statusResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
             headers: { 'apikey': evolutionApiKey }
           });
       
@@ -304,7 +274,6 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } catch (error) {
-          auditLog("GET_STATUS_ERROR", user.id, { instanceName, error: error.message });
           console.error(`[EVOLUTION-HANDLER] Erro ao obter status da instância ${instanceName}:`, error);
           return new Response(JSON.stringify({ success: false, error: "Erro ao obter status da instância" }), {
             status: 500,
@@ -315,17 +284,14 @@ serve(async (req) => {
       
       case "restart": {
         if (!instanceName) {
-          auditLog("MISSING_INSTANCE_NAME", user.id, { action });
           return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
       
-        auditLog("RESTART_INSTANCE", user.id, { instanceName });
-      
         try {
-          const restartResponse = await fetch(`${evolutionApiUrl}/instance/restart/${instanceName}`, {
+          const restartResponse = await fetch(`${cleanApiUrl}/instance/restart/${instanceName}`, {
             method: 'GET',
             headers: { 'apikey': evolutionApiKey }
           });
@@ -339,7 +305,6 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } catch (error) {
-          auditLog("RESTART_INSTANCE_ERROR", user.id, { instanceName, error: error.message });
           console.error(`[EVOLUTION-HANDLER] Erro ao reiniciar instância ${instanceName}:`, error);
           return new Response(JSON.stringify({ success: false, error: "Erro ao reiniciar instância" }), {
             status: 500,
@@ -350,17 +315,14 @@ serve(async (req) => {
       
       case "logout": {
         if (!instanceName) {
-          auditLog("MISSING_INSTANCE_NAME", user.id, { action });
           return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
       
-        auditLog("LOGOUT_INSTANCE", user.id, { instanceName });
-      
         try {
-          const logoutResponse = await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+          const logoutResponse = await fetch(`${cleanApiUrl}/instance/logout/${instanceName}`, {
             method: 'GET',
             headers: { 'apikey': evolutionApiKey }
           });
@@ -374,7 +336,6 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } catch (error) {
-          auditLog("LOGOUT_INSTANCE_ERROR", user.id, { instanceName, error: error.message });
           console.error(`[EVOLUTION-HANDLER] Erro ao deslogar instância ${instanceName}:`, error);
           return new Response(JSON.stringify({ success: false, error: "Erro ao deslogar instância" }), {
             status: 500,
@@ -385,17 +346,14 @@ serve(async (req) => {
       
       case "delete": {
         if (!instanceName) {
-          auditLog("MISSING_INSTANCE_NAME", user.id, { action });
           return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
       
-        auditLog("DELETE_INSTANCE", user.id, { instanceName });
-      
         try {
-          const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+          const deleteResponse = await fetch(`${cleanApiUrl}/instance/delete/${instanceName}`, {
             method: 'GET',
             headers: { 'apikey': evolutionApiKey }
           });
@@ -415,7 +373,6 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } catch (error) {
-          auditLog("DELETE_INSTANCE_ERROR", user.id, { instanceName, error: error.message });
           console.error(`[EVOLUTION-HANDLER] Erro ao deletar instância ${instanceName}:`, error);
           return new Response(JSON.stringify({ success: false, error: "Erro ao deletar instância" }), {
             status: 500,

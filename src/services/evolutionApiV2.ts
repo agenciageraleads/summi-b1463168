@@ -13,6 +13,8 @@ export interface QRCodeResult {
   success: boolean;
   qrCode?: string;
   error?: string;
+  alreadyConnected?: boolean;
+  instanceNotFound?: boolean;
 }
 
 export interface StatusResult {
@@ -45,13 +47,25 @@ export const initializeConnection = async (): Promise<ConnectionResult> => {
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[Evolution API v2] Erro na função:`, error);
+      throw error;
+    }
+
+    if (!data.success) {
+      console.error(`[Evolution API v2] Resposta de erro:`, data);
+      throw new Error(data.error || 'Erro desconhecido na inicialização');
+    }
     
     console.log(`[Evolution API v2] Inicialização concluída:`, data);
     return data;
   } catch (error) {
     console.error(`[Evolution API v2] Erro na inicialização:`, error);
-    throw error;
+    return {
+      success: false,
+      state: 'error',
+      error: error.message || 'Erro inesperado na inicialização'
+    };
   }
 };
 
@@ -70,13 +84,29 @@ export const getQRCode = async (instanceName: string): Promise<QRCodeResult> => 
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[Evolution API v2] Erro na função QR:`, error);
+      throw error;
+    }
+
+    if (!data.success) {
+      console.error(`[Evolution API v2] Erro ao obter QR Code:`, data);
+      return {
+        success: false,
+        error: data.error || 'Erro ao gerar QR Code',
+        alreadyConnected: data.alreadyConnected,
+        instanceNotFound: data.instanceNotFound
+      };
+    }
     
     console.log(`[Evolution API v2] QR Code obtido com sucesso`);
     return data;
   } catch (error) {
     console.error(`[Evolution API v2] Erro ao obter QR Code:`, error);
-    throw error;
+    return {
+      success: false,
+      error: error.message || 'Erro inesperado ao obter QR Code'
+    };
   }
 };
 
@@ -90,16 +120,25 @@ export const getConnectionStatus = async (instanceName: string): Promise<StatusR
 
     const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
       body: { 
-        action: 'get-status'
+        action: 'get-status',
+        instanceName
       },
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[Evolution API v2] Erro na função status:`, error);
+      throw error;
+    }
+
+    if (!data.success) {
+      console.error(`[Evolution API v2] Erro no status:`, data);
+      return { success: false, status: 'DISCONNECTED', error: data.error };
+    }
     
-    console.log(`[Evolution API v2] Status verificado:`, data.state);
+    console.log(`[Evolution API v2] Status verificado:`, data.status);
     return data;
   } catch (error) {
     console.error(`[Evolution API v2] Erro ao verificar status:`, error);
@@ -117,7 +156,7 @@ export const logoutInstance = async (instanceName: string): Promise<{ success: b
 
     const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
       body: { 
-        action: 'logout', // Ação corrigida
+        action: 'logout',
         instanceName 
       },
       headers: {
@@ -125,7 +164,15 @@ export const logoutInstance = async (instanceName: string): Promise<{ success: b
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[Evolution API v2] Erro na função logout:`, error);
+      throw error;
+    }
+
+    if (!data.success) {
+      console.error(`[Evolution API v2] Erro no logout:`, data);
+      throw new Error(data.error || 'Erro no logout');
+    }
     
     console.log(`[Evolution API v2] Logout realizado com sucesso`);
     return data;
@@ -135,7 +182,7 @@ export const logoutInstance = async (instanceName: string): Promise<{ success: b
   }
 };
 
-// Função para deletar instância (usa a mesma lógica de disconnect)
+// Função para deletar instância
 export const deleteInstance = async (instanceName: string): Promise<{ success: boolean; message?: string; error?: string }> => {
   console.log(`[Evolution API v2] Deletando instância: ${instanceName}`);
   
@@ -145,7 +192,7 @@ export const deleteInstance = async (instanceName: string): Promise<{ success: b
 
     const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
       body: { 
-        action: 'delete', // Ação corrigida
+        action: 'delete',
         instanceName 
       },
       headers: {
@@ -153,7 +200,15 @@ export const deleteInstance = async (instanceName: string): Promise<{ success: b
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[Evolution API v2] Erro na função delete:`, error);
+      throw error;
+    }
+
+    if (!data.success) {
+      console.error(`[Evolution API v2] Erro ao deletar:`, data);
+      throw new Error(data.error || 'Erro ao deletar instância');
+    }
     
     console.log(`[Evolution API v2] Instância deletada com sucesso`);
     return data;
