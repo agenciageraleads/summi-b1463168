@@ -3,10 +3,15 @@ import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { WhatsAppSection } from '@/components/Dashboard/WhatsAppSection';
 import { ChatsList } from '@/components/Dashboard/ChatsList';
 import { SubscriptionStatus } from '@/components/SubscriptionStatus';
+import { OnboardingTour } from '@/components/Onboarding/OnboardingTour';
+import { OnboardingHighlight } from '@/components/Onboarding/OnboardingHighlight';
 
 const DashboardPage = () => {
   return (
     <DashboardLayout>
+      {/* Tour de Onboarding */}
+      <OnboardingTour />
+      
       <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
         
         {/* Header do Dashboard */}
@@ -21,16 +26,22 @@ const DashboardPage = () => {
 
         {/* Grid Principal Reorganizada */}
         <div className="space-y-6">
-          {/* Lista de Chats em destaque */}
-          <ChatsList />
+          {/* Lista de Chats em destaque - com highlight para onboarding */}
+          <OnboardingHighlight targetId="chats-section">
+            <ChatsList />
+          </OnboardingHighlight>
 
           {/* Grid para os outros widgets */}
           <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-            {/* Seção do WhatsApp */}
-            <WhatsAppSection />
+            {/* Seção do WhatsApp - com highlight para onboarding */}
+            <OnboardingHighlight targetId="whatsapp-section">
+              <WhatsAppSection />
+            </OnboardingHighlight>
             
-            {/* Status da Assinatura */}
-            <SubscriptionStatus />
+            {/* Status da Assinatura - com highlight para onboarding */}
+            <OnboardingHighlight targetId="subscription-section">
+              <SubscriptionStatus />
+            </OnboardingHighlight>
           </div>
         </div>
       </div>
