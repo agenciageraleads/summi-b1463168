@@ -50,10 +50,10 @@ serve(async (req) => {
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
-    // CORREÇÃO: Primeiro verificar o status da instância antes de gerar QR Code
-    logStep("Checking instance status first", { instanceName });
+    // CORREÇÃO: Primeiro verificar se a instância existe
+    logStep("Checking if instance exists", { instanceName });
     
-    const statusResponse = await fetch(`${cleanApiUrl}/instance/status/${instanceName}`, {
+    const checkResponse = await fetch(`${cleanApiUrl}/instance/status/${instanceName}`, {
       method: 'GET',
       headers: {
         'apikey': evolutionApiKey,
@@ -61,11 +61,15 @@ serve(async (req) => {
       }
     });
 
-    if (statusResponse.ok) {
-      const statusData = await statusResponse.json();
-      const currentStatus = statusData.instance?.state || statusData.state;
+    let instanceExists = false;
+    let currentStatus = null;
+
+    if (checkResponse.ok) {
+      const statusData = await checkResponse.json();
+      currentStatus = statusData.instance?.state || statusData.state;
+      instanceExists = true;
       
-      logStep("Current instance status", { status: currentStatus });
+      logStep("Instance exists with status", { status: currentStatus });
       
       // Se a instância já está conectada (open), não gerar QR Code
       if (currentStatus === 'open' || currentStatus === 'connected') {
@@ -79,9 +83,49 @@ serve(async (req) => {
           status: 200,
         });
       }
+    } else if (checkResponse.status === 404) {
+      logStep("Instance does not exist, will create it");
+      instanceExists = false;
+    } else {
+      const errorText = await checkResponse.text();
+      logStep("Error checking instance status", { status: checkResponse.status, error: errorText });
+      throw new Error(`Failed to check instance status: ${checkResponse.status} - ${errorText}`);
     }
 
-    // Se chegou até aqui, a instância precisa de QR Code
+    // Se a instância não existe, criar ela primeiro
+    if (!instanceExists) {
+      logStep("Creating new instance", { instanceName });
+      
+      const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
+        method: 'POST',
+        headers: {
+          'apikey': evolutionApiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          instanceName: instanceName,
+          integration: "WHATSAPP-BAILEYS",
+          webhook: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-api-handler`,
+          events: ["MESSAGES_UPSERT"],
+          webhookByEvents: false,
+          webhookBase64: true
+        })
+      });
+
+      if (!createResponse.ok) {
+        const createErrorText = await createResponse.text();
+        logStep("Error creating instance", { status: createResponse.status, error: createErrorText });
+        throw new Error(`Failed to create instance: ${createResponse.status} - ${createErrorText}`);
+      }
+
+      const createData = await createResponse.json();
+      logStep("Instance created successfully", createData);
+
+      // Aguardar 3 segundos para a instância se estabilizar
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    // Agora gerar o QR Code
     logStep("Generating QR Code", { instanceName, url: `${cleanApiUrl}/instance/connect/${instanceName}` });
 
     const response = await fetch(`${cleanApiUrl}/instance/connect/${instanceName}`, {
