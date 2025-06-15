@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface InstanceCreateResult {
@@ -54,16 +55,19 @@ export const initializeConnection = async (): Promise<ConnectionResult> => {
   }
 };
 
-// Função para obter QR Code
+// Função para obter QR Code (só para instâncias já existentes)
 export const getQRCode = async (instanceName: string): Promise<QRCodeResult> => {
   console.log(`[Evolution API v2] Obtendo QR Code: ${instanceName}`);
   
   try {
-    const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
-      body: { 
-        action: 'get-qrcode',
-        instanceName 
-      }
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) throw new Error('Usuário não autenticado');
+
+    const { data, error } = await supabase.functions.invoke('evolution-generate-qr', {
+      body: { instanceName },
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}`,
+      },
     });
 
     if (error) throw error;
