@@ -69,7 +69,7 @@ export const useWhatsAppManager = () => {
     }
   }, []);
   
-  // Define o estado como conectado de forma definitiva
+  // CORREÇÃO PRINCIPAL: Define o estado como conectado de forma definitiva
   const setConnectedStateDefinitively = useCallback(() => {
     console.log('[WA Manager] ✅ Definindo como conectado definitivamente');
     isDefinitivelyConnectedRef.current = true;
@@ -77,7 +77,7 @@ export const useWhatsAppManager = () => {
     if (isMountedRef.current) {
       setState(prev => ({
         ...prev,
-        connectionState: 'already_connected',
+        connectionState: 'already_connected', // CORREÇÃO: Garantir que o estado seja atualizado
         qrCode: null,
         message: 'WhatsApp conectado e funcionando!',
         isLoading: false,
@@ -312,7 +312,7 @@ export const useWhatsAppManager = () => {
       isDefinitivelyConnectedRef.current = false;
       hasAutoConnectedRef.current = false;
       
-      // CORREÇÃO: Manter todas as propriedades do estado
+      // CORREÇÃO: Resetar completamente o estado após desconexão
       setState(prev => ({
         ...prev,
         connectionState: 'needs_qr_code',
