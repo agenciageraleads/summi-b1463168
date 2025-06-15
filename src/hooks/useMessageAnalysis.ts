@@ -23,7 +23,6 @@ export const useMessageAnalysis = () => {
 
     setIsAnalyzing(true);
     console.log('[MESSAGE_ANALYSIS] Iniciando análise para usuário:', user.id);
-    console.log('[MESSAGE_ANALYSIS] Supabase URL:', supabase.supabaseUrl);
 
     try {
       // Payload com apenas o userId necessário
