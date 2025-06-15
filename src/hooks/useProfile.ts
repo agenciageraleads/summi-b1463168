@@ -1,12 +1,15 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-// Interface do perfil com novos campos de indicação
+// Interface do perfil com novos campos de indicação e onboarding
 export interface Profile {
   id: string;
   nome: string;
+  name?: string; // Novo campo
+  avatar?: string; // Novo campo
   email?: string;
   numero?: string;
   instance_name?: string;
@@ -18,8 +21,9 @@ export interface Profile {
   segundos_para_resumir?: number;
   'Summi em Audio?'?: boolean;
   apenas_horario_comercial?: boolean;
-  referral_code?: string; // Novo campo
-  referred_by_user_id?: string; // Novo campo
+  referral_code?: string;
+  referred_by_user_id?: string;
+  onboarding_completed?: boolean; // Novo campo
 }
 
 // Função para validar número de telefone brasileiro
@@ -143,6 +147,7 @@ export const useProfile = () => {
       const sanitizedUpdates = {
         ...updates,
         nome: updates.nome ? sanitizeText(updates.nome) : updates.nome,
+        name: updates.name ? sanitizeText(updates.name) : updates.name,
         temas_importantes: updates.temas_importantes ? sanitizeText(updates.temas_importantes) : updates.temas_importantes,
         temas_urgentes: updates.temas_urgentes ? sanitizeText(updates.temas_urgentes) : updates.temas_urgentes,
       };
@@ -175,6 +180,8 @@ export const useProfile = () => {
 
       // Adicionar apenas campos que não são undefined
       if (sanitizedUpdates.nome !== undefined) updateData.nome = sanitizedUpdates.nome;
+      if (sanitizedUpdates.name !== undefined) updateData.name = sanitizedUpdates.name;
+      if (sanitizedUpdates.avatar !== undefined) updateData.avatar = sanitizedUpdates.avatar;
       if (sanitizedUpdates.numero !== undefined) updateData.numero = sanitizedUpdates.numero;
       if (sanitizedUpdates.temas_importantes !== undefined) updateData.temas_importantes = sanitizedUpdates.temas_importantes;
       if (sanitizedUpdates.temas_urgentes !== undefined) updateData.temas_urgentes = sanitizedUpdates.temas_urgentes;
@@ -184,6 +191,7 @@ export const useProfile = () => {
       if (sanitizedUpdates.segundos_para_resumir !== undefined) updateData.segundos_para_resumir = sanitizedUpdates.segundos_para_resumir;
       if (sanitizedUpdates['Summi em Audio?'] !== undefined) updateData['Summi em Audio?'] = sanitizedUpdates['Summi em Audio?'];
       if (sanitizedUpdates.apenas_horario_comercial !== undefined) updateData.apenas_horario_comercial = sanitizedUpdates.apenas_horario_comercial;
+      if (sanitizedUpdates.onboarding_completed !== undefined) updateData.onboarding_completed = sanitizedUpdates.onboarding_completed;
       
       // Novos campos de indicação (somente leitura - não podem ser alterados pelo usuário)
       // referral_code e referred_by_user_id são gerenciados automaticamente pelo sistema

@@ -84,12 +84,15 @@ export type Database = {
       profiles: {
         Row: {
           apenas_horario_comercial: boolean | null
+          avatar: string | null
           created_at: string | null
           email: string | null
           id: string
           instance_name: string | null
+          name: string | null
           nome: string
           numero: string | null
+          onboarding_completed: boolean | null
           referral_code: string | null
           referred_by_user_id: string | null
           resume_audio: boolean | null
@@ -104,12 +107,15 @@ export type Database = {
         }
         Insert: {
           apenas_horario_comercial?: boolean | null
+          avatar?: string | null
           created_at?: string | null
           email?: string | null
           id: string
           instance_name?: string | null
+          name?: string | null
           nome: string
           numero?: string | null
+          onboarding_completed?: boolean | null
           referral_code?: string | null
           referred_by_user_id?: string | null
           resume_audio?: boolean | null
@@ -124,12 +130,15 @@ export type Database = {
         }
         Update: {
           apenas_horario_comercial?: boolean | null
+          avatar?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           instance_name?: string | null
+          name?: string | null
           nome?: string
           numero?: string | null
+          onboarding_completed?: boolean | null
           referral_code?: string | null
           referred_by_user_id?: string | null
           resume_audio?: boolean | null
