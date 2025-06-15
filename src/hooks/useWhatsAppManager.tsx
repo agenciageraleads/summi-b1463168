@@ -187,11 +187,11 @@ export const useWhatsAppManager = () => {
         success: result.success, 
         hasQR: !!result.qrCode, 
         state: result.state,
-        alreadyConnected: result.state === 'open'
+        connectionState: result.state
       });
 
-      // CORREÇÃO: Verificar se já está conectado usando result.state
-      if (result.state === 'open') {
+      // CORREÇÃO: Verificar se já está conectado usando result.state = 'already_connected'
+      if (result.state === 'already_connected') {
         console.log('[WA Manager] ✅ Já conectado detectado no QR');
         setConnectedStateDefinitively();
         return;
