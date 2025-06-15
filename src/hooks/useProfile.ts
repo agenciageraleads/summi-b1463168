@@ -94,7 +94,7 @@ export const useProfile = () => {
       }
 
       setProfile(data);
-      console.log('[PROFILE] Profile loaded successfully');
+      console.log('[PROFILE] Profile loaded successfully:', data);
       
     } catch (error) {
       console.error('[PROFILE] Erro inesperado ao buscar perfil:', error);
@@ -116,7 +116,8 @@ export const useProfile = () => {
     }
 
     try {
-      console.log('[PROFILE] Updating profile with:', updates);
+      console.log('[PROFILE] Starting profile update for user:', user.id);
+      console.log('[PROFILE] Updates received:', updates);
 
       // Validações de entrada
       if (updates.numero && !validatePhoneNumber(updates.numero)) {
@@ -166,29 +167,38 @@ export const useProfile = () => {
         return { success: false, error: 'Alteração de email não permitida' };
       }
 
-      // Preparar objeto de atualização com campos corretos da tabela
-      const updateData = {
-        nome: sanitizedUpdates.nome,
-        numero: sanitizedUpdates.numero,
-        temas_importantes: sanitizedUpdates.temas_importantes,
-        temas_urgentes: sanitizedUpdates.temas_urgentes,
-        transcreve_audio_recebido: sanitizedUpdates.transcreve_audio_recebido,
-        transcreve_audio_enviado: sanitizedUpdates.transcreve_audio_enviado,
-        resume_audio: sanitizedUpdates.resume_audio,
-        segundos_para_resumir: sanitizedUpdates.segundos_para_resumir,
-        'Summi em Audio?': sanitizedUpdates['Summi em Audio?'],
-        apenas_horario_comercial: sanitizedUpdates.apenas_horario_comercial,
+      // Preparar objeto limpo para atualização, incluindo apenas campos definidos
+      const updateData: any = {
         updated_at: new Date().toISOString()
       };
 
-      // Remover campos undefined para evitar problemas
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key as keyof typeof updateData] === undefined) {
-          delete updateData[key as keyof typeof updateData];
-        }
-      });
+      // Adicionar apenas campos que não são undefined
+      if (sanitizedUpdates.nome !== undefined) updateData.nome = sanitizedUpdates.nome;
+      if (sanitizedUpdates.numero !== undefined) updateData.numero = sanitizedUpdates.numero;
+      if (sanitizedUpdates.temas_importantes !== undefined) updateData.temas_importantes = sanitizedUpdates.temas_importantes;
+      if (sanitizedUpdates.temas_urgentes !== undefined) updateData.temas_urgentes = sanitizedUpdates.temas_urgentes;
+      if (sanitizedUpdates.transcreve_audio_recebido !== undefined) updateData.transcreve_audio_recebido = sanitizedUpdates.transcreve_audio_recebido;
+      if (sanitizedUpdates.transcreve_audio_enviado !== undefined) updateData.transcreve_audio_enviado = sanitizedUpdates.transcreve_audio_enviado;
+      if (sanitizedUpdates.resume_audio !== undefined) updateData.resume_audio = sanitizedUpdates.resume_audio;
+      if (sanitizedUpdates.segundos_para_resumir !== undefined) updateData.segundos_para_resumir = sanitizedUpdates.segundos_para_resumir;
+      if (sanitizedUpdates['Summi em Audio?'] !== undefined) updateData['Summi em Audio?'] = sanitizedUpdates['Summi em Audio?'];
+      if (sanitizedUpdates.apenas_horario_comercial !== undefined) updateData.apenas_horario_comercial = sanitizedUpdates.apenas_horario_comercial;
 
-      console.log('[PROFILE] Prepared update data:', updateData);
+      console.log('[PROFILE] Final update data being sent to database:', updateData);
+
+      // Verificar se há sessão ativa antes de tentar atualizar
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('[PROFILE] No active session found');
+        toast({
+          title: "Erro de autenticação",
+          description: "Sessão expirada. Faça login novamente.",
+          variant: "destructive",
+        });
+        return { success: false, error: 'Sessão expirada' };
+      }
+
+      console.log('[PROFILE] Session active, proceeding with update...');
 
       const { data, error } = await supabase
         .from('profiles')
@@ -198,7 +208,13 @@ export const useProfile = () => {
         .single();
 
       if (error) {
-        console.error('[PROFILE] Erro ao atualizar perfil:', error);
+        console.error('[PROFILE] Database update error:', error);
+        console.error('[PROFILE] Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         
         let errorMessage = "Erro ao atualizar perfil";
         
@@ -209,6 +225,8 @@ export const useProfile = () => {
           errorMessage = "Dados fornecidos não atendem aos critérios de segurança";
         } else if (error.code === '42501') {
           errorMessage = "Erro de permissão. Verifique se você está logado corretamente.";
+        } else if (error.code === 'PGRST301') {
+          errorMessage = "Erro de permissão no banco de dados";
         }
         
         toast({
@@ -219,9 +237,19 @@ export const useProfile = () => {
         return { success: false, error: error.message };
       }
 
+      if (!data) {
+        console.error('[PROFILE] No data returned from update');
+        toast({
+          title: "Erro",
+          description: "Nenhum dado retornado após atualização",
+          variant: "destructive",
+        });
+        return { success: false, error: 'Nenhum dado retornado' };
+      }
+
       // Atualizar o estado local com os dados retornados do banco
       setProfile(data);
-      console.log('[PROFILE] Profile updated successfully:', data);
+      console.log('[PROFILE] Profile updated successfully in database:', data);
       
       toast({
         title: "Sucesso",
@@ -231,7 +259,7 @@ export const useProfile = () => {
       return { success: true, data };
       
     } catch (error) {
-      console.error('[PROFILE] Erro inesperado ao atualizar perfil:', error);
+      console.error('[PROFILE] Unexpected error during profile update:', error);
       toast({
         title: "Erro",
         description: "Erro inesperado ao atualizar perfil",
