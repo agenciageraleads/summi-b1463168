@@ -1,4 +1,3 @@
-
 // Hook principal para gerenciar toda a conexão WhatsApp - VERSÃO CORRIGIDA
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -266,7 +265,7 @@ export const useWhatsAppManager = () => {
   // Conectar WhatsApp - CORRIGIDO
   const handleConnect = useCallback(async () => {
     console.log('[WhatsApp Manager] Tentativa de conexão iniciada');
-    
+
     if (!profile?.numero) {
       toast({
         title: 'Informações incompletas',
@@ -276,15 +275,13 @@ export const useWhatsAppManager = () => {
       return;
     }
 
-    // Se já está carregando, não fazer nada
     if (state.isLoading) {
       console.log('[WhatsApp Manager] Já está carregando, ignorando clique');
       return;
     }
 
-    // Parar polling anterior
     stopPolling();
-    
+
     setState(prev => ({
       ...prev,
       isLoading: true,
@@ -293,26 +290,20 @@ export const useWhatsAppManager = () => {
       qrCode: null
     }));
 
-    // Só inicializar se não foi inicializado ainda
-    if (!hasInitializedRef.current) {
+    // Sempre obtenha a instância corretamente do profile (apenas se já existe)
+    // NÃO gerar "user_${profile.id}", use apenas o nome correto persistido
+    if (!profile.instance_name) {
+      // Força nova inicialização (vai persistir o instance_name correto)
       await initializeConnection();
+      // Após initializeConnection, atualize o profile!
+      await refreshProfile();
     } else {
-      // Se já foi inicializado, verificar estado atual e agir
-      const currentState = getInitialStateFromProfile();
-      if (currentState.connectionState === 'already_connected') {
-        setState(prev => ({
-          ...prev,
-          connectionState: 'already_connected',
-          message: 'WhatsApp já está conectado',
-          isLoading: false
-        }));
-      } else {
-        // Tentar gerar QR code direto
-        const instanceName = profile.instance_name || `user_${profile.id}`;
-        await handleGenerateQR(instanceName);
-      }
+      // Com instance_name já salvo, TRABALHE SEMPRE com ele!
+      await handleGenerateQR(profile.instance_name);
     }
-  }, [profile, toast, stopPolling, state.isLoading, hasInitializedRef, initializeConnection, getInitialStateFromProfile, handleGenerateQR]);
+  }, [
+    profile, toast, stopPolling, state.isLoading, initializeConnection, refreshProfile, handleGenerateQR
+  ]);
 
   // Desconectar WhatsApp
   const handleDisconnect = useCallback(async () => {

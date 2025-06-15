@@ -163,6 +163,19 @@ serve(async (req) => {
         
         console.log(`[EVOLUTION-HANDLER] Instance name: ${instanceNameToUse}`);
 
+        // TENTE SEMPRE SALVAR O instance_name, se não existir
+        if (!profile.instance_name) {
+          const { error: updateError } = await supabaseServiceRole
+            .from('profiles')
+            .update({ instance_name: instanceNameToUse })
+            .eq('id', user.id);
+          if (updateError) {
+            console.error("[EVOLUTION-HANDLER] Erro ao salvar instance_name inicial:", updateError);
+          } else {
+            console.log(`[EVOLUTION-HANDLER] instance_name inicial salvo no profile: ${instanceNameToUse}`);
+          }
+        }
+
         // Verificar se a instância já existe
         try {
           const checkResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceNameToUse}`, {
