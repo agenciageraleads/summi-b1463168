@@ -86,7 +86,7 @@ export const useWhatsAppManager = () => {
     }
   }, [stopPolling]);
 
-  // Checa o status da conexão
+  // CORREÇÃO: Checa o status da conexão e mapeia corretamente os estados
   const checkConnectionAndUpdate = useCallback(async (instanceName: string) => {
     if (!isMountedRef.current || isCheckingConnectionRef.current) return false;
     isCheckingConnectionRef.current = true;
@@ -94,16 +94,21 @@ export const useWhatsAppManager = () => {
     try {
       console.log('[WA Manager] 🔍 Verificando conexão para:', instanceName);
       const statusResult = await checkConnectionStatus(instanceName);
-      const isConnected = statusResult.success && ['open', 'connected'].includes(statusResult.state || '');
+      
+      // CORREÇÃO: Mapear corretamente os estados da API Evolution
+      // A API retorna state: "open" quando conectado, mas precisamos mapear para nosso estado
+      const apiState = statusResult.state;
+      const isConnected = statusResult.success && ['open', 'connected'].includes(apiState || '');
       
       console.log('[WA Manager] 📊 Estado detectado:', { 
-        state: statusResult.state, 
+        apiState,
         isConnected,
-        success: statusResult.success 
+        success: statusResult.success,
+        mappingTo: isConnected ? 'already_connected' : 'disconnected'
       });
 
       if (isConnected) {
-        console.log('[WA Manager] ✅ Conexão confirmada - atualizando estado');
+        console.log('[WA Manager] ✅ Conexão confirmada - atualizando estado para already_connected');
         if (!isDefinitivelyConnectedRef.current) {
           toast({ 
             title: "✅ Conectado!", 
