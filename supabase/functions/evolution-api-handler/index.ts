@@ -18,6 +18,27 @@ const sanitizeInput = (input: string): string => {
   return input.replace(/[<>\"']/g, '').trim();
 };
 
+// Função para criar nome de instância válido
+const createValidInstanceName = (nome: string, numero: string): string => {
+  // Limpar nome: remover acentos, espaços e caracteres especiais
+  const cleanName = nome
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-z0-9]/g, '') // Remove tudo exceto letras e números
+    .substring(0, 12); // Máximo 12 caracteres para o nome
+  
+  // Pegar últimos 4 dígitos do número
+  const lastDigits = numero.slice(-4);
+  
+  // Combinar: nome + últimos 4 dígitos = máximo 16 caracteres
+  const instanceName = `${cleanName}_${lastDigits}`;
+  
+  console.log(`[EVOLUTION-HANDLER] Nome da instância criado: ${instanceName} (${instanceName.length} caracteres)`);
+  
+  return instanceName;
+};
+
 const validatePhoneNumber = (phone: string): boolean => {
   // Validação para números brasileiros
   const phoneRegex = /^55[1-9][1-9][0-9]{8,9}$/;
@@ -133,8 +154,8 @@ serve(async (req) => {
           });
         }
 
-        // Determinar nome da instância
-        const instanceNameToUse = profile.instance_name || `${profile.nome.toLowerCase().replace(/\s+/g, '')}_${profile.numero.slice(-4)}`;
+        // Criar nome de instância válido e curto
+        const instanceNameToUse = profile.instance_name || createValidInstanceName(profile.nome, profile.numero);
         
         console.log(`[EVOLUTION-HANDLER] Instance name: ${instanceNameToUse}`);
 
@@ -185,45 +206,49 @@ serve(async (req) => {
         console.log(`[EVOLUTION-HANDLER] Criando nova instância: ${instanceNameToUse}`);
         
         try {
+          const createPayload = {
+            instanceName: instanceNameToUse,
+            token: evolutionApiKey,
+            qrcode: true,
+            number: profile.numero,
+            integration: "WHATSAPP-BAILEYS",
+            webhook: {
+              url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
+              by_events: false,
+              base64: true
+            },
+            settings: {
+              reject_call: false,
+              msg_call: "",
+              groups_ignore: true,
+              always_online: false,
+              read_messages: false,
+              read_status: false
+            },
+            events: [
+              "MESSAGES_UPSERT"
+            ]
+          };
+
+          console.log(`[EVOLUTION-HANDLER] Payload de criação:`, JSON.stringify(createPayload, null, 2));
+
           const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'apikey': evolutionApiKey
             },
-            body: JSON.stringify({
-              instanceName: instanceNameToUse,
-              token: evolutionApiKey,
-              qrcode: true,
-              number: profile.numero,
-              integration: "WHATSAPP-BAILEYS",
-              webhook: {
-                url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
-                by_events: false,
-                base64: true
-              },
-              settings: {
-                reject_call: false,
-                msg_call: "",
-                groups_ignore: true,
-                always_online: false,
-                read_messages: false,
-                read_status: false
-              },
-              events: [
-                "MESSAGES_UPSERT"
-              ]
-            })
+            body: JSON.stringify(createPayload)
           });
           
           if (!createResponse.ok) {
             const errorText = await createResponse.text();
             console.error(`[EVOLUTION-HANDLER] Erro ao criar instância: ${createResponse.status} - ${errorText}`);
-            throw new Error(`Falha ao criar instância: ${createResponse.status}`);
+            throw new Error(`Falha ao criar instância: ${createResponse.status} - ${errorText}`);
           }
           
           const createData = await createResponse.json();
-          console.log(`[EVOLUTION-HANDLER] Instância criada com sucesso`);
+          console.log(`[EVOLUTION-HANDLER] Instância criada com sucesso:`, createData);
           
           // Salvar instance_name no perfil
           await supabaseServiceRole
