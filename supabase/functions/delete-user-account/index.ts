@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -21,9 +20,24 @@ serve(async (req) => {
   try {
     // Verificar se há token de autorização
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    // Log para debug: Printar token recebido
+    console.log('[EDGE_FN][DEBUG] Authorization header recebido:', authHeader);
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       auditLog("UNAUTHORIZED_ACCESS_ATTEMPT", "unknown", { endpoint: "delete-user-account" });
-      return new Response(JSON.stringify({ success: false, error: "Token de autorização obrigatório" }), {
+      return new Response(JSON.stringify({ success: false, error: "Token de autorização obrigatório ou formato inválido" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '').trim();
+
+    // Printar token (corte para evitar leak, só 15 primeiros chars)
+    console.log('[EDGE_FN][DEBUG] access_token:', token.substring(0, 15) + '...');
+
+    if (!token) {
+      return new Response(JSON.stringify({ success: false, error: "Token está vazio" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
@@ -36,14 +50,15 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Verificar token do usuário usando service role client
-    const { data: { user }, error: authError } = await supabaseServiceRole.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
+    // Tentar obter o usuário autenticado pelo token recebido
+    const { data: { user }, error: authError } = await supabaseServiceRole.auth.getUser(token);
+
+    // Log de debug: user e erro
+    console.log('[EDGE_FN][DEBUG] Resultado getUser:', user, authError);
 
     if (authError || !user) {
       auditLog("INVALID_TOKEN", "unknown", { error: authError?.message });
-      return new Response(JSON.stringify({ success: false, error: "Token inválido" }), {
+      return new Response(JSON.stringify({ success: false, error: "Token inválido ou sessão expirada" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
