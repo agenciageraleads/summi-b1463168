@@ -33,7 +33,7 @@ serve(async (req) => {
       throw new Error("Evolution API credentials not configured");
     }
 
-    // Remove trailing slash if present
+    // Remove a barra final se presente para consistência
     const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
     logStep("API URL configured", { url: cleanApiUrl });
 
@@ -50,7 +50,7 @@ serve(async (req) => {
     const { instanceName } = await req.json();
     if (!instanceName) throw new Error("Instance name is required");
 
-    // Primeiro verificar se a instância existe e seu status
+    // 1. Verificar se a instância existe e seu status
     logStep("Checking instance status", { instanceName });
     
     let instanceExists = false;
@@ -59,10 +59,7 @@ serve(async (req) => {
     try {
       const statusResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
         method: 'GET',
-        headers: {
-          'apikey': evolutionApiKey,
-          'Content-Type': 'application/json'
-        }
+        headers: { 'apikey': evolutionApiKey, 'Content-Type': 'application/json' }
       });
 
       if (statusResponse.ok) {
@@ -71,7 +68,7 @@ serve(async (req) => {
         currentStatus = statusData.state || 'disconnected';
         logStep("Instance exists with status", { status: currentStatus });
         
-        // Se já está conectada, retornar erro
+        // Se já está conectada, não precisa de QR Code
         if (currentStatus === 'open') {
           return new Response(JSON.stringify({
             success: false,
@@ -87,15 +84,14 @@ serve(async (req) => {
         instanceExists = false;
       }
     } catch (error) {
-      logStep("Error checking instance status, treating as non-existent", { error: error.message });
+      logStep("Error checking instance status, assuming it's non-existent", { error: error.message });
       instanceExists = false;
     }
 
-    // Se a instância não existe, criar ela primeiro
+    // 2. Se a instância não existe, criar ela primeiro
     if (!instanceExists) {
       logStep("Creating new instance", { instanceName });
       
-      // Buscar dados do usuário para criar a instância
       const { data: profile, error: profileError } = await supabaseClient
         .from('profiles')
         .select('numero')
@@ -109,18 +105,16 @@ serve(async (req) => {
       const webhookUrl = Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
       
       const createPayload = {
-        instanceName: instanceName,
+        instanceName,
         token: evolutionApiKey,
-        qrcode: true,
+        qrcode: true, // Solicita o QR Code diretamente na criação
         number: profile.numero,
         integration: "WHATSAPP-BAILEYS",
         webhook: {
           url: webhookUrl,
           byEvents: false,
           base64: true,
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           events: ["MESSAGES_UPSERT"]
         },
         settings: {
@@ -135,10 +129,7 @@ serve(async (req) => {
 
       const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey
-        },
+        headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
         body: JSON.stringify(createPayload)
       });
 
@@ -148,35 +139,46 @@ serve(async (req) => {
         throw new Error(`Failed to create instance: ${createResponse.status} - ${errorText}`);
       }
 
-      logStep("Instance created successfully");
+      const creationData = await createResponse.json();
+      logStep("Instance creation response received", { instance: creationData.instance?.instanceName });
       
-      // Aguardar um pouco para a instância se estabelecer
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Otimização: Se o QR Code veio na resposta da criação, retorna imediatamente
+      let qrCodeDataFromCreate = creationData.qrcode?.base64 || creationData.base64 || creationData.qrcode?.code || creationData.code;
+
+      if (qrCodeDataFromCreate) {
+        logStep("QR Code found in creation response, returning directly.");
+        if (!qrCodeDataFromCreate.startsWith('data:image/')) {
+          qrCodeDataFromCreate = `data:image/png;base64,${qrCodeDataFromCreate}`;
+        }
+        return new Response(JSON.stringify({ success: true, qrCode: qrCodeDataFromCreate }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+      
+      logStep("QR Code not in creation response, will proceed to connect endpoint after a delay.");
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Espera 3s para a instância estabilizar
     }
 
-    // Agora gerar o QR Code
-    logStep("Generating QR Code for instance", { instanceName });
+    // 3. Gerar o QR Code (para instâncias existentes ou se a criação não retornou o QR)
+    logStep("Generating QR Code via connect endpoint", { instanceName });
 
     const response = await fetch(`${cleanApiUrl}/instance/connect/${instanceName}`, {
       method: 'GET',
-      headers: {
-        'apikey': evolutionApiKey,
-        'Content-Type': 'application/json'
-      }
+      headers: { 'apikey': evolutionApiKey, 'Content-Type': 'application/json' }
     });
 
-    logStep("API Response", { status: response.status, ok: response.ok });
+    logStep("Connect API Response", { status: response.status, ok: response.ok });
 
     if (!response.ok) {
       const errorText = await response.text();
-      logStep("Error generating QR", { status: response.status, error: errorText });
+      logStep("Error generating QR via connect", { status: response.status, error: errorText });
       throw new Error(`Failed to generate QR Code: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    logStep("QR Code response", data);
+    logStep("Connect QR Code response data", data);
 
-    // Verificar se a resposta indica que a instância já está conectada
     if (data.instance?.state === 'open') {
       logStep("Instance became connected during request");
       return new Response(JSON.stringify({
@@ -189,42 +191,26 @@ serve(async (req) => {
       });
     }
 
-    let qrCodeData = null;
-    if (data.qrcode?.base64) {
-      qrCodeData = data.qrcode.base64;
-    } else if (data.qrcode?.code) {
-      qrCodeData = data.qrcode.code;
-    } else if (data.base64) {
-      qrCodeData = data.base64;
-    } else if (data.code) {
-      qrCodeData = data.code;
-    }
+    let qrCodeData = data.qrcode?.base64 || data.base64 || data.qrcode?.code || data.code;
 
     if (!qrCodeData) {
-      logStep("QR Code data not found", { availableKeys: Object.keys(data) });
+      logStep("QR Code data not found in connect response", { availableKeys: Object.keys(data) });
       throw new Error('QR Code not found in API response - instance may already be connected');
     }
 
-    // Ensure the QR code data is properly formatted
     if (!qrCodeData.startsWith('data:image/')) {
       qrCodeData = `data:image/png;base64,${qrCodeData}`;
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      qrCode: qrCodeData
-    }), {
+    return new Response(JSON.stringify({ success: true, qrCode: qrCodeData }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in evolution-generate-qr", { message: errorMessage });
-    return new Response(JSON.stringify({ 
-      success: false,
-      error: errorMessage 
-    }), {
+    logStep("FATAL ERROR in evolution-generate-qr", { message: errorMessage });
+    return new Response(JSON.stringify({ success: false, error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
