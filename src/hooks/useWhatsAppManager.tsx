@@ -57,6 +57,9 @@ export const useWhatsAppManager = () => {
   // NOVO: Ref para travar chamada automática única do handleConnect
   const didAutoConnectRef = useRef(false);
 
+  // Ref para limitar tentativas automáticas de retry
+  const autoRetryCountRef = useRef(0);
+
   // Função para determinar estado inicial baseado no perfil
   const getInitialStateFromProfile = useCallback(() => {
     console.log('[WhatsApp Manager] 🔍 Determinando estado inicial do perfil:', profile);
@@ -399,8 +402,8 @@ export const useWhatsAppManager = () => {
   }, [handleGenerateQR]);
 
   // Conectar WhatsApp
-  const handleConnect = useCallback(async () => {
-    console.log('[WhatsApp Manager] 🚀 Tentativa de conexão iniciada');
+  const handleConnect = useCallback(async (isAutoRetry?: boolean) => {
+    console.log('[WhatsApp Manager] 🚀 Tentativa de conexão iniciada', { isAutoRetry });
 
     if (!profile?.numero) {
       toast({
@@ -427,24 +430,104 @@ export const useWhatsAppManager = () => {
       qrCode: null
     }));
 
-    // Verificar primeiro se já está conectado
-    if (profile.instance_name) {
-      console.log('[WhatsApp Manager] Verificando se já está conectado...');
-      const isAlreadyConnected = await checkConnectionAndUpdate(profile.instance_name);
-      
-      if (isAlreadyConnected) {
-        console.log('[WhatsApp Manager] Já estava conectado!');
-        return;
+    try {
+      // Se já tem instância, checa status, senão inicializa.
+      if (profile.instance_name) {
+        console.log('[WhatsApp Manager] Verificando se já está conectado...');
+
+        const isAlreadyConnected = await checkConnectionAndUpdate(profile.instance_name);
+
+        if (isAlreadyConnected) {
+          console.log('[WhatsApp Manager] Já estava conectado!');
+          // Resetar retry
+          autoRetryCountRef.current = 0;
+          return;
+        }
+
+        // Se não está conectado, tentar gerar novo QR
+        const qrResult = await generateQRCode(profile.instance_name);
+
+        // Detecta erro de "instance not found" vindo da função
+        if (
+          isAutoRetry &&
+          qrResult.error &&
+          typeof qrResult.error === "string" &&
+          (qrResult.error.toLowerCase().includes("instance not found") ||
+            qrResult.error.toLowerCase().includes("not found"))
+        ) {
+          // Se ainda pode tentar, aguarda 3s e tenta de novo
+          if (autoRetryCountRef.current < 2) {
+            autoRetryCountRef.current += 1;
+            setTimeout(() => {
+              // Só tenta se o componente ainda está montado
+              if (isMountedRef.current) {
+                handleConnect(true);
+              }
+            }, 3000);
+          } else {
+            // Limite superado, exibe mensagem de erro normal
+            setState(prev => ({
+              ...prev,
+              connectionState: 'needs_qr_code',
+              isLoading: false,
+              message: 'Falha ao gerar QR Code, tente novamente manualmente.',
+              qrCode: null,
+              isPolling: false
+            }));
+          }
+          return;
+        }
+
+        // Resetar retry se não houve esse erro
+        autoRetryCountRef.current = 0;
+
+        // Se já conectado, não prossegue
+        if (qrResult.state === 'already_connected') return;
+        // Se outro erro, já está tratado dentro do hook original (state será error)
+      } else {
+        // Se não tem instance_name, inicializa conexão (handle já inclui QR)
+        const result = await initializeWhatsAppConnection();
+        if (
+          isAutoRetry &&
+          result.error &&
+          typeof result.error === "string" &&
+          (result.error.toLowerCase().includes("instance not found") ||
+            result.error.toLowerCase().includes("not found"))
+        ) {
+          // Quando criar instância falha por "not found" (raro), re-tentar rápido
+          if (autoRetryCountRef.current < 2) {
+            autoRetryCountRef.current += 1;
+            setTimeout(() => {
+              if (isMountedRef.current) {
+                handleConnect(true);
+              }
+            }, 3000);
+          } else {
+            setState(prev => ({
+              ...prev,
+              connectionState: 'needs_qr_code',
+              isLoading: false,
+              message: 'Falha ao inicializar conexão, tente novamente manualmente.',
+              qrCode: null,
+              isPolling: false
+            }));
+          }
+          return;
+        }
+        autoRetryCountRef.current = 0;
+        await refreshProfile();
       }
-      
-      // Se não está conectado, gerar novo QR
-      await handleGenerateQR(profile.instance_name);
-    } else {
-      // Se não tem instance_name, inicializar conexão
-      await initializeConnection();
-      await refreshProfile();
+    } catch (catchErr) {
+      // Falha inesperada, só resetar retry para não travar
+      autoRetryCountRef.current = 0;
+      setState(prev => ({
+        ...prev,
+        connectionState: 'error',
+        isLoading: false,
+        message: 'Erro inesperado ao conectar. Tente novamente.'
+      }));
     }
-  }, [profile, toast, stopPolling, state.isLoading, checkConnectionAndUpdate, handleGenerateQR, refreshProfile, initializeConnection]);
+  }, [profile, toast, stopPolling, state.isLoading, checkConnectionAndUpdate, refreshProfile, initializeWhatsAppConnection, setState]);
 
   // Desconectar WhatsApp
   const handleDisconnect = useCallback(async () => {
@@ -573,7 +656,8 @@ export const useWhatsAppManager = () => {
     ) {
       if (profile?.numero) {
         didAutoConnectRef.current = true; // Travar para não duplicar
-        handleConnect();
+        autoRetryCountRef.current = 0; // Resetar retry a cada abertura
+        handleConnect(true); // Marcando como automática (permitido retry)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -592,7 +676,7 @@ export const useWhatsAppManager = () => {
 
   return {
     state,
-    handleConnect,
+    handleConnect: () => handleConnect(false), // para uso manual sempre desativa retry
     handleDisconnect,
     handleGenerateQR,
     getStateMessage
