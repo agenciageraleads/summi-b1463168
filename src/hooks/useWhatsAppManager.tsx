@@ -43,7 +43,7 @@ export const useWhatsAppManager = () => {
   const isMountedRef = useRef(true);
   const isCheckingConnectionRef = useRef(false);
   const isPollingActiveRef = useRef(false);
-  const hasAutoConnectedRef = useRef(false); // Previne múltiplas auto-conexões
+  const hasAutoConnectedRef = useRef(false);
   const isDefinitivelyConnectedRef = useRef(false);
 
   console.log('[WA Manager] 🎯 Estado atual:', {
@@ -52,11 +52,13 @@ export const useWhatsAppManager = () => {
     isLoading: state.isLoading,
     qrCode: state.qrCode ? 'Presente' : 'Ausente',
     profileNumero: profile?.numero,
-    instanceName: profile?.instance_name
+    instanceName: profile?.instance_name,
+    isDefinitivelyConnected: isDefinitivelyConnectedRef.current
   });
 
   // Limpar todos os timers
   const stopPolling = useCallback(() => {
+    console.log('[WA Manager] 🛑 Parando polling');
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     if (qrTimeoutRef.current) clearTimeout(qrTimeoutRef.current);
     pollingIntervalRef.current = null;
@@ -90,14 +92,24 @@ export const useWhatsAppManager = () => {
     isCheckingConnectionRef.current = true;
 
     try {
+      console.log('[WA Manager] 🔍 Verificando conexão para:', instanceName);
       const statusResult = await checkConnectionStatus(instanceName);
       const isConnected = statusResult.success && ['open', 'connected'].includes(statusResult.state || '');
       
-      console.log('[WA Manager] 📊 Estado detectado:', { state: statusResult.state, isConnected });
+      console.log('[WA Manager] 📊 Estado detectado:', { 
+        state: statusResult.state, 
+        isConnected,
+        success: statusResult.success 
+      });
 
       if (isConnected) {
+        console.log('[WA Manager] ✅ Conexão confirmada - atualizando estado');
         if (!isDefinitivelyConnectedRef.current) {
-          toast({ title: "✅ Conectado!", description: "Seu WhatsApp foi conectado com sucesso.", duration: 3000 });
+          toast({ 
+            title: "✅ Conectado!", 
+            description: "Seu WhatsApp foi conectado com sucesso.", 
+            duration: 3000 
+          });
           await refreshProfile();
         }
         setConnectedStateDefinitively();
@@ -105,12 +117,15 @@ export const useWhatsAppManager = () => {
       }
       return false;
     } catch (error) {
-      console.error("Erro ao checar status:", error);
+      console.error('[WA Manager] ❌ Erro ao checar status:', error);
       return false;
     } finally {
       isCheckingConnectionRef.current = false;
     }
   }, [refreshProfile, toast, setConnectedStateDefinitively]);
+
+  // Usa ref para startPolling para evitar dependência circular
+  const startPollingRef = useRef<((instanceName: string) => void) | null>(null);
 
   // Inicia o polling para verificar a conexão
   const startPolling = useCallback((instanceName: string) => {
@@ -131,7 +146,10 @@ export const useWhatsAppManager = () => {
         return;
       }
       const isConnected = await checkConnectionAndUpdate(instanceName);
-      if (isConnected) stopPolling();
+      if (isConnected) {
+        console.log('[WA Manager] ✅ Conexão detectada no polling - parando');
+        stopPolling();
+      }
     };
 
     // Checagem inicial após 3 segundos
@@ -146,10 +164,17 @@ export const useWhatsAppManager = () => {
       stopPolling();
       setState(prev => ({ ...prev, message: 'QR Code expirado, reiniciando...', qrCode: null }));
       await restartInstance(instanceName);
-      setTimeout(() => handleGenerateQR(instanceName), 3000);
+      setTimeout(() => {
+        if (startPollingRef.current) {
+          handleGenerateQR(instanceName);
+        }
+      }, 3000);
     }, 60000);
 
-  }, [stopPolling, checkConnectionAndUpdate, setConnectedStateDefinitively]);
+  }, [stopPolling, checkConnectionAndUpdate]);
+
+  // Atualiza a ref
+  startPollingRef.current = startPolling;
   
   // Gera QR Code e inicia o polling
   const handleGenerateQR = useCallback(async (instanceName: string) => {
@@ -158,7 +183,19 @@ export const useWhatsAppManager = () => {
     
     try {
       const result: ConnectionResult = await generateQRCode(instanceName);
-      console.log('[WA Manager] 📨 Resultado do QR:', { success: result.success, hasQR: !!result.qrCode, state: result.state });
+      console.log('[WA Manager] 📨 Resultado do QR:', { 
+        success: result.success, 
+        hasQR: !!result.qrCode, 
+        state: result.state,
+        alreadyConnected: result.state === 'open'
+      });
+
+      // CORREÇÃO: Verificar se já está conectado usando result.state
+      if (result.state === 'open') {
+        console.log('[WA Manager] ✅ Já conectado detectado no QR');
+        setConnectedStateDefinitively();
+        return;
+      }
 
       if (result.success && result.qrCode) {
         console.log('[WA Manager] ✅ QR Code recebido, exibindo na tela');
@@ -170,15 +207,17 @@ export const useWhatsAppManager = () => {
           isLoading: false
         }));
         startPolling(instanceName);
-      } else if (result.state === 'already_connected') {
-        console.log('[WA Manager] ✅ Já conectado');
-        setConnectedStateDefinitively();
       } else {
         throw new Error(result.error || 'Falha ao gerar QR Code.');
       }
     } catch (error: any) {
       console.error('[WA Manager] ❌ Erro ao gerar QR:', error);
-      setState(prev => ({ ...prev, connectionState: 'error', message: error.message, isLoading: false }));
+      setState(prev => ({ 
+        ...prev, 
+        connectionState: 'error', 
+        message: error.message, 
+        isLoading: false 
+      }));
     }
   }, [setConnectedStateDefinitively, startPolling]);
 
@@ -192,13 +231,23 @@ export const useWhatsAppManager = () => {
     }
     
     if (!profile?.numero) {
-      toast({ title: 'Informações incompletas', description: 'Configure seu número de telefone no perfil.', variant: 'destructive' });
+      toast({ 
+        title: 'Informações incompletas', 
+        description: 'Configure seu número de telefone no perfil.', 
+        variant: 'destructive' 
+      });
       return;
     }
 
     stopPolling();
     isDefinitivelyConnectedRef.current = false;
-    setState(prev => ({ ...prev, isLoading: true, connectionState: 'is_connecting', message: 'Iniciando conexão...', qrCode: null }));
+    setState(prev => ({ 
+      ...prev, 
+      isLoading: true, 
+      connectionState: 'is_connecting', 
+      message: 'Iniciando conexão...', 
+      qrCode: null 
+    }));
 
     try {
       let instanceName = profile.instance_name;
@@ -220,7 +269,10 @@ export const useWhatsAppManager = () => {
       console.log('[WA Manager] 🔍 Verificando status da instância:', instanceName);
       setState(prev => ({ ...prev, message: 'Verificando status da conexão...' }));
       const isConnected = await checkConnectionAndUpdate(instanceName);
-      if (isConnected) return;
+      if (isConnected) {
+        console.log('[WA Manager] ✅ Já conectado - finalizando');
+        return;
+      }
       
       // Passo 3: Gerar QR Code
       setState(prev => ({ ...prev, message: 'Gerando QR Code...' }));
@@ -228,8 +280,17 @@ export const useWhatsAppManager = () => {
 
     } catch (err: any) {
       console.error('[WA Manager] ❌ Erro durante handleConnect:', err);
-      setState(prev => ({ ...prev, connectionState: 'error', isLoading: false, message: err.message || 'Erro inesperado.' }));
-      toast({ title: "Erro na Conexão", description: err.message || 'Ocorreu um erro.', variant: 'destructive' });
+      setState(prev => ({ 
+        ...prev, 
+        connectionState: 'error', 
+        isLoading: false, 
+        message: err.message || 'Erro inesperado.' 
+      }));
+      toast({ 
+        title: "Erro na Conexão", 
+        description: err.message || 'Ocorreu um erro.', 
+        variant: 'destructive' 
+      });
     }
   }, [profile, state.isLoading, toast, stopPolling, refreshProfile, checkConnectionAndUpdate, handleGenerateQR]);
 
@@ -244,8 +305,9 @@ export const useWhatsAppManager = () => {
     try {
       await disconnectWhatsApp();
       isDefinitivelyConnectedRef.current = false;
-      hasAutoConnectedRef.current = false; // Reset para permitir nova auto-conexão se necessário
+      hasAutoConnectedRef.current = false;
       
+      // CORREÇÃO: Manter todas as propriedades do estado
       setState(prev => ({
         ...prev,
         connectionState: 'needs_qr_code',
@@ -257,12 +319,20 @@ export const useWhatsAppManager = () => {
       
       toast({ title: "Desconectado", description: "Seu WhatsApp foi desconectado." });
     } catch (error: any) {
-      setState(prev => ({ ...prev, isLoading: false, message: error.message || 'Erro ao desconectar' }));
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        message: error.message || 'Erro ao desconectar' 
+      }));
+      toast({ 
+        title: "Erro", 
+        description: error.message, 
+        variant: "destructive" 
+      });
     }
   }, [profile, stopPolling, toast]);
 
-  // Estado inicial baseado no perfil - SEM AUTO-CONEXÃO
+  // Estado inicial baseado no perfil
   useEffect(() => {
     if (!profile) return;
     
@@ -273,26 +343,41 @@ export const useWhatsAppManager = () => {
     });
 
     if (!profile.numero) {
-      setState(prev => ({ ...prev, connectionState: 'needs_phone_number', message: 'Configure seu número de telefone' }));
+      setState(prev => ({ 
+        ...prev, 
+        connectionState: 'needs_phone_number', 
+        message: 'Configure seu número de telefone' 
+      }));
     } else if (profile.instance_name) {
-      setState(prev => ({ ...prev, connectionState: 'needs_qr_code', message: 'Pronto para conectar', instanceName: profile.instance_name }));
+      setState(prev => ({ 
+        ...prev, 
+        connectionState: 'needs_qr_code', 
+        message: 'Pronto para conectar', 
+        instanceName: profile.instance_name 
+      }));
     } else {
-      setState(prev => ({ ...prev, connectionState: 'needs_qr_code', message: 'Pronto para criar sua instância' }));
+      setState(prev => ({ 
+        ...prev, 
+        connectionState: 'needs_qr_code', 
+        message: 'Pronto para criar sua instância' 
+      }));
     }
   }, [profile]);
 
   // Auto-conexão APENAS uma vez quando o perfil carrega com número
   useEffect(() => {
-    if (profile?.numero && !hasAutoConnectedRef.current && !isDefinitivelyConnectedRef.current) {
+    if (profile?.numero && profile?.instance_name && !hasAutoConnectedRef.current && !isDefinitivelyConnectedRef.current) {
       console.log('[WA Manager] 🤖 Executando auto-conexão inicial...');
       hasAutoConnectedRef.current = true;
       
       // Pequeno delay para evitar corrida entre efeitos
       setTimeout(() => {
-        handleConnect();
+        if (isMountedRef.current) {
+          handleConnect();
+        }
       }, 1000);
     }
-  }, [profile?.numero, handleConnect]);
+  }, [profile?.numero, profile?.instance_name, handleConnect]);
 
   // Cleanup ao desmontar
   useEffect(() => {
