@@ -8,6 +8,7 @@ import {
   checkConnectionStatus,
   disconnectWhatsApp,
   restartInstance,
+  ConnectionResult, // Importar o tipo
 } from '@/services/whatsappConnection';
 
 // Tipos
@@ -43,6 +44,9 @@ export const useWhatsAppManager = () => {
   const isPollingActiveRef = useRef(false);
   const didAutoConnectRef = useRef(false);
   const isDefinitivelyConnectedRef = useRef(false);
+
+  // Ref para resolver dependência circular entre handleGenerateQR e startPolling
+  const handleGenerateQRRef = useRef<(instanceName: string) => Promise<void>>();
 
   // Função para determinar estado inicial baseado no perfil
   const getInitialStateFromProfile = useCallback(() => {
@@ -114,32 +118,8 @@ export const useWhatsAppManager = () => {
     }
   }, [refreshProfile, toast, setConnectedStateDefinitively]);
 
-  // Gera QR Code e inicia o polling
-  const handleGenerateQR = useCallback(async (instanceName: string) => {
-    setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
-    try {
-      const result = await generateQRCode(instanceName);
-
-      if (result.success && result.qrCode) {
-        setState(prev => ({
-          ...prev,
-          connectionState: 'needs_qr_code',
-          qrCode: result.qrCode!,
-          message: 'Escaneie o QR Code com seu WhatsApp',
-          isLoading: false
-        }));
-        startPolling(instanceName);
-      } else if (result.alreadyConnected || result.state === 'already_connected') {
-        setConnectedStateDefinitively();
-      } else {
-        throw new Error(result.error || 'Falha ao gerar QR Code.');
-      }
-    } catch (error: any) {
-      setState(prev => ({ ...prev, connectionState: 'error', message: error.message, isLoading: false }));
-    }
-  }, [setConnectedStateDefinitively, startPolling]);
-
   // Inicia o polling para verificar a conexão
+  // Esta função é declarada antes de `handleGenerateQR` para que possa ser usada nela.
   const startPolling = useCallback((instanceName: string) => {
     if (!isMountedRef.current || isPollingActiveRef.current || isDefinitivelyConnectedRef.current) return;
     
@@ -165,10 +145,43 @@ export const useWhatsAppManager = () => {
       stopPolling();
       setState(prev => ({ ...prev, message: 'QR Code expirado, reiniciando...', qrCode: null }));
       await restartInstance(instanceName);
-      setTimeout(() => handleGenerateQR(instanceName), 3000);
+      // A ref é usada aqui para chamar a versão mais recente de handleGenerateQR
+      if (handleGenerateQRRef.current) {
+        setTimeout(() => handleGenerateQRRef.current!(instanceName), 3000);
+      }
     }, 65000);
 
-  }, [stopPolling, checkConnectionAndUpdate, handleGenerateQR]);
+  }, [stopPolling, checkConnectionAndUpdate, setConnectedStateDefinitively]);
+  
+  // Gera QR Code e inicia o polling
+  const handleGenerateQR = useCallback(async (instanceName: string) => {
+    setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
+    try {
+      const result: ConnectionResult = await generateQRCode(instanceName);
+
+      if (result.success && result.qrCode) {
+        setState(prev => ({
+          ...prev,
+          connectionState: 'needs_qr_code',
+          qrCode: result.qrCode!,
+          message: 'Escaneie o QR Code com seu WhatsApp',
+          isLoading: false
+        }));
+        startPolling(instanceName);
+      } else if (result.state === 'already_connected') { // CORREÇÃO: Usar result.state
+        setConnectedStateDefinitively();
+      } else {
+        throw new Error(result.error || 'Falha ao gerar QR Code.');
+      }
+    } catch (error: any) {
+      setState(prev => ({ ...prev, connectionState: 'error', message: error.message, isLoading: false }));
+    }
+  }, [setConnectedStateDefinitively, startPolling]);
+
+  // Atualiza a ref com a última versão da função handleGenerateQR
+  useEffect(() => {
+    handleGenerateQRRef.current = handleGenerateQR;
+  }, [handleGenerateQR]);
 
   // Ação principal de conexão, agora simplificada
   const handleConnect = useCallback(async () => {
@@ -224,9 +237,12 @@ export const useWhatsAppManager = () => {
     try {
       await disconnectWhatsApp();
       isDefinitivelyConnectedRef.current = false;
+      // CORREÇÃO: Garantir que todas as propriedades do estado estão presentes
       setState(prev => ({
+        ...prev,
         ...getInitialStateFromProfile(),
         isLoading: false,
+        isPolling: false,
         qrCode: null,
         message: 'WhatsApp desconectado com sucesso.',
       }));
