@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -197,15 +196,22 @@ serve(async (req) => {
               token: evolutionApiKey,
               qrcode: true,
               number: profile.numero,
-              webhook: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
-              webhook_by_events: false,
-              webhook_base64: false,
+              integration: "WHATSAPP-BAILEYS",
+              webhook: {
+                url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`,
+                by_events: false,
+                base64: true
+              },
+              settings: {
+                reject_call: false,
+                msg_call: "",
+                groups_ignore: true,
+                always_online: false,
+                read_messages: false,
+                read_status: false
+              },
               events: [
-                "APPLICATION_STARTUP",
-                "QRCODE_UPDATED", 
-                "CONNECTION_UPDATE",
-                "MESSAGES_UPSERT",
-                "MESSAGES_UPDATE"
+                "MESSAGES_UPSERT"
               ]
             })
           });
