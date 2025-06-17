@@ -64,23 +64,27 @@ const LoginPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-blue/5 to-summi-green/5">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-green/5 to-summi-green/10">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-green"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-blue/5 to-summi-green/5 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-green/5 to-summi-green/10 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Logo Oficial Summi */}
         <div className="text-center">
           <div className="flex items-center justify-center space-x-3 mb-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-summi-blue to-summi-green rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-2xl">S</span>
+            <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg">
+              <img 
+                src="/lovable-uploads/3cf7feb3-ab92-46ee-85a8-7706495a4bcf.png" 
+                alt="Summi Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-summi-blue to-summi-green bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-summi-green to-summi-secondary bg-clip-text text-transparent">
                 Summi
               </h1>
               <p className="text-sm text-summi-gray-600">Inteligência Artificial para WhatsApp</p>
@@ -94,7 +98,7 @@ const LoginPage = () => {
               ? 'Digite seu e-mail para receber instruções'
               : 'Ou '}
             {!showResetPassword && (
-              <Link to="/register" className="font-medium text-summi-blue hover:text-summi-green transition-colors">
+              <Link to="/register" className="font-medium text-summi-green hover:text-summi-secondary transition-colors">
                 cadastre-se gratuitamente
               </Link>
             )}
@@ -112,7 +116,7 @@ const LoginPage = () => {
 
         {/* Form */}
         <Card className="card-hover shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="bg-gradient-to-r from-summi-blue/5 to-summi-green/5 rounded-t-lg">
+          <CardHeader className="bg-gradient-to-r from-summi-green/5 to-summi-secondary/5 rounded-t-lg">
             <CardTitle className="text-center text-summi-gray-900">
               {showResetPassword ? 'Recuperar Acesso' : 'Fazer Login'}
             </CardTitle>
@@ -129,7 +133,7 @@ const LoginPage = () => {
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     placeholder="seu@email.com"
-                    className="mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20"
+                    className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
                   />
                 </div>
                 
@@ -144,7 +148,7 @@ const LoginPage = () => {
                   </Button>
                   <Button
                     type="submit"
-                    className="flex-1 bg-gradient-to-r from-summi-blue to-summi-green hover:from-summi-blue/90 hover:to-summi-green/90 text-white font-medium shadow-lg"
+                    className="flex-1 bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? 'Enviando...' : 'Enviar'}
@@ -162,7 +166,7 @@ const LoginPage = () => {
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     placeholder="seu@email.com"
-                    className="mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20"
+                    className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
                   />
                 </div>
 
@@ -175,7 +179,7 @@ const LoginPage = () => {
                     value={formData.password}
                     onChange={(e) => setFormData({...formData, password: e.target.value})}
                     placeholder="••••••••"
-                    className="mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20"
+                    className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
                   />
                 </div>
 
@@ -183,7 +187,7 @@ const LoginPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowResetPassword(true)}
-                    className="text-sm text-summi-blue hover:text-summi-green transition-colors"
+                    className="text-sm text-summi-green hover:text-summi-secondary transition-colors"
                   >
                     Esqueci minha senha
                   </button>
@@ -191,7 +195,7 @@ const LoginPage = () => {
 
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-summi-blue to-summi-green hover:from-summi-blue/90 hover:to-summi-green/90 text-white font-medium shadow-lg"
+                  className="w-full bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? 'Entrando...' : 'Entrar'}

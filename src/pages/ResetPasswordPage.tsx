@@ -83,16 +83,20 @@ const ResetPasswordPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-blue/5 to-summi-green/5 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-green/5 to-summi-secondary/5 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Logo Oficial Summi */}
         <div className="text-center">
           <div className="flex items-center justify-center space-x-3 mb-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-summi-blue to-summi-green rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-2xl">S</span>
+            <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg">
+              <img 
+                src="/lovable-uploads/3cf7feb3-ab92-46ee-85a8-7706495a4bcf.png" 
+                alt="Summi Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-summi-blue to-summi-green bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-summi-green to-summi-secondary bg-clip-text text-transparent">
                 Summi
               </h1>
               <p className="text-sm text-summi-gray-600">Inteligência Artificial para WhatsApp</p>
@@ -108,7 +112,7 @@ const ResetPasswordPage = () => {
 
         {/* Form */}
         <Card className="card-hover shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="bg-gradient-to-r from-summi-blue/5 to-summi-green/5 rounded-t-lg">
+          <CardHeader className="bg-gradient-to-r from-summi-green/5 to-summi-secondary/5 rounded-t-lg">
             <CardTitle className="text-center text-summi-gray-900">Redefinir Senha</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
@@ -122,7 +126,7 @@ const ResetPasswordPage = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20"
+                  className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
                 />
               </div>
 
@@ -135,13 +139,13 @@ const ResetPasswordPage = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20"
+                  className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-summi-blue to-summi-green hover:from-summi-blue/90 hover:to-summi-green/90 text-white font-medium shadow-lg"
+                className="w-full bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
                 disabled={isLoading}
               >
                 {isLoading ? 'Atualizando...' : 'Atualizar Senha'}

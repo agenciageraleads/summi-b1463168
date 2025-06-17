@@ -53,7 +53,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Cores da Summi baseadas na logo
+        // Cores da Summi baseadas na logo - apenas verde
         summi: {
           green: "#42AA6B", // Verde principal da logo
           primary: "#42AA6B", // Verde principal
