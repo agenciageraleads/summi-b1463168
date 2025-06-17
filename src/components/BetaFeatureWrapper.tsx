@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useBetaFeatures } from '@/hooks/useBetaFeatures';
 import { BetaBadge } from '@/components/BetaBadge';
-import { Lock, Mail } from 'lucide-react';
+import { Lock, Mail, TestTube } from 'lucide-react'; // Adicionado TestTube na importação
 
 interface BetaFeatureWrapperProps {
   children: React.ReactNode;
