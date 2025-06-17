@@ -20,6 +20,7 @@ import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
 import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
+import AdminGroupsPage from "./pages/AdminGroupsPage"; // Nova página beta
 import ReferralPage from '@/pages/ReferralPage';
 
 const queryClient = new QueryClient();
@@ -77,6 +78,7 @@ function App() {
                 {/* Admin Routes */}
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
+                <Route path="/admin/groups" element={<AdminGroupsPage />} />
                 
                 {/* Rotas de convite - ambas funcionam */}
                 <Route path="/convite/:referralCode" element={<ReferralPage />} />

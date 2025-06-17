@@ -83,17 +83,22 @@ const ResetPasswordPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-summi-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-blue/5 to-summi-green/5 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Logo */}
+        {/* Logo Oficial Summi */}
         <div className="text-center">
-          <Link to="/" className="flex items-center justify-center space-x-2">
-            <div className="w-12 h-12 bg-summi-blue rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">S</span>
+          <div className="flex items-center justify-center space-x-3 mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-summi-blue to-summi-green rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-2xl">S</span>
             </div>
-            <span className="text-2xl font-bold text-summi-blue">Summi</span>
-          </Link>
-          <h2 className="mt-6 text-3xl font-bold text-summi-gray-900">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-summi-blue to-summi-green bg-clip-text text-transparent">
+                Summi
+              </h1>
+              <p className="text-sm text-summi-gray-600">Inteligência Artificial para WhatsApp</p>
+            </div>
+          </div>
+          <h2 className="text-3xl font-bold text-summi-gray-900">
             Nova Senha
           </h2>
           <p className="mt-2 text-sm text-summi-gray-600">
@@ -102,14 +107,14 @@ const ResetPasswordPage = () => {
         </div>
 
         {/* Form */}
-        <Card className="card-hover">
-          <CardHeader>
-            <CardTitle className="text-center">Redefinir Senha</CardTitle>
+        <Card className="card-hover shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="bg-gradient-to-r from-summi-blue/5 to-summi-green/5 rounded-t-lg">
+            <CardTitle className="text-center text-summi-gray-900">Redefinir Senha</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="password">Nova Senha</Label>
+                <Label htmlFor="password" className="text-summi-gray-700 font-medium">Nova Senha</Label>
                 <Input
                   id="password"
                   type="password"
@@ -117,12 +122,12 @@ const ResetPasswordPage = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="mt-1"
+                  className="mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20"
                 />
               </div>
 
               <div>
-                <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                <Label htmlFor="confirmPassword" className="text-summi-gray-700 font-medium">Confirmar Nova Senha</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -130,13 +135,13 @@ const ResetPasswordPage = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="mt-1"
+                  className="mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20"
                 />
               </div>
 
               <Button
                 type="submit"
-                className="btn-primary w-full"
+                className="w-full bg-gradient-to-r from-summi-blue to-summi-green hover:from-summi-blue/90 hover:to-summi-green/90 text-white font-medium shadow-lg"
                 disabled={isLoading}
               >
                 {isLoading ? 'Atualizando...' : 'Atualizar Senha'}

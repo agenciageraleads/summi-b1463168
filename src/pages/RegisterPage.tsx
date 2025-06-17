@@ -68,38 +68,43 @@ const RegisterPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-summi-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-blue/5 to-summi-green/5">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-summi-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-blue/5 to-summi-green/5 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Logo */}
+        {/* Logo Oficial Summi */}
         <div className="text-center">
-          <Link to="/" className="flex items-center justify-center space-x-2">
-            <div className="w-12 h-12 bg-summi-blue rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">S</span>
+          <div className="flex items-center justify-center space-x-3 mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-summi-blue to-summi-green rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-2xl">S</span>
             </div>
-            <span className="text-2xl font-bold text-summi-blue">Summi</span>
-          </Link>
-          <h2 className="mt-6 text-3xl font-bold text-summi-gray-900">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-summi-blue to-summi-green bg-clip-text text-transparent">
+                Summi
+              </h1>
+              <p className="text-sm text-summi-gray-600">Inteligência Artificial para WhatsApp</p>
+            </div>
+          </div>
+          <h2 className="text-3xl font-bold text-summi-gray-900">
             Crie sua conta
           </h2>
-          <div className="mt-2 space-y-2">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <p className="text-sm font-medium text-green-800">
+          <div className="mt-4 space-y-3">
+            <div className="bg-gradient-to-r from-summi-green/10 to-summi-blue/10 border border-summi-green/20 rounded-lg p-4">
+              <p className="text-lg font-bold text-summi-green">
                 🎉 Trial de 7 dias GRÁTIS
               </p>
-              <p className="text-xs text-green-600">
+              <p className="text-sm text-summi-gray-600">
                 Sem cartão de crédito • Acesso completo
               </p>
             </div>
             <p className="text-sm text-summi-gray-600">
               Ou{' '}
-              <Link to="/login" className="font-medium text-summi-blue hover:underline">
+              <Link to="/login" className="font-medium text-summi-blue hover:text-summi-green transition-colors">
                 faça login na sua conta existente
               </Link>
             </p>
@@ -107,16 +112,16 @@ const RegisterPage = () => {
         </div>
 
         {/* Form */}
-        <Card className="card-hover">
-          <CardHeader>
+        <Card className="card-hover shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="bg-gradient-to-r from-summi-blue/5 to-summi-green/5 rounded-t-lg">
             <CardTitle className="text-center text-summi-gray-900">
               Trial Gratuito de 7 Dias
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="name" className="text-summi-gray-700">Nome completo</Label>
+                <Label htmlFor="name" className="text-summi-gray-700 font-medium">Nome completo</Label>
                 <Input
                   id="name"
                   type="text"
@@ -124,7 +129,7 @@ const RegisterPage = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   placeholder="Seu nome"
-                  className={`mt-1 ${errors.name ? 'border-red-500' : ''}`}
+                  className={`mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20 ${errors.name ? 'border-red-500' : ''}`}
                 />
                 {errors.name && (
                   <p className="text-red-500 text-sm mt-1">{errors.name}</p>
@@ -132,7 +137,7 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="email" className="text-summi-gray-700">E-mail</Label>
+                <Label htmlFor="email" className="text-summi-gray-700 font-medium">E-mail</Label>
                 <Input
                   id="email"
                   type="email"
@@ -140,7 +145,7 @@ const RegisterPage = () => {
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   placeholder="seu@email.com"
-                  className={`mt-1 ${errors.email ? 'border-red-500' : ''}`}
+                  className={`mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20 ${errors.email ? 'border-red-500' : ''}`}
                 />
                 {errors.email && (
                   <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -148,7 +153,7 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="password" className="text-summi-gray-700">Senha</Label>
+                <Label htmlFor="password" className="text-summi-gray-700 font-medium">Senha</Label>
                 <Input
                   id="password"
                   type="password"
@@ -156,7 +161,7 @@ const RegisterPage = () => {
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
                   placeholder="••••••••"
-                  className={`mt-1 ${errors.password ? 'border-red-500' : ''}`}
+                  className={`mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20 ${errors.password ? 'border-red-500' : ''}`}
                 />
                 {errors.password && (
                   <p className="text-red-500 text-sm mt-1">{errors.password}</p>
@@ -164,7 +169,7 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="confirmPassword" className="text-summi-gray-700">Confirmar senha</Label>
+                <Label htmlFor="confirmPassword" className="text-summi-gray-700 font-medium">Confirmar senha</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -172,7 +177,7 @@ const RegisterPage = () => {
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
                   placeholder="••••••••"
-                  className={`mt-1 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                  className={`mt-1 border-summi-gray-300 focus:border-summi-blue focus:ring-summi-blue/20 ${errors.confirmPassword ? 'border-red-500' : ''}`}
                 />
                 {errors.confirmPassword && (
                   <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
@@ -181,7 +186,7 @@ const RegisterPage = () => {
 
               <Button
                 type="submit"
-                className="btn-primary w-full"
+                className="w-full bg-gradient-to-r from-summi-blue to-summi-green hover:from-summi-blue/90 hover:to-summi-green/90 text-white font-medium shadow-lg"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? 'Criando conta e ativando trial...' : 'Começar trial gratuito'}

@@ -1,12 +1,13 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { BarChart3, Users, ArrowLeft } from 'lucide-react';
+import { BarChart3, Users, ArrowLeft, Monitor } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: BarChart3 },
   { name: 'Usuários', href: '/admin/users', icon: Users },
+  { name: 'Grupos Beta', href: '/admin/groups', icon: Monitor }, // Nova funcionalidade beta
 ];
 
 export const AdminSidebar = () => {
