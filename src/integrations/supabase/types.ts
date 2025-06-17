@@ -81,6 +81,30 @@ export type Database = {
         }
         Relationships: []
       }
+      monitored_whatsapp_groups: {
+        Row: {
+          created_at: string
+          group_id: string
+          group_name: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          group_name: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          group_name?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           apenas_horario_comercial: boolean | null

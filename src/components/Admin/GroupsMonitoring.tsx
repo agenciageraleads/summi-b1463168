@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile } from '@/hooks/useProfile';
 
+// Interface para os grupos do WhatsApp retornados pela Evolution API
 interface WhatsAppGroup {
   groupId: string;
   groupName: string;
@@ -18,6 +19,7 @@ interface WhatsAppGroup {
   isMonitored?: boolean;
 }
 
+// Interface para grupos monitorados armazenados no banco
 interface MonitoredGroup {
   id: string;
   group_id: string;
@@ -41,28 +43,39 @@ export const GroupsMonitoring: React.FC = () => {
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin && selectedUserId) {
       fetchMonitoredGroups();
     }
-  }, [isAdmin]);
+  }, [isAdmin, selectedUserId]);
 
   const fetchMonitoredGroups = async () => {
     if (!selectedUserId) return;
 
     try {
-      const { data, error } = await supabase
-        .from('monitored_whatsapp_groups')
-        .select('*')
-        .eq('user_id', selectedUserId);
+      console.log('[GROUPS-MONITORING] Buscando grupos monitorados para usuário:', selectedUserId);
 
-      if (error) {
-        console.error('Erro ao buscar grupos monitorados:', error);
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        console.error('[GROUPS-MONITORING] Sessão não encontrada');
         return;
       }
 
+      const { data, error } = await supabase.functions.invoke('get-monitored-groups', {
+        body: { target_user_id: selectedUserId },
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('[GROUPS-MONITORING] Erro ao buscar grupos monitorados:', error);
+        return;
+      }
+
+      console.log('[GROUPS-MONITORING] Grupos monitorados encontrados:', data?.length || 0);
       setMonitoredGroups(data || []);
     } catch (error) {
-      console.error('Erro inesperado ao buscar grupos monitorados:', error);
+      console.error('[GROUPS-MONITORING] Erro inesperado ao buscar grupos monitorados:', error);
     }
   };
 
@@ -338,7 +351,9 @@ export const GroupsMonitoring: React.FC = () => {
                   />
                 </div>
                 <Badge 
-                  variant={monitoredCount >= 3 ? "destructive" : "secondary"}
+                  variant={mon
+
+   >= 3 ? "destructive" : "secondary"}
                   className="ml-2"
                 >
                   {monitoredCount}/3 monitorados
