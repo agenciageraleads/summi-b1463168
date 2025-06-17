@@ -1,31 +1,41 @@
 
 import React, { useState } from 'react';
+import { AdminUser } from '@/hooks/useAdmin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, UserPlus, Crown, TestTube, User } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { UserCheck, UserX, Search, TestTube } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { AdminUser } from '@/hooks/useAdmin';
+import { useToast } from '@/hooks/use-toast';
 
 interface BetaUsersSectionProps {
   users: AdminUser[];
   onRefresh: () => void;
 }
 
+// Componente para gestão de usuários beta
 export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [loading, setLoading] = useState(false);
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-  
+
+  // Filtrar usuários com base no termo de busca
+  const filteredUsers = users.filter(user => 
+    user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Separar usuários beta dos demais
+  const betaUsers = filteredUsers.filter(user => user.role === 'beta');
+  const regularUsers = filteredUsers.filter(user => user.role === 'user');
+
   // Função para promover usuário para beta
   const promoteUserToBeta = async (userId: string, userName: string) => {
-    setLoading(true);
+    setLoadingStates(prev => ({ ...prev, [userId]: true }));
+    
     try {
       const { error } = await supabase
         .from('profiles')
@@ -38,6 +48,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
         title: "Sucesso",
         description: `${userName} foi promovido para usuário beta`,
       });
+      
       onRefresh();
     } catch (error) {
       console.error('Erro ao promover usuário:', error);
@@ -47,13 +58,14 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setLoadingStates(prev => ({ ...prev, [userId]: false }));
     }
   };
 
-  // Função para remover usuário do beta
+  // Função para remover usuário do programa beta
   const removeUserFromBeta = async (userId: string, userName: string) => {
-    setLoading(true);
+    setLoadingStates(prev => ({ ...prev, [userId]: true }));
+    
     try {
       const { error } = await supabase
         .from('profiles')
@@ -66,243 +78,164 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
         title: "Sucesso",
         description: `${userName} foi removido do programa beta`,
       });
+      
       onRefresh();
     } catch (error) {
       console.error('Erro ao remover usuário do beta:', error);
       toast({
         title: "Erro",
-        description: "Erro ao remover usuário do beta",
+        description: "Erro ao remover usuário do programa beta",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setLoadingStates(prev => ({ ...prev, [userId]: false }));
     }
   };
 
-  // Filtrar usuários baseado na pesquisa e filtro de role
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    
-    return matchesSearch && matchesRole;
-  });
-
-  // Contar usuários por role
-  const userCounts = {
-    total: users.length,
-    beta: users.filter(u => u.role === 'beta').length,
-    admin: users.filter(u => u.role === 'admin').length,
-    user: users.filter(u => u.role === 'user').length,
-  };
-
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return <Badge className="bg-red-100 text-red-800"><Crown className="h-3 w-3 mr-1" />Admin</Badge>;
-      case 'beta':
-        return <Badge className="bg-purple-100 text-purple-800"><TestTube className="h-3 w-3 mr-1" />Beta</Badge>;
-      default:
-        return <Badge variant="secondary"><User className="h-3 w-3 mr-1" />Usuário</Badge>;
-    }
-  };
+  const UserCard: React.FC<{ user: AdminUser; isBeta: boolean }> = ({ user, isBeta }) => (
+    <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-medium text-gray-900">{user.nome}</h3>
+            {isBeta && <Badge className="bg-purple-100 text-purple-800">BETA</Badge>}
+          </div>
+          <p className="text-sm text-gray-600">{user.numero || 'Sem número'}</p>
+          <p className="text-xs text-gray-500 font-mono">{user.id}</p>
+          <p className="text-xs text-gray-500">
+            Criado em: {new Date(user.created_at).toLocaleDateString('pt-BR')}
+          </p>
+        </div>
+        
+        <div className="flex flex-col gap-2">
+          {isBeta ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingStates[user.id]}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <UserX className="h-4 w-4 mr-1" />
+                  Remover Beta
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remover do Programa Beta</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja remover <strong>{user.nome}</strong> do programa beta? 
+                    O usuário perderá acesso às funcionalidades beta.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => removeUserFromBeta(user.id, user.nome)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Remover do Beta
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingStates[user.id]}
+                  className="text-purple-600 hover:text-purple-700"
+                >
+                  <UserCheck className="h-4 w-4 mr-1" />
+                  Promover Beta
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Promover para Beta</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja promover <strong>{user.nome}</strong> para usuário beta? 
+                    O usuário terá acesso às funcionalidades beta da plataforma.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => promoteUserToBeta(user.id, user.nome)}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    Promover para Beta
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Estatísticas dos Usuários Beta */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total de Usuários</p>
-                <p className="text-2xl font-bold text-gray-900">{userCounts.total}</p>
-              </div>
-              <User className="h-8 w-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Barra de busca */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Buscar usuários por nome, número ou ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Usuários Beta</p>
-                <p className="text-2xl font-bold text-purple-600">{userCounts.beta}</p>
-              </div>
-              <TestTube className="h-8 w-8 text-purple-400" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Administradores</p>
-                <p className="text-2xl font-bold text-red-600">{userCounts.admin}</p>
-              </div>
-              <Crown className="h-8 w-8 text-red-400" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Usuários Normais</p>
-                <p className="text-2xl font-bold text-blue-600">{userCounts.user}</p>
-              </div>
-              <User className="h-8 w-8 text-blue-400" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Seção de Gestão de Usuários Beta */}
+      {/* Usuários Beta */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TestTube className="h-5 w-5 text-purple-600" />
-            Gestão de Usuários Beta
+            Usuários Beta ({betaUsers.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Filtros */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <Label htmlFor="search">Buscar usuários</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  id="search"
-                  placeholder="Nome, email ou ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          {betaUsers.length > 0 ? (
+            <div className="space-y-3">
+              {betaUsers.map(user => (
+                <UserCard key={user.id} user={user} isBeta={true} />
+              ))}
             </div>
-            <div className="min-w-[200px]">
-              <Label htmlFor="role-filter">Filtrar por role</Label>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os roles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os roles</SelectItem>
-                  <SelectItem value="user">Usuários</SelectItem>
-                  <SelectItem value="beta">Beta</SelectItem>
-                  <SelectItem value="admin">Administradores</SelectItem>
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <TestTube className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+              <p>Nenhum usuário beta encontrado</p>
             </div>
-          </div>
+          )}
+        </CardContent>
+      </Card>
 
-          {/* Lista de Usuários */}
-          <div className="space-y-3">
-            {filteredUsers.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="font-medium text-gray-900">{user.nome}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
-                      <p className="text-xs text-gray-400 font-mono">{user.id}</p>
-                    </div>
-                    <div className="ml-4">
-                      {getRoleBadge(user.role)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Ações baseadas no role atual */}
-                  {user.role === 'user' && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          disabled={loading}
-                          className="text-purple-600 hover:text-purple-700"
-                        >
-                          <UserPlus className="h-4 w-4 mr-1" />
-                          Promover para Beta
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Promover para Beta</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja promover <strong>{user.nome}</strong> para usuário beta? 
-                            Isso dará acesso às funcionalidades beta do sistema.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => promoteUserToBeta(user.id, user.nome)}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            Promover para Beta
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-
-                  {user.role === 'beta' && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          disabled={loading}
-                          className="text-orange-600 hover:text-orange-700"
-                        >
-                          Remover do Beta
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Remover do Beta</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja remover <strong>{user.nome}</strong> do programa beta? 
-                            Isso removerá o acesso às funcionalidades beta.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => removeUserFromBeta(user.id, user.nome)}
-                            className="bg-orange-600 hover:bg-orange-700"
-                          >
-                            Remover do Beta
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-
-                  {user.role === 'admin' && (
-                    <Badge variant="secondary" className="cursor-not-allowed">
-                      Administrador
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {filteredUsers.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                Nenhum usuário encontrado com os filtros aplicados
-              </div>
-            )}
-          </div>
+      {/* Usuários Regulares */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Usuários Regulares ({regularUsers.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {regularUsers.length > 0 ? (
+            <div className="space-y-3">
+              {regularUsers.map(user => (
+                <UserCard key={user.id} user={user} isBeta={false} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>Nenhum usuário regular encontrado</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
