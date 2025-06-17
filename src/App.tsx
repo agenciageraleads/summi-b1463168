@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,7 +20,8 @@ import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
 import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
-import AdminGroupsPage from "./pages/AdminGroupsPage"; // Nova página beta
+import AdminGroupsPage from "./pages/AdminGroupsPage";
+import AdminBetaUsersPage from "./pages/AdminBetaUsersPage"; // Nova página
 import ReferralPage from '@/pages/ReferralPage';
 import TermsPage from "./pages/TermsPage";
 
@@ -80,6 +82,7 @@ function App() {
                 {/* Admin Routes */}
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
+                <Route path="/admin/beta-users" element={<AdminBetaUsersPage />} />
                 <Route path="/admin/groups" element={<AdminGroupsPage />} />
                 
                 {/* Rotas de convite - ambas funcionam */}
