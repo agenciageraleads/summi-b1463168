@@ -351,9 +351,7 @@ export const GroupsMonitoring: React.FC = () => {
                   />
                 </div>
                 <Badge 
-                  variant={mon
-
-   >= 3 ? "destructive" : "secondary"}
+                  variant={monitoredCount >= 3 ? "destructive" : "secondary"}
                   className="ml-2"
                 >
                   {monitoredCount}/3 monitorados
