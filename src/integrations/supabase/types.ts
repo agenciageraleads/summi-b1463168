@@ -125,6 +125,8 @@ export type Database = {
           "Summi em Audio?": boolean | null
           temas_importantes: string | null
           temas_urgentes: string | null
+          terms_accepted_at: string | null
+          terms_version: string | null
           transcreve_audio_enviado: boolean | null
           transcreve_audio_recebido: boolean | null
           updated_at: string | null
@@ -148,6 +150,8 @@ export type Database = {
           "Summi em Audio?"?: boolean | null
           temas_importantes?: string | null
           temas_urgentes?: string | null
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           transcreve_audio_enviado?: boolean | null
           transcreve_audio_recebido?: boolean | null
           updated_at?: string | null
@@ -171,6 +175,8 @@ export type Database = {
           "Summi em Audio?"?: boolean | null
           temas_importantes?: string | null
           temas_urgentes?: string | null
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           transcreve_audio_enviado?: boolean | null
           transcreve_audio_recebido?: boolean | null
           updated_at?: string | null

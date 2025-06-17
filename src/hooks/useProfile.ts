@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -342,6 +341,46 @@ export const useProfile = () => {
     await fetchProfile();
   };
 
+  // Função para aceitar termos de uso
+  const acceptTerms = async (version: string = 'v1.0') => {
+    if (!user) {
+      console.error('[PROFILE] No user found for terms acceptance');
+      return { success: false, error: 'Usuário não autenticado' };
+    }
+
+    try {
+      console.log('[PROFILE] Accepting terms for user:', user.id);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          terms_accepted_at: new Date().toISOString(),
+          terms_version: version,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[PROFILE] Error accepting terms:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Atualizar estado local
+      if (data) {
+        setProfile(data);
+      }
+
+      console.log('[PROFILE] Terms accepted successfully');
+      return { success: true, data };
+      
+    } catch (error) {
+      console.error('[PROFILE] Unexpected error accepting terms:', error);
+      return { success: false, error: 'Erro inesperado ao aceitar termos' };
+    }
+  };
+
   // Buscar perfil ao montar o componente ou quando o usuário mudar
   useEffect(() => {
     fetchProfile();
@@ -352,6 +391,7 @@ export const useProfile = () => {
     isLoading,
     updateProfile,
     deleteAccount,
-    refreshProfile
+    refreshProfile,
+    acceptTerms
   };
 };

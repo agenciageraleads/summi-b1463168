@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +21,7 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminGroupsPage from "./pages/AdminGroupsPage"; // Nova página beta
 import ReferralPage from '@/pages/ReferralPage';
+import TermsPage from "./pages/TermsPage";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +39,8 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
                     <DashboardPage />

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -142,19 +141,25 @@ serve(async (req) => {
     logStep("Usuário criado com sucesso", { userId });
 
     try {
-      // Passo 2: O perfil é criado automaticamente pelo trigger, apenas precisamos atualizar referência
-      if (referrerUserId) {
-        logStep("Atualizando perfil com referência de indicação");
-        const { error: profileError } = await supabaseAdmin
-          .from('profiles')
-          .update({
-            referred_by_user_id: referrerUserId
-          })
-          .eq('id', userId);
+      // Passo 2: Atualizar perfil com aceitação dos termos e referência
+      logStep("Atualizando perfil com termos aceitos e referência");
+      
+      const profileUpdateData: any = {
+        terms_accepted_at: new Date().toISOString(),
+        terms_version: 'v1.0'
+      };
 
-        if (profileError) {
-          logStep("Erro ao atualizar perfil com indicação", { error: profileError });
-        }
+      if (referrerUserId) {
+        profileUpdateData.referred_by_user_id = referrerUserId;
+      }
+
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update(profileUpdateData)
+        .eq('id', userId);
+
+      if (profileError) {
+        logStep("Erro ao atualizar perfil", { error: profileError });
       }
 
       // Passo 3: Criar customer no Stripe

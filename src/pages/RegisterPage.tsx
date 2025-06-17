@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
+import { TermsCheckbox } from '@/components/TermsCheckbox';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -17,10 +18,11 @@ const RegisterPage = () => {
     password: '',
     confirmPassword: ''
   });
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Redirect if already logged in
+  // Redirecionar se já estiver logado
   useEffect(() => {
     if (user && !isLoading) {
       navigate('/dashboard');
@@ -44,6 +46,10 @@ const RegisterPage = () => {
 
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Senhas não coincidem';
+    }
+
+    if (!termsAccepted) {
+      newErrors.terms = 'Você deve aceitar os termos de uso para continuar';
     }
 
     setErrors(newErrors);
@@ -186,6 +192,15 @@ const RegisterPage = () => {
                 {errors.confirmPassword && (
                   <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
                 )}
+              </div>
+
+              {/* Termos de Uso */}
+              <div className="pt-2">
+                <TermsCheckbox
+                  checked={termsAccepted}
+                  onCheckedChange={setTermsAccepted}
+                  error={errors.terms}
+                />
               </div>
 
               <Button
