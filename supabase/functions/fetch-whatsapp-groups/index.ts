@@ -8,14 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Interface para os grupos retornados pela Evolution API v2
-interface EvolutionGroup {
-  id: string;
-  subject: string;
-  participants?: any[];
-  participantsCount?: number;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -120,17 +112,16 @@ serve(async (req) => {
 
     console.log('[FETCH-WHATSAPP-GROUPS] Configurações Evolution API OK');
 
-    // Construir URL da Evolution API seguindo a documentação v2
-    // GET /group/fetchAllGroups/{instanceName}?getParticipants=true
-    const evolutionUrl = `${evolutionApiUrl}/group/fetchAllGroups/${profile.instance_name}?getParticipants=true`;
+    // Construir URL seguindo exatamente o padrão do curl
+    // GET /group/fetchAllGroups/{instance}
+    const evolutionUrl = `${evolutionApiUrl}/group/fetchAllGroups/${profile.instance_name}`;
     console.log('[FETCH-WHATSAPP-GROUPS] URL da Evolution API:', evolutionUrl);
 
-    // Fazer requisição para a Evolution API seguindo a documentação
+    // Fazer requisição seguindo exatamente o padrão do curl
     const evolutionResponse = await fetch(evolutionUrl, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey, // Header conforme documentação
+        'apikey': evolutionApiKey, // Exatamente como no curl
       },
     })
 
@@ -159,61 +150,28 @@ serve(async (req) => {
 
     // Processar resposta da Evolution API
     const evolutionData = await evolutionResponse.json()
-    console.log('[FETCH-WHATSAPP-GROUPS] Resposta da Evolution API:', {
-      type: typeof evolutionData,
-      isArray: Array.isArray(evolutionData),
-      length: Array.isArray(evolutionData) ? evolutionData.length : 'N/A',
-      keys: evolutionData && typeof evolutionData === 'object' ? Object.keys(evolutionData) : null
-    });
+    console.log('[FETCH-WHATSAPP-GROUPS] Resposta da Evolution API:', evolutionData);
 
-    // A Evolution API pode retornar um objeto com uma propriedade contendo o array
-    // ou diretamente um array, vamos verificar ambos os casos
-    let groupsArray: EvolutionGroup[] = [];
+    // A resposta deve ser um array de grupos diretamente
+    let groupsArray = [];
 
     if (Array.isArray(evolutionData)) {
       groupsArray = evolutionData;
-    } else if (evolutionData && typeof evolutionData === 'object') {
-      // Procurar por propriedades que possam conter os grupos
-      const possibleKeys = ['groups', 'data', 'result', 'response'];
-      for (const key of possibleKeys) {
-        if (evolutionData[key] && Array.isArray(evolutionData[key])) {
-          groupsArray = evolutionData[key];
-          break;
-        }
-      }
-      
-      // Se não encontrou em propriedades conhecidas, tenta usar o próprio objeto se tiver propriedades de grupo
-      if (groupsArray.length === 0 && evolutionData.id && evolutionData.subject) {
-        groupsArray = [evolutionData];
-      }
+    } else {
+      console.log('[FETCH-WHATSAPP-GROUPS] Resposta não é um array:', typeof evolutionData);
+      groupsArray = [];
     }
 
     console.log('[FETCH-WHATSAPP-GROUPS] Grupos encontrados:', groupsArray.length);
 
-    if (!Array.isArray(groupsArray) || groupsArray.length === 0) {
-      console.log('[FETCH-WHATSAPP-GROUPS] Nenhum grupo encontrado ou formato inválido');
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          groups: [],
-          total: 0,
-          instanceName: profile.instance_name,
-          message: 'Nenhum grupo encontrado'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
-    }
-
-    // Formatar os dados dos grupos conforme esperado pelo frontend
-    const formattedGroups = groupsArray.map((group: EvolutionGroup) => ({
-      groupId: group.id,
+    // Formatar os dados dos grupos para o frontend
+    const formattedGroups = groupsArray.map((group) => ({
+      id: group.id || group.remoteJid,
+      groupId: group.id || group.remoteJid,
+      name: group.subject || 'Grupo sem nome',
       groupName: group.subject || 'Grupo sem nome',
-      participantCount: group.participants?.length || group.participantsCount || 0,
-      id: group.id, // Alias para compatibilidade
-      name: group.subject || 'Grupo sem nome', // Alias para compatibilidade
-      participants: group.participants?.length || group.participantsCount || 0 // Alias para compatibilidade
+      participants: group.participants?.length || 0,
+      participantCount: group.participants?.length || 0,
     }))
 
     console.log('[FETCH-WHATSAPP-GROUPS] Grupos formatados:', {
