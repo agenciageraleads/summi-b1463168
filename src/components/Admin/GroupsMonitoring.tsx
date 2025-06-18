@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,7 @@ interface WhatsAppGroup {
   isMonitored: boolean;
 }
 
-// Componente para monitoramento de grupos WhatsApp
+// Componente para monitoramento de grupos WhatsApp - SIMPLIFICADO
 export const GroupsMonitoring: React.FC = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -30,7 +29,15 @@ export const GroupsMonitoring: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
-  // Buscar grupos do WhatsApp - funciona para qualquer usuário logado
+  // CORREÇÃO: Buscar grupos automaticamente quando o componente carrega
+  useEffect(() => {
+    if (user && profile?.instance_name) {
+      fetchWhatsAppGroups();
+      fetchMonitoredGroups();
+    }
+  }, [user, profile?.instance_name]);
+
+  // Buscar grupos do WhatsApp - CORRIGIDO para funcionar para qualquer usuário
   const fetchWhatsAppGroups = async () => {
     if (!user || !profile?.instance_name) {
       toast({
@@ -57,6 +64,10 @@ export const GroupsMonitoring: React.FC = () => {
       if (data.success) {
         setGroups(data.groups || []);
         console.log(`[GroupsMonitoring] ${data.groups?.length || 0} grupos encontrados`);
+        toast({
+          title: "Grupos atualizados",
+          description: `${data.groups?.length || 0} grupos encontrados`,
+        });
       } else {
         throw new Error(data.error || 'Erro ao buscar grupos');
       }
@@ -163,13 +174,6 @@ export const GroupsMonitoring: React.FC = () => {
     }
   };
 
-  // Carregar dados iniciais
-  useEffect(() => {
-    if (user) {
-      fetchMonitoredGroups();
-    }
-  }, [user]);
-
   // Filtrar grupos com base na busca
   const filteredGroups = groups.filter(group =>
     group.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -181,7 +185,7 @@ export const GroupsMonitoring: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Controles */}
+      {/* CORREÇÃO: Controles simplificados */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
@@ -197,7 +201,7 @@ export const GroupsMonitoring: React.FC = () => {
         <div className="flex gap-2">
           <Button onClick={fetchWhatsAppGroups} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Buscar Grupos
+            Atualizar Grupos
           </Button>
           {selectedGroups.length > 0 && (
             <Button onClick={addToMonitoring} className="bg-green-600 hover:bg-green-700">
@@ -257,7 +261,7 @@ export const GroupsMonitoring: React.FC = () => {
             <div className="text-center py-8 text-gray-500">
               <Users className="h-12 w-12 mx-auto mb-2 text-gray-300" />
               <p>Nenhum grupo sendo monitorado</p>
-              <p className="text-sm">Use o botão "Buscar Grupos" para encontrar grupos disponíveis</p>
+              <p className="text-sm">Use o botão "Atualizar Grupos" para encontrar grupos disponíveis</p>
             </div>
           )}
         </CardContent>
