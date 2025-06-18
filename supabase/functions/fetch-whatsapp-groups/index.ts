@@ -41,10 +41,13 @@ serve(async (req) => {
       )
     }
 
-    // Verificar usuário autenticado
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    console.log('[FETCH-WHATSAPP-GROUPS] Token de autorização encontrado, verificando usuário...');
+
+    // Verificar usuário autenticado - extrair token corretamente
+    const token = authHeader.replace('Bearer ', '');
+    console.log('[FETCH-WHATSAPP-GROUPS] Token extraído, verificando usuário...');
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
       console.error('[FETCH-WHATSAPP-GROUPS] Erro de autenticação:', userError);
@@ -57,17 +60,40 @@ serve(async (req) => {
       )
     }
 
-    console.log('[FETCH-WHATSAPP-GROUPS] Usuário autenticado:', user.id);
+    console.log('[FETCH-WHATSAPP-GROUPS] Usuário autenticado:', {
+      id: user.id,
+      email: user.email
+    });
 
-    // Buscar perfil do usuário
+    // Buscar perfil do usuário - usar maybeSingle() para evitar erro
+    console.log('[FETCH-WHATSAPP-GROUPS] Buscando perfil do usuário na base de dados...');
+    
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('instance_name, nome')
+      .select('instance_name, nome, id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle(); // Mudança aqui: usar maybeSingle() em vez de single()
 
-    if (profileError || !profile) {
+    // Log detalhado do resultado da busca
+    console.log('[FETCH-WHATSAPP-GROUPS] Resultado da busca do perfil:', {
+      profile: profile,
+      error: profileError,
+      userId: user.id
+    });
+
+    if (profileError) {
       console.error('[FETCH-WHATSAPP-GROUPS] Erro ao buscar perfil:', profileError);
+      return new Response(
+        JSON.stringify({ error: 'Erro ao buscar perfil do usuário' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    if (!profile) {
+      console.error('[FETCH-WHATSAPP-GROUPS] Perfil não encontrado para o usuário:', user.id);
       return new Response(
         JSON.stringify({ error: 'Perfil do usuário não encontrado' }),
         {
@@ -78,7 +104,7 @@ serve(async (req) => {
     }
 
     if (!profile.instance_name) {
-      console.error('[FETCH-WHATSAPP-GROUPS] Instance name não configurado');
+      console.error('[FETCH-WHATSAPP-GROUPS] Instance name não configurado para o usuário:', user.id);
       return new Response(
         JSON.stringify({ error: 'WhatsApp não conectado. Configure sua conexão primeiro.' }),
         {
@@ -90,7 +116,8 @@ serve(async (req) => {
 
     console.log('[FETCH-WHATSAPP-GROUPS] Perfil encontrado:', {
       nome: profile.nome,
-      instance_name: profile.instance_name
+      instance_name: profile.instance_name,
+      id: profile.id
     });
 
     // Verificar configurações da Evolution API
