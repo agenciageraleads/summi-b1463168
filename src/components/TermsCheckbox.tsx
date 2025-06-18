@@ -11,6 +11,7 @@ interface TermsCheckboxProps {
   error?: string;
 }
 
+// Checkbox simplificado para os termos de uso
 export const TermsCheckbox: React.FC<TermsCheckboxProps> = ({
   checked,
   onCheckedChange,
@@ -48,8 +49,7 @@ export const TermsCheckbox: React.FC<TermsCheckboxProps> = ({
                 <TermsOfService isModal={true} />
               </DialogContent>
             </Dialog>
-            {' '}da plataforma Summi, incluindo a autorização para processar mensagens 
-            e enviar respostas automáticas em meu nome.
+            {' '}da plataforma Summi.
           </label>
         </div>
       </div>

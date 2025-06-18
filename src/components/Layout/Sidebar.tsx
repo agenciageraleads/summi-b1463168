@@ -1,179 +1,164 @@
 
-import React, { useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { LogOut, Settings, Users, PieChart, MessageSquare, X, User, LayoutDashboard } from 'lucide-react';
+import React from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { 
+  BarChart3, 
+  Settings, 
+  CreditCard, 
+  Users, 
+  MessageSquare, 
+  TestTube,
+  LogOut,
+  X,
+  Menu
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
-import { useBetaFeatures } from '@/hooks/useBetaFeatures';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
-interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
+// Sidebar corrigida com funcionalidade mobile e itens corretos
+export const Sidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { profile } = useProfile();
-  const { isBetaUser } = useBetaFeatures();
+  const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
-  // Fechar sidebar automaticamente no mobile quando rota muda
-  useEffect(() => {
-    if (isOpen && window.innerWidth < 1024) {
-      onClose();
-    }
-  }, [location.pathname, onClose]);
+  // Navegação principal do usuário
+  const navigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
+    { name: 'Configurações', href: '/settings', icon: Settings },
+    { name: 'Assinatura', href: '/subscription', icon: CreditCard },
+    { name: 'Indicações', href: '/referrals', icon: Users },
+    { name: 'Feedback', href: '/feedback', icon: MessageSquare },
+  ];
 
-  // Fechar sidebar quando clicar em qualquer link no mobile
-  const handleLinkClick = () => {
-    if (window.innerWidth < 1024) { // mobile/tablet
-      onClose();
-    }
+  // Adicionar itens condicionais baseados no role do usuário
+  const conditionalNavigation = [];
+  
+  // Beta para admin e beta users
+  if (profile?.role === 'admin' || profile?.role === 'beta') {
+    conditionalNavigation.push({
+      name: 'Beta',
+      href: '/beta',
+      icon: TestTube,
+    });
+  }
+
+  // Admin panel apenas para admins
+  if (profile?.role === 'admin') {
+    conditionalNavigation.push({
+      name: 'Painel do Admin',
+      href: '/admin',
+      icon: BarChart3,
+    });
+  }
+
+  const allNavigation = [...navigation, ...conditionalNavigation];
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+    setIsMobileOpen(false);
   };
 
-  const navigationItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Configurações', path: '/settings', icon: Settings },
-    { name: 'Assinatura', path: '/subscription', icon: PieChart },
-    { name: 'Indicações', path: '/referrals', icon: Users },
-    { name: 'Feedback', path: '/feedback', icon: MessageSquare },
-  ];
+  const handleNavClick = () => {
+    setIsMobileOpen(false);
+  };
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full bg-white border-r border-gray-200">
+      {/* Logo/Header */}
+      <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-summi-green rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">S</span>
+          </div>
+          <span className="text-xl font-bold text-summi-gray-900">Summi</span>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-4 py-6 space-y-2">
+        {allNavigation.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.href;
+          return (
+            <Link
+              key={item.name}
+              to={item.href}
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                isActive
+                  ? "bg-summi-green text-white"
+                  : "text-summi-gray-700 hover:bg-summi-gray-100 hover:text-summi-green"
+              )}
+            >
+              <Icon className="mr-3 h-5 w-5" />
+              {item.name}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* User section */}
+      <div className="p-4 border-t border-gray-200">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-summi-green flex items-center justify-center">
+            <span className="text-white text-sm font-medium">
+              {profile?.nome?.charAt(0) || user?.email?.charAt(0) || 'U'}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-summi-gray-900 truncate">
+              {profile?.nome || 'Usuário'}
+            </p>
+            <p className="text-xs text-summi-gray-500 truncate">
+              {user?.email}
+            </p>
+          </div>
+        </div>
+        
+        <Button
+          onClick={handleLogout}
+          variant="outline"
+          className="w-full flex items-center justify-center space-x-2 text-summi-gray-700 hover:text-red-600 hover:border-red-300"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Sair</span>
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <>
-      {/* Overlay para mobile */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
-      
-      {/* Sidebar */}
-      <div className={`
-        fixed top-0 left-0 h-full w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:shadow-lg
-      `}>
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-summi-gray-200">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg overflow-hidden">
-              <img 
-                src="/lovable-uploads/3cf7feb3-ab92-46ee-85a8-7706495a4bcf.png" 
-                alt="Summi" 
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <h1 className="text-xl font-bold text-summi-green">Summi</h1>
-          </div>
-          
-          {/* Botão de fechar apenas no mobile */}
-          <button
-            onClick={onClose}
-            className="lg:hidden p-1 rounded-md hover:bg-summi-gray-100"
-          >
-            <X className="w-5 h-5 text-summi-gray-500" />
-          </button>
-        </div>
+      {/* Mobile Menu Button - Visível apenas no mobile */}
+      <div className="lg:hidden fixed top-4 left-4 z-50">
+        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="bg-white shadow-lg border-gray-200"
+              aria-label="Abrir menu"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-64">
+            <SidebarContent />
+          </SheetContent>
+        </Sheet>
+      </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <div className="space-y-2">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={handleLinkClick}
-                className={`
-                  flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors
-                  ${location.pathname === item.path
-                    ? 'bg-summi-green text-white'
-                    : 'text-summi-gray-700 hover:bg-summi-gray-100'
-                  }
-                `}
-              >
-                <item.icon className="w-5 h-5" />
-                <span>{item.name}</span>
-              </Link>
-            ))}
-
-            {/* Beta Features - visível para admin ou beta */}
-            {isBetaUser && (
-              <Link
-                to="/beta"
-                onClick={handleLinkClick}
-                className={`
-                  flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors
-                  ${location.pathname === '/beta'
-                    ? 'bg-purple-600 text-white'
-                    : 'text-purple-600 hover:bg-purple-50'
-                  }
-                `}
-              >
-                <MessageSquare className="w-5 h-5" />
-                <span>Beta</span>
-                <span className="ml-auto text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                  BETA
-                </span>
-              </Link>
-            )}
-
-            {/* Admin Panel - visível apenas para admins */}
-            {profile?.role === 'admin' && (
-              <Link
-                to="/admin"
-                onClick={handleLinkClick}
-                className={`
-                  flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors
-                  ${location.pathname.startsWith('/admin')
-                    ? 'bg-red-600 text-white'
-                    : 'text-red-600 hover:bg-red-50'
-                  }
-                `}
-              >
-                <Settings className="w-5 h-5" />
-                <span>Painel do Admin</span>
-              </Link>
-            )}
-          </div>
-        </nav>
-
-        {/* User Profile & Logout */}
-        <div className="border-t border-summi-gray-200 p-4">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="w-10 h-10 bg-summi-green rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-summi-gray-900 truncate">
-                {profile?.nome || user?.email}
-              </p>
-              <p className="text-xs text-summi-gray-500 truncate">
-                {user?.email}
-              </p>
-              {profile?.role && profile.role !== 'user' && (
-                <span className="inline-block text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full mt-1">
-                  {profile.role}
-                </span>
-              )}
-            </div>
-          </div>
-          
-          <button
-            onClick={() => {
-              logout();
-              handleLinkClick(); // Fechar sidebar no mobile
-            }}
-            className="w-full flex items-center space-x-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Sair</span>
-          </button>
-        </div>
+      {/* Desktop Sidebar - Visível apenas no desktop */}
+      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
+        <SidebarContent />
       </div>
     </>
   );
 };
-
-export default Sidebar;
