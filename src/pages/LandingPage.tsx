@@ -4,8 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
+
 const LandingPage = () => {
-  return <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
       <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -611,20 +613,20 @@ Cancele quando quiser.</CardDescription>
             </div>
 
             <div>
-              <h4 className="font-semibold mb-4">Suporte</h4>
+              <h4 className="font-semibold mb-4">Produto</h4>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Contato</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Documentação</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status do Sistema</a></li>
+                <li><a href="#como-funciona" className="hover:text-white transition-colors">Como Funciona</a></li>
+                <li><a href="#recursos" className="hover:text-white transition-colors">Recursos</a></li>
+                <li><Link to="/register" className="hover:text-white transition-colors">Começar Agora</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-semibold mb-4">Legal</h4>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Termos de Uso</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Política de Privacidade</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">LGPD</a></li>
+                <li><Link to="/terms" className="hover:text-white transition-colors">Termos de Uso</Link></li>
+                <li><Link to="/privacy" className="hover:text-white transition-colors">Política de Privacidade</Link></li>
+                <li><Link to="/lgpd" className="hover:text-white transition-colors">LGPD</Link></li>
               </ul>
             </div>
           </div>
@@ -634,6 +636,8 @@ Cancele quando quiser.</CardDescription>
           </div>
         </div>
       </footer>
-    </div>;
+    </div>
+  );
 };
+
 export default LandingPage;

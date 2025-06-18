@@ -65,26 +65,69 @@ serve(async (req) => {
 
     console.log('[FETCH-WHATSAPP-GROUPS] Usuário autenticado:', user.id);
 
-    // CORREÇÃO: Buscar perfil do usuário atual (não só admin)
+    // CORREÇÃO: Usar select específico e tratamento correto do retorno
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role, instance_name, nome')
+      .select('role, instance_name, nome, id')
       .eq('id', user.id)
-      .maybeSingle(); // Usar maybeSingle() em vez de single()
+      .single();
 
     if (profileError) {
       console.error('[FETCH-WHATSAPP-GROUPS] Erro ao buscar perfil:', profileError);
-      return new Response(
-        JSON.stringify({ error: 'Erro ao verificar dados do usuário' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      
+      // Se o erro for NOT_FOUND, tentar criar o perfil básico
+      if (profileError.code === 'PGRST116') {
+        console.log('[FETCH-WHATSAPP-GROUPS] Perfil não encontrado, tentando criar perfil básico');
+        
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: user.id,
+              email: user.email,
+              nome: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
+              role: 'user'
+            }
+          ])
+          .select('role, instance_name, nome, id')
+          .single();
+
+        if (createError) {
+          console.error('[FETCH-WHATSAPP-GROUPS] Erro ao criar perfil:', createError);
+          return new Response(
+            JSON.stringify({ error: 'Erro ao criar perfil do usuário' }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          )
         }
-      )
+
+        // Usar o perfil recém-criado
+        console.log('[FETCH-WHATSAPP-GROUPS] Perfil criado com sucesso:', newProfile);
+        
+        if (!newProfile.instance_name) {
+          return new Response(
+            JSON.stringify({ error: 'WhatsApp não conectado. Configure sua conexão primeiro.' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          )
+        }
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Erro ao verificar dados do usuário' }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
     }
 
     if (!profile) {
-      console.error('[FETCH-WHATSAPP-GROUPS] Perfil não encontrado para o usuário:', user.id);
+      console.error('[FETCH-WHATSAPP-GROUPS] Perfil retornou null após busca');
       return new Response(
         JSON.stringify({ error: 'Perfil do usuário não encontrado' }),
         {
@@ -111,23 +154,20 @@ serve(async (req) => {
       nome: profile.nome
     });
 
-    const { instanceName } = await req.json()
+    // Processar o body da requisição para pegar instanceName opcional
+    let instanceName = profile.instance_name; // Usar do perfil como padrão
     
-    // Usar instance_name do perfil se não fornecido no body
-    const finalInstanceName = instanceName || profile.instance_name;
-    
-    if (!finalInstanceName) {
-      console.error('[FETCH-WHATSAPP-GROUPS] instanceName não encontrado');
-      return new Response(
-        JSON.stringify({ error: 'Instance name é obrigatório' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
+    try {
+      const body = await req.json();
+      if (body.instanceName) {
+        instanceName = body.instanceName;
+      }
+    } catch (e) {
+      // Se não conseguir fazer parse do JSON, usar instanceName do perfil
+      console.log('[FETCH-WHATSAPP-GROUPS] Usando instanceName do perfil, body não é JSON válido');
     }
-
-    console.log('[FETCH-WHATSAPP-GROUPS] Buscando grupos para instância:', finalInstanceName);
+    
+    console.log('[FETCH-WHATSAPP-GROUPS] Buscando grupos para instância:', instanceName);
 
     // Buscar grupos na Evolution API
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
@@ -150,7 +190,7 @@ serve(async (req) => {
       )
     }
 
-    const evolutionUrl = `${evolutionApiUrl}/group/fetchAllGroups/${finalInstanceName}`;
+    const evolutionUrl = `${evolutionApiUrl}/group/fetchAllGroups/${instanceName}`;
     console.log('[FETCH-WHATSAPP-GROUPS] Chamando Evolution API:', evolutionUrl);
 
     const evolutionResponse = await fetch(evolutionUrl, {
