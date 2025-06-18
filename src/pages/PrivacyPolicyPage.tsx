@@ -142,7 +142,7 @@ const PrivacyPolicyPage = () => {
                 Para questões sobre privacidade ou exercício de direitos, entre em contato 
                 através dos canais de suporte da plataforma.
               </p>
-            </div>
+            </section>
 
             <div className="bg-summi-green/10 p-4 rounded-lg border border-summi-green/20 mt-6">
               <h4 className="font-semibold text-summi-green mb-2">Transparência:</h4>
