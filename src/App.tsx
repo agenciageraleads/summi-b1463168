@@ -13,6 +13,7 @@ import SettingsPage from "./pages/SettingsPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import ReferralsPage from "./pages/ReferralsPage";
+import BetaPage from "./pages/BetaPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -20,8 +21,7 @@ import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
 import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
-import AdminGroupsPage from "./pages/AdminGroupsPage";
-import AdminBetaUsersPage from "./pages/AdminBetaUsersPage"; // Nova página
+import AdminBetaUsersPage from "./pages/AdminBetaUsersPage";
 import ReferralPage from '@/pages/ReferralPage';
 import TermsPage from "./pages/TermsPage";
 
@@ -78,12 +78,16 @@ function App() {
                     <ReferralsPage />
                   </ProtectedRoute>
                 } />
+                <Route path="/beta" element={
+                  <ProtectedRoute>
+                    <BetaPage />
+                  </ProtectedRoute>
+                } />
                 
                 {/* Admin Routes */}
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
                 <Route path="/admin/beta-users" element={<AdminBetaUsersPage />} />
-                <Route path="/admin/groups" element={<AdminGroupsPage />} />
                 
                 {/* Rotas de convite - ambas funcionam */}
                 <Route path="/convite/:referralCode" element={<ReferralPage />} />

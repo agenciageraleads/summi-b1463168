@@ -1,8 +1,10 @@
+
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LogOut, Settings, Users, PieChart, MessageSquare, X, User, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useBetaFeatures } from '@/hooks/useBetaFeatures';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -13,10 +15,11 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const { profile } = useProfile();
+  const { isBetaUser } = useBetaFeatures();
 
   // Fechar sidebar automaticamente no mobile quando rota muda
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && window.innerWidth < 1024) {
       onClose();
     }
   }, [location.pathname, onClose]);
@@ -30,10 +33,10 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
   const navigationItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'WhatsApp', path: '/whatsapp-v2', icon: MessageSquare },
-    { name: 'Ajustes', path: '/settings', icon: Settings },
-    { name: 'Plano', path: '/subscription', icon: PieChart },
+    { name: 'Configurações', path: '/settings', icon: Settings },
+    { name: 'Assinatura', path: '/subscription', icon: PieChart },
     { name: 'Indicações', path: '/referrals', icon: Users },
+    { name: 'Feedback', path: '/feedback', icon: MessageSquare },
   ];
 
   return (
@@ -94,6 +97,45 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 <span>{item.name}</span>
               </Link>
             ))}
+
+            {/* Beta Features - visível para admin ou beta */}
+            {isBetaUser && (
+              <Link
+                to="/beta"
+                onClick={handleLinkClick}
+                className={`
+                  flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors
+                  ${location.pathname === '/beta'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-purple-600 hover:bg-purple-50'
+                  }
+                `}
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span>Beta</span>
+                <span className="ml-auto text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                  BETA
+                </span>
+              </Link>
+            )}
+
+            {/* Admin Panel - visível apenas para admins */}
+            {profile?.role === 'admin' && (
+              <Link
+                to="/admin"
+                onClick={handleLinkClick}
+                className={`
+                  flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors
+                  ${location.pathname.startsWith('/admin')
+                    ? 'bg-red-600 text-white'
+                    : 'text-red-600 hover:bg-red-50'
+                  }
+                `}
+              >
+                <Settings className="w-5 h-5" />
+                <span>Painel do Admin</span>
+              </Link>
+            )}
           </div>
         </nav>
 
@@ -110,6 +152,11 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <p className="text-xs text-summi-gray-500 truncate">
                 {user?.email}
               </p>
+              {profile?.role && profile.role !== 'user' && (
+                <span className="inline-block text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full mt-1">
+                  {profile.role}
+                </span>
+              )}
             </div>
           </div>
           
