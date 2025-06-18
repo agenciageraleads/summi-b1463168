@@ -8,11 +8,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Interface para os grupos retornados pela Evolution API
+// Interface para os grupos retornados pela Evolution API v2
 interface EvolutionGroup {
   id: string;
   subject: string;
-  participants: any[];
+  participants?: any[];
+  participantsCount?: number;
 }
 
 serve(async (req) => {
@@ -22,9 +23,9 @@ serve(async (req) => {
   }
 
   try {
-    console.log('[FETCH-WHATSAPP-GROUPS] Função iniciada');
+    console.log('[FETCH-WHATSAPP-GROUPS] Iniciando busca de grupos');
 
-    // Criar cliente Supabase para verificar autenticação
+    // Criar cliente Supabase
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -48,7 +49,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('[FETCH-WHATSAPP-GROUPS] Verificando autenticação do usuário');
+    // Verificar usuário autenticado
     const { data: { user }, error: userError } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', '')
     )
@@ -66,14 +67,14 @@ serve(async (req) => {
 
     console.log('[FETCH-WHATSAPP-GROUPS] Usuário autenticado:', user.id);
 
-    // Buscar perfil do usuário logado (sem tentar criar)
+    // Buscar perfil do usuário
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('instance_name, nome, role')
+      .select('instance_name, nome')
       .eq('id', user.id)
       .single();
 
-    if (profileError) {
+    if (profileError || !profile) {
       console.error('[FETCH-WHATSAPP-GROUPS] Erro ao buscar perfil:', profileError);
       return new Response(
         JSON.stringify({ error: 'Perfil do usuário não encontrado' }),
@@ -84,19 +85,8 @@ serve(async (req) => {
       )
     }
 
-    if (!profile) {
-      console.error('[FETCH-WHATSAPP-GROUPS] Perfil não encontrado para o usuário');
-      return new Response(
-        JSON.stringify({ error: 'Perfil do usuário não encontrado' }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
-    }
-
     if (!profile.instance_name) {
-      console.error('[FETCH-WHATSAPP-GROUPS] Instance name não configurado para o usuário');
+      console.error('[FETCH-WHATSAPP-GROUPS] Instance name não configurado');
       return new Response(
         JSON.stringify({ error: 'WhatsApp não conectado. Configure sua conexão primeiro.' }),
         {
@@ -108,27 +98,18 @@ serve(async (req) => {
 
     console.log('[FETCH-WHATSAPP-GROUPS] Perfil encontrado:', {
       nome: profile.nome,
-      instance_name: profile.instance_name,
-      role: profile.role
+      instance_name: profile.instance_name
     });
-
-    // Usar o instance_name do perfil do usuário
-    const instanceName = profile.instance_name;
-    console.log('[FETCH-WHATSAPP-GROUPS] Buscando grupos para instância:', instanceName);
 
     // Verificar configurações da Evolution API
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
-    console.log('[FETCH-WHATSAPP-GROUPS] Evolution API URL:', evolutionApiUrl ? 'Configurada' : 'Não configurada');
-    console.log('[FETCH-WHATSAPP-GROUPS] Evolution API Key:', evolutionApiKey ? 'Configurada' : 'Não configurada');
-
     if (!evolutionApiUrl || !evolutionApiKey) {
       console.error('[FETCH-WHATSAPP-GROUPS] Configurações da Evolution API não encontradas');
       return new Response(
         JSON.stringify({ 
-          error: 'Configuração da Evolution API não encontrada',
-          details: 'Verifique as variáveis EVOLUTION_API_URL e EVOLUTION_API_KEY'
+          error: 'Configuração da Evolution API não encontrada'
         }),
         {
           status: 500,
@@ -137,21 +118,23 @@ serve(async (req) => {
       )
     }
 
-    // Construir URL da Evolution API para buscar grupos
-    // Documentação: GET /group/fetchAllGroups/{instanceName}
-    const evolutionUrl = `${evolutionApiUrl}/group/fetchAllGroups/${instanceName}`;
-    console.log('[FETCH-WHATSAPP-GROUPS] Chamando Evolution API:', evolutionUrl);
+    console.log('[FETCH-WHATSAPP-GROUPS] Configurações Evolution API OK');
 
-    // Fazer requisição para a Evolution API
+    // Construir URL da Evolution API seguindo a documentação v2
+    // GET /group/fetchAllGroups/{instanceName}?getParticipants=true
+    const evolutionUrl = `${evolutionApiUrl}/group/fetchAllGroups/${profile.instance_name}?getParticipants=true`;
+    console.log('[FETCH-WHATSAPP-GROUPS] URL da Evolution API:', evolutionUrl);
+
+    // Fazer requisição para a Evolution API seguindo a documentação
     const evolutionResponse = await fetch(evolutionUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': evolutionApiKey,
+        'apikey': evolutionApiKey, // Header conforme documentação
       },
     })
 
-    console.log('[FETCH-WHATSAPP-GROUPS] Status da resposta da Evolution API:', evolutionResponse.status);
+    console.log('[FETCH-WHATSAPP-GROUPS] Status da resposta:', evolutionResponse.status);
 
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text();
@@ -165,7 +148,7 @@ serve(async (req) => {
         JSON.stringify({ 
           error: 'Erro ao buscar grupos no WhatsApp',
           details: `Status: ${evolutionResponse.status} - ${evolutionResponse.statusText}`,
-          apiError: errorText
+          apiResponse: errorText
         }),
         {
           status: 500,
@@ -176,47 +159,74 @@ serve(async (req) => {
 
     // Processar resposta da Evolution API
     const evolutionData = await evolutionResponse.json()
-    console.log('[FETCH-WHATSAPP-GROUPS] Dados recebidos da Evolution API:', {
+    console.log('[FETCH-WHATSAPP-GROUPS] Resposta da Evolution API:', {
       type: typeof evolutionData,
       isArray: Array.isArray(evolutionData),
       length: Array.isArray(evolutionData) ? evolutionData.length : 'N/A',
-      sample: Array.isArray(evolutionData) && evolutionData.length > 0 ? evolutionData[0] : null
+      keys: evolutionData && typeof evolutionData === 'object' ? Object.keys(evolutionData) : null
     });
 
-    // Verificar se a resposta é um array
-    if (!Array.isArray(evolutionData)) {
-      console.error('[FETCH-WHATSAPP-GROUPS] Resposta da Evolution API não é um array:', evolutionData);
+    // A Evolution API pode retornar um objeto com uma propriedade contendo o array
+    // ou diretamente um array, vamos verificar ambos os casos
+    let groupsArray: EvolutionGroup[] = [];
+
+    if (Array.isArray(evolutionData)) {
+      groupsArray = evolutionData;
+    } else if (evolutionData && typeof evolutionData === 'object') {
+      // Procurar por propriedades que possam conter os grupos
+      const possibleKeys = ['groups', 'data', 'result', 'response'];
+      for (const key of possibleKeys) {
+        if (evolutionData[key] && Array.isArray(evolutionData[key])) {
+          groupsArray = evolutionData[key];
+          break;
+        }
+      }
+      
+      // Se não encontrou em propriedades conhecidas, tenta usar o próprio objeto se tiver propriedades de grupo
+      if (groupsArray.length === 0 && evolutionData.id && evolutionData.subject) {
+        groupsArray = [evolutionData];
+      }
+    }
+
+    console.log('[FETCH-WHATSAPP-GROUPS] Grupos encontrados:', groupsArray.length);
+
+    if (!Array.isArray(groupsArray) || groupsArray.length === 0) {
+      console.log('[FETCH-WHATSAPP-GROUPS] Nenhum grupo encontrado ou formato inválido');
       return new Response(
         JSON.stringify({ 
-          error: 'Formato de resposta inválido da Evolution API',
-          details: 'Esperado array, recebido: ' + typeof evolutionData,
-          data: evolutionData
+          success: true, 
+          groups: [],
+          total: 0,
+          instanceName: profile.instance_name,
+          message: 'Nenhum grupo encontrado'
         }),
         {
-          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       )
     }
 
-    // Formatar os dados dos grupos para retorno
-    const groups = evolutionData.map((group: EvolutionGroup) => ({
+    // Formatar os dados dos grupos conforme esperado pelo frontend
+    const formattedGroups = groupsArray.map((group: EvolutionGroup) => ({
       groupId: group.id,
       groupName: group.subject || 'Grupo sem nome',
-      participantCount: group.participants?.length || 0
+      participantCount: group.participants?.length || group.participantsCount || 0,
+      id: group.id, // Alias para compatibilidade
+      name: group.subject || 'Grupo sem nome', // Alias para compatibilidade
+      participants: group.participants?.length || group.participantsCount || 0 // Alias para compatibilidade
     }))
 
-    console.log('[FETCH-WHATSAPP-GROUPS] Grupos formatados com sucesso:', {
-      total: groups.length,
-      grupos: groups.map(g => ({ id: g.groupId, nome: g.groupName, participantes: g.participantCount }))
+    console.log('[FETCH-WHATSAPP-GROUPS] Grupos formatados:', {
+      total: formattedGroups.length,
+      sample: formattedGroups.slice(0, 2)
     });
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        groups: groups,
-        total: groups.length,
-        instanceName: instanceName
+        groups: formattedGroups,
+        total: formattedGroups.length,
+        instanceName: profile.instance_name
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
