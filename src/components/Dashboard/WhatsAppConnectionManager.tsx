@@ -1,3 +1,4 @@
+
 // Componente simplificado que usa apenas o hook unificado - VERSÃO FINAL
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,12 +7,79 @@ import { Badge } from '@/components/ui/badge';
 import { useProfile } from '@/hooks/useProfile';
 import { useNavigate } from 'react-router-dom';
 import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
-import { MessageSquare, Loader2, Wifi, WifiOff, QrCode, Phone, CheckCircle, AlertCircle, Unlink, Settings } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { MessageSquare, Loader2, Wifi, WifiOff, QrCode, Phone, CheckCircle, AlertCircle, Unlink, Settings, RefreshCw } from 'lucide-react';
 
 export const WhatsAppConnectionManager: React.FC = () => {
-  const { profile } = useProfile();
+  const { profile, refreshProfile } = useProfile();
   const navigate = useNavigate();
   const { state, handleConnect, handleDisconnect } = useWhatsAppManager();
+  const { toast } = useToast();
+  const [isRecreating, setIsRecreating] = React.useState(false);
+
+  // Função para recriar instância (deletar e criar nova)
+  const handleRecreateInstance = async () => {
+    if (!profile?.instance_name) {
+      toast({
+        title: "Erro",
+        description: "Nenhuma instância encontrada para recriar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsRecreating(true);
+    
+    try {
+      console.log('[WhatsApp Manager] 🔄 Iniciando recriação da instância...');
+      
+      // Obter sessão atual para autenticação
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Passo 1: Deletar instância atual
+      console.log('[WhatsApp Manager] 🗑️ Deletando instância atual...');
+      const { data: deleteData, error: deleteError } = await supabase.functions.invoke('evolution-delete-instance', {
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (deleteError) {
+        console.error('[WhatsApp Manager] ❌ Erro ao deletar instância:', deleteError);
+        throw new Error('Erro ao deletar instância atual');
+      }
+
+      console.log('[WhatsApp Manager] ✅ Instância deletada com sucesso');
+
+      // Passo 2: Aguardar um pouco e atualizar o perfil
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await refreshProfile();
+
+      // Passo 3: Iniciar nova conexão
+      console.log('[WhatsApp Manager] 🚀 Iniciando nova conexão...');
+      await handleConnect();
+
+      toast({
+        title: "Instância Recriada",
+        description: "A instância foi recriada com sucesso. Escaneie o novo QR Code.",
+        duration: 5000
+      });
+
+    } catch (error: any) {
+      console.error('[WhatsApp Manager] ❌ Erro ao recriar instância:', error);
+      toast({
+        title: "Erro ao Recriar Instância",
+        description: error.message || 'Erro inesperado ao recriar instância',
+        variant: "destructive"
+      });
+    } finally {
+      setIsRecreating(false);
+    }
+  };
 
   // Renderizar badge de status
   const renderStatusBadge = () => {
@@ -50,11 +118,11 @@ export const WhatsAppConnectionManager: React.FC = () => {
 
   // Renderizar botões de ação
   const renderActionButtons = () => {
-    if (state.isLoading) {
+    if (state.isLoading || isRecreating) {
       return (
         <Button disabled size="sm">
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          Processando...
+          {isRecreating ? 'Recriando...' : 'Processando...'}
         </Button>
       );
     }
@@ -69,10 +137,24 @@ export const WhatsAppConnectionManager: React.FC = () => {
         );
       case 'needs_qr_code':
         return (
-          <Button onClick={handleConnect} size="sm">
-            <QrCode className="w-4 h-4 mr-2" />
-            Conectar WhatsApp
-          </Button>
+          <div className="flex space-x-2">
+            <Button onClick={handleConnect} size="sm">
+              <QrCode className="w-4 h-4 mr-2" />
+              Conectar WhatsApp
+            </Button>
+            {/* Botão para recriar instância quando desconectado */}
+            {profile?.instance_name && (
+              <Button 
+                onClick={handleRecreateInstance} 
+                variant="outline" 
+                size="sm"
+                title="Recriar instância (útil para resolver problemas de conexão)"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Recriar Instância
+              </Button>
+            )}
+          </div>
         );
       case 'already_connected':
         return (
@@ -83,9 +165,23 @@ export const WhatsAppConnectionManager: React.FC = () => {
         );
       case 'error':
         return (
-          <Button onClick={handleConnect} variant="outline" size="sm">
-            Tentar Novamente
-          </Button>
+          <div className="flex space-x-2">
+            <Button onClick={handleConnect} variant="outline" size="sm">
+              Tentar Novamente
+            </Button>
+            {/* Botão para recriar instância em caso de erro */}
+            {profile?.instance_name && (
+              <Button 
+                onClick={handleRecreateInstance} 
+                variant="outline" 
+                size="sm"
+                title="Recriar instância (útil para resolver problemas de conexão)"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Recriar Instância
+              </Button>
+            )}
+          </div>
         );
       default:
         return (
