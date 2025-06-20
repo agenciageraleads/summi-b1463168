@@ -56,6 +56,61 @@ const LandingPage = () => {
         </div>
       </nav>
 
+      {/* Para Quem É Section */}
+      <section className="py-16 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">A Summi é perfeita para você que...</h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Store className="w-8 h-8 text-green-600" />
+                </div>
+                <CardDescription className="text-gray-700 text-sm leading-relaxed">
+                  É <strong>Empreendedor ou Dono de Negócio</strong> e sente que o WhatsApp é mais um chefe do que uma ferramenta.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Target className="w-8 h-8 text-green-600" />
+                </div>
+                <CardDescription className="text-gray-700 text-sm leading-relaxed">
+                  É <strong>Vendedor ou do Time Comercial</strong> e precisa de velocidade para bater metas e não perder leads para a concorrência.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Briefcase className="w-8 h-8 text-green-600" />
+                </div>
+                <CardDescription className="text-gray-700 text-sm leading-relaxed">
+                  É <strong>Profissional Liberal, Consultor ou de Agência</strong> e precisa organizar as demandas dos clientes para garantir entregas perfeitas.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Headphones className="w-8 h-8 text-green-600" />
+                </div>
+                <CardDescription className="text-gray-700 text-sm leading-relaxed">
+                  Trabalha com <strong>Atendimento ou Suporte</strong> e precisa identificar problemas urgentes antes que virem uma crise.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Hero Section */}
       <section className="py-20 lg:py-[92px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -109,61 +164,6 @@ const LandingPage = () => {
                 Nenhum cartão necessário • Sem compromisso • Ativação imediata
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Para Quem É Section */}
-      <section id="para-quem" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">A Summi é perfeita para você que...</h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Store className="w-8 h-8 text-green-600" />
-                </div>
-                <CardDescription className="text-gray-700 text-sm leading-relaxed">
-                  É <strong>Empreendedor ou Dono de Negócio</strong> e sente que o WhatsApp é mais um chefe do que uma ferramenta.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Target className="w-8 h-8 text-green-600" />
-                </div>
-                <CardDescription className="text-gray-700 text-sm leading-relaxed">
-                  É <strong>Vendedor ou do Time Comercial</strong> e precisa de velocidade para bater metas e não perder leads para a concorrência.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Briefcase className="w-8 h-8 text-green-600" />
-                </div>
-                <CardDescription className="text-gray-700 text-sm leading-relaxed">
-                  É <strong>Profissional Liberal, Consultor ou de Agência</strong> e precisa organizar as demandas dos clientes para garantir entregas perfeitas.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Headphones className="w-8 h-8 text-green-600" />
-                </div>
-                <CardDescription className="text-gray-700 text-sm leading-relaxed">
-                  Trabalha com <strong>Atendimento ou Suporte</strong> e precisa identificar problemas urgentes antes que virem uma crise.
-                </CardDescription>
-              </CardHeader>
-            </Card>
           </div>
         </div>
       </section>
@@ -345,7 +345,7 @@ const LandingPage = () => {
               <CardContent>
                 <div className="text-6xl text-green-200 mb-4 text-center">"</div>
                 <CardDescription className="text-gray-700 text-center italic text-base leading-relaxed">
-                  Eu perdia vendas porque não dava conta do volume. Com a Summi, eu sei exatamente qual lead responder primeiro. Deixou de ser um caos para virar uma máquina de vendas. A paz de espírito não tem preço.
+                  Eu perdi vendas porque não dava conta do volume. Com a Summi, eu sei exatamente qual lead responder primeiro. Deixou de ser um caos para virar uma máquina de vendas. A paz de espírito não tem preço.
                 </CardDescription>
               </CardContent>
             </Card>
