@@ -5,85 +5,100 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { RefreshCw, Search, Users, Trash2, Plus } from 'lucide-react';
+import { RefreshCw, Search, Users, Trash2, Plus, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProfile } from '@/hooks/useProfile';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface WhatsAppGroup {
   id: string;
   name: string;
   participants: number;
   isMonitored: boolean;
+  lastUpdated?: string;
 }
 
-// Componente para monitoramento de grupos WhatsApp - SIMPLIFICADO
 export const GroupsMonitoring: React.FC = () => {
   const { user } = useAuth();
-  const { profile } = useProfile();
   const { toast } = useToast();
   const [groups, setGroups] = useState<WhatsAppGroup[]>([]);
   const [monitoredGroups, setMonitoredGroups] = useState<WhatsAppGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [lastCacheUpdate, setLastCacheUpdate] = useState<string | null>(null);
 
-  // CORREÇÃO: Buscar grupos automaticamente quando o componente carrega
   useEffect(() => {
-    if (user && profile?.instance_name) {
-      fetchWhatsAppGroups();
+    if (user) {
+      loadCachedGroups();
       fetchMonitoredGroups();
     }
-  }, [user, profile?.instance_name]);
+  }, [user]);
 
-  // Buscar grupos do WhatsApp - CORRIGIDO para funcionar para qualquer usuário
-  const fetchWhatsAppGroups = async () => {
-    if (!user || !profile?.instance_name) {
-      toast({
-        title: "Aviso",
-        description: "Você precisa estar conectado ao WhatsApp para ver os grupos",
-        variant: "destructive",
-      });
-      return;
-    }
+  // Carregar grupos do cache
+  const loadCachedGroups = async () => {
+    if (!user) return;
 
     setIsLoading(true);
     try {
-      console.log(`[GroupsMonitoring] Buscando grupos para usuário: ${profile.nome} (${profile.instance_name})`);
-      
-      const { data, error } = await supabase.functions.invoke('fetch-whatsapp-groups', {
-        body: { 
-          instanceName: profile.instance_name,
-          userId: user.id 
-        },
+      const { data, error } = await supabase.functions.invoke('manage-whatsapp-groups-cache', {
+        body: { action: 'get_cached' },
       });
 
       if (error) throw error;
 
       if (data.success) {
         setGroups(data.groups || []);
-        console.log(`[GroupsMonitoring] ${data.groups?.length || 0} grupos encontrados`);
+        if (data.groups?.length > 0) {
+          setLastCacheUpdate(data.groups[0]?.lastUpdated);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar grupos do cache:', error);
+      // Se não há cache, mostrar que precisa atualizar
+      setGroups([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Atualizar grupos da API e salvar no cache
+  const refreshGroupsFromApi = async () => {
+    if (!user) return;
+
+    setIsRefreshing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-whatsapp-groups-cache', {
+        body: { action: 'refresh_from_api' },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setGroups(data.groups || []);
+        setLastCacheUpdate(new Date().toISOString());
         toast({
           title: "Grupos atualizados",
-          description: `${data.groups?.length || 0} grupos encontrados`,
+          description: `${data.groups?.length || 0} grupos encontrados e salvos no cache`,
         });
       } else {
         throw new Error(data.error || 'Erro ao buscar grupos');
       }
     } catch (error) {
-      console.error('Erro ao buscar grupos:', error);
+      console.error('Erro ao atualizar grupos:', error);
       toast({
         title: "Erro",
         description: "Erro ao buscar grupos do WhatsApp",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  // Buscar grupos monitorados do usuário
   const fetchMonitoredGroups = async () => {
     if (!user) return;
 
@@ -108,7 +123,6 @@ export const GroupsMonitoring: React.FC = () => {
     }
   };
 
-  // Adicionar grupos ao monitoramento
   const addToMonitoring = async () => {
     if (!user || selectedGroups.length === 0) return;
 
@@ -145,7 +159,6 @@ export const GroupsMonitoring: React.FC = () => {
     }
   };
 
-  // Remover grupo do monitoramento
   const removeFromMonitoring = async (groupId: string) => {
     if (!user) return;
 
@@ -174,7 +187,6 @@ export const GroupsMonitoring: React.FC = () => {
     }
   };
 
-  // Filtrar grupos com base na busca
   const filteredGroups = groups.filter(group =>
     group.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -185,7 +197,7 @@ export const GroupsMonitoring: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* CORREÇÃO: Controles simplificados */}
+      {/* Controles e Status do Cache */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
@@ -199,9 +211,13 @@ export const GroupsMonitoring: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchWhatsAppGroups} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Atualizar Grupos
+          <Button onClick={loadCachedGroups} disabled={isLoading} variant="outline">
+            <Users className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Carregar Cache
+          </Button>
+          <Button onClick={refreshGroupsFromApi} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Atualizar da API
           </Button>
           {selectedGroups.length > 0 && (
             <Button onClick={addToMonitoring} className="bg-green-600 hover:bg-green-700">
@@ -211,6 +227,23 @@ export const GroupsMonitoring: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Status do Cache */}
+      {lastCacheUpdate && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-blue-800">
+              <Clock className="h-4 w-4" />
+              <span className="text-sm">
+                Cache atualizado {formatDistanceToNow(new Date(lastCacheUpdate), { 
+                  addSuffix: true, 
+                  locale: ptBR 
+                })}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Grupos Monitorados */}
       <Card>
@@ -261,7 +294,7 @@ export const GroupsMonitoring: React.FC = () => {
             <div className="text-center py-8 text-gray-500">
               <Users className="h-12 w-12 mx-auto mb-2 text-gray-300" />
               <p>Nenhum grupo sendo monitorado</p>
-              <p className="text-sm">Use o botão "Atualizar Grupos" para encontrar grupos disponíveis</p>
+              <p className="text-sm">Use o botão "Atualizar da API" para encontrar grupos disponíveis</p>
             </div>
           )}
         </CardContent>
@@ -309,11 +342,12 @@ export const GroupsMonitoring: React.FC = () => {
             <div className="text-center py-8 text-gray-500">
               <Users className="h-12 w-12 mx-auto mb-2 text-gray-300" />
               <p>Nenhum grupo encontrado</p>
-              {!profile?.instance_name && (
-                <p className="text-sm text-red-500 mt-2">
-                  Conecte-se ao WhatsApp primeiro para ver seus grupos
-                </p>
-              )}
+              <p className="text-sm text-gray-400 mt-2">
+                {!lastCacheUpdate ? 
+                  'Clique em "Atualizar da API" para buscar seus grupos do WhatsApp' :
+                  'Use o campo de busca para filtrar grupos ou atualize da API'
+                }
+              </p>
             </div>
           )}
         </CardContent>

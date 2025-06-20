@@ -9,6 +9,89 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_announcements: {
+        Row: {
+          created_at: string
+          created_by: string
+          failed_count: number | null
+          id: string
+          message: string
+          recipients_count: number | null
+          send_via_email: boolean | null
+          send_via_whatsapp: boolean | null
+          sent_at: string | null
+          sent_count: number | null
+          status: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          failed_count?: number | null
+          id?: string
+          message: string
+          recipients_count?: number | null
+          send_via_email?: boolean | null
+          send_via_whatsapp?: boolean | null
+          sent_at?: string | null
+          sent_count?: number | null
+          status?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          failed_count?: number | null
+          id?: string
+          message?: string
+          recipients_count?: number | null
+          send_via_email?: boolean | null
+          send_via_whatsapp?: boolean | null
+          sent_at?: string | null
+          sent_count?: number | null
+          status?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      announcement_deliveries: {
+        Row: {
+          announcement_id: string
+          delivery_method: string
+          error_message: string | null
+          id: string
+          sent_at: string | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          delivery_method: string
+          error_message?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          delivery_method?: string
+          error_message?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_deliveries_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "admin_announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chats: {
         Row: {
           analisado_em: string | null
@@ -236,6 +319,33 @@ export type Database = {
           trial_ends_at?: string | null
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      whatsapp_groups_cache: {
+        Row: {
+          group_id: string
+          group_name: string
+          id: string
+          last_updated: string
+          participants_count: number | null
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          group_name: string
+          id?: string
+          last_updated?: string
+          participants_count?: number | null
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          group_name?: string
+          id?: string
+          last_updated?: string
+          participants_count?: number | null
+          user_id?: string
         }
         Relationships: []
       }
