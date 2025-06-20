@@ -56,61 +56,6 @@ const LandingPage = () => {
         </div>
       </nav>
 
-      {/* Para Quem É Section */}
-      <section className="py-16 bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">A Summi é perfeita para você que...</h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Store className="w-8 h-8 text-green-600" />
-                </div>
-                <CardDescription className="text-gray-700 text-sm leading-relaxed">
-                  É <strong>Empreendedor ou Dono de Negócio</strong> e sente que o WhatsApp é mais um chefe do que uma ferramenta.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Target className="w-8 h-8 text-green-600" />
-                </div>
-                <CardDescription className="text-gray-700 text-sm leading-relaxed">
-                  É <strong>Vendedor ou do Time Comercial</strong> e precisa de velocidade para bater metas e não perder leads para a concorrência.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Briefcase className="w-8 h-8 text-green-600" />
-                </div>
-                <CardDescription className="text-gray-700 text-sm leading-relaxed">
-                  É <strong>Profissional Liberal, Consultor ou de Agência</strong> e precisa organizar as demandas dos clientes para garantir entregas perfeitas.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Headphones className="w-8 h-8 text-green-600" />
-                </div>
-                <CardDescription className="text-gray-700 text-sm leading-relaxed">
-                  Trabalha com <strong>Atendimento ou Suporte</strong> e precisa identificar problemas urgentes antes que virem uma crise.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-        </div>
-      </section>
-
       {/* Hero Section */}
       <section className="py-20 lg:py-[92px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -168,8 +113,122 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Para Quem É Section */}
+      <section id="para-quem" className="py-16 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">A Summi é perfeita para você que...</h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Store className="w-8 h-8 text-green-600" />
+                </div>
+                <CardDescription className="text-gray-700 text-sm leading-relaxed">
+                  É <strong>Empreendedor ou Dono de Negócio</strong> e sente que o WhatsApp é mais um chefe do que uma ferramenta.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Target className="w-8 h-8 text-green-600" />
+                </div>
+                <CardDescription className="text-gray-700 text-sm leading-relaxed">
+                  É <strong>Vendedor ou do Time Comercial</strong> e precisa de velocidade para bater metas e não perder leads para a concorrência.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Briefcase className="w-8 h-8 text-green-600" />
+                </div>
+                <CardDescription className="text-gray-700 text-sm leading-relaxed">
+                  É <strong>Profissional Liberal, Consultor ou de Agência</strong> e precisa organizar as demandas dos clientes para garantir entregas perfeitas.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center border-gray-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Headphones className="w-8 h-8 text-green-600" />
+                </div>
+                <CardDescription className="text-gray-700 text-sm leading-relaxed">
+                  Trabalha com <strong>Atendimento ou Suporte</strong> e precisa identificar problemas urgentes antes que virem uma crise.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Antes e Depois Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Sua rotina no WhatsApp vai mudar do caos para o controle
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12 max-w-6xl mx-auto">
+            {/* Antes da Summi */}
+            <div className="text-center">
+              <div className="text-6xl mb-6">😥</div>
+              <h3 className="text-2xl font-bold text-gray-500 mb-8">Antes da Summi</h3>
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
+                  <p className="text-gray-600 line-through">Áudios longos roubando seu tempo</p>
+                </div>
+                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
+                  <p className="text-gray-600 line-through">Leads importantes perdidos na bagunça</p>
+                </div>
+                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
+                  <p className="text-gray-600 line-through">Respostas lentas e perda de vendas</p>
+                </div>
+                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
+                  <p className="text-gray-600 line-through">Ansiedade a cada nova notificação</p>
+                </div>
+                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
+                  <p className="text-gray-600 line-through">Sensação de estar sempre atrasado</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Com a Summi */}
+            <div className="text-center">
+              <div className="text-6xl mb-6">😎</div>
+              <h3 className="text-2xl font-bold text-green-600 mb-8">Com a Summi</h3>
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                  <p className="text-green-700 font-semibold">Resumos de áudio lidos em segundos</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                  <p className="text-green-700 font-semibold">Prioridades claras e visão do que importa</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                  <p className="text-green-700 font-semibold">Agilidade para responder e vender mais</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                  <p className="text-green-700 font-semibold">Controle e paz de espírito</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                  <p className="text-green-700 font-semibold">Sensação de estar sempre no comando</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Como Funciona Section */}
-      <section id="como-funciona" className="py-20 bg-gray-50">
+      <section id="como-funciona" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Como Funciona</h2>
@@ -237,7 +296,7 @@ const LandingPage = () => {
       </section>
 
       {/* Recursos Section */}
-      <section id="recursos" className="py-20 bg-white">
+      <section id="recursos" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Recursos</h2>
@@ -324,7 +383,7 @@ const LandingPage = () => {
       </section>
 
       {/* Prova Social (Testemunhos) Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
@@ -571,65 +630,6 @@ Cancele quando quiser.</CardDescription>
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Sem compromisso
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Antes e Depois Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Sua rotina no WhatsApp vai mudar do caos para o controle
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-12 max-w-6xl mx-auto">
-            {/* Antes da Summi */}
-            <div className="text-center">
-              <div className="text-6xl mb-6">😥</div>
-              <h3 className="text-2xl font-bold text-gray-500 mb-8">Antes da Summi</h3>
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
-                  <p className="text-gray-600 line-through">Áudios longos roubando seu tempo</p>
-                </div>
-                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
-                  <p className="text-gray-600 line-through">Leads importantes perdidos na bagunça</p>
-                </div>
-                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
-                  <p className="text-gray-600 line-through">Respostas lentas e perda de vendas</p>
-                </div>
-                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
-                  <p className="text-gray-600 line-through">Ansiedade a cada nova notificação</p>
-                </div>
-                <div className="p-4 bg-gray-100 rounded-lg border-l-4 border-gray-400">
-                  <p className="text-gray-600 line-through">Sensação de estar sempre atrasado</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Com a Summi */}
-            <div className="text-center">
-              <div className="text-6xl mb-6">😎</div>
-              <h3 className="text-2xl font-bold text-green-600 mb-8">Com a Summi</h3>
-              <div className="space-y-4">
-                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
-                  <p className="text-green-700 font-semibold">Resumos de áudio lidos em segundos</p>
-                </div>
-                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
-                  <p className="text-green-700 font-semibold">Prioridades claras e visão do que importa</p>
-                </div>
-                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
-                  <p className="text-green-700 font-semibold">Agilidade para responder e vender mais</p>
-                </div>
-                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
-                  <p className="text-green-700 font-semibold">Controle e paz de espírito</p>
-                </div>
-                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
-                  <p className="text-green-700 font-semibold">Sensação de estar sempre no comando</p>
-                </div>
               </div>
             </div>
           </div>
