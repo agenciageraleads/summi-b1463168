@@ -64,7 +64,7 @@ serve(async (req) => {
 
     if (userError || !user) {
       console.error('[FETCH-WHATSAPP-GROUPS] ❌ Erro de autenticação:', {
-        error: userError,
+        hasError: !!userError,
         hasUser: !!user
       });
       return new Response(
@@ -77,8 +77,7 @@ serve(async (req) => {
     }
 
     console.log('[FETCH-WHATSAPP-GROUPS] ✅ Usuário autenticado:', {
-      id: user.id,
-      email: user.email
+      id: user.id
     });
 
     // Buscar perfil do usuário usando service role para evitar problemas de RLS
@@ -91,18 +90,14 @@ serve(async (req) => {
       .maybeSingle();
 
     console.log('[FETCH-WHATSAPP-GROUPS] 📊 Resultado da busca do perfil:', {
-      profile: profile ? { 
-        id: profile.id, 
-        nome: profile.nome, 
-        instance_name: profile.instance_name,
-        hasNumero: !!profile.numero 
-      } : null,
-      error: profileError,
+      hasProfile: !!profile,
+      hasInstanceName: !!profile?.instance_name,
+      hasError: !!profileError,
       userId: user.id
     });
 
     if (profileError) {
-      console.error('[FETCH-WHATSAPP-GROUPS] ❌ Erro ao buscar perfil:', profileError);
+      console.error('[FETCH-WHATSAPP-GROUPS] ❌ Erro ao buscar perfil:', profileError.message);
       return new Response(
         JSON.stringify({ 
           error: 'Erro ao buscar perfil do usuário',
@@ -116,7 +111,7 @@ serve(async (req) => {
     }
 
     if (!profile) {
-      console.error('[FETCH-WHATSAPP-GROUPS] ❌ Perfil não encontrado para o usuário:', user.id);
+      console.error('[FETCH-WHATSAPP-GROUPS] ❌ Perfil não encontrado para o usuário');
       return new Response(
         JSON.stringify({ 
           error: 'Perfil do usuário não encontrado',
@@ -130,7 +125,7 @@ serve(async (req) => {
     }
 
     if (!profile.instance_name) {
-      console.error('[FETCH-WHATSAPP-GROUPS] ❌ Instance name não configurado para o usuário:', user.id);
+      console.error('[FETCH-WHATSAPP-GROUPS] ❌ Instance name não configurado');
       return new Response(
         JSON.stringify({ 
           error: 'WhatsApp não conectado. Configure sua conexão primeiro.',
@@ -143,11 +138,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('[FETCH-WHATSAPP-GROUPS] ✅ Perfil encontrado:', {
-      nome: profile.nome,
-      instance_name: profile.instance_name,
-      id: profile.id
-    });
+    console.log('[FETCH-WHATSAPP-GROUPS] ✅ Perfil encontrado com instance_name configurado');
 
     // Verificar configurações da Evolution API
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
@@ -170,10 +161,11 @@ serve(async (req) => {
     console.log('[FETCH-WHATSAPP-GROUPS] ⚙️ Configurações Evolution API validadas');
 
     // CORREÇÃO: Construir URL da Evolution API de forma segura para evitar barra dupla
+    // e adicionar parâmetro getParticipants=false
     const baseUrl = evolutionApiUrl.endsWith('/') ? evolutionApiUrl.slice(0, -1) : evolutionApiUrl;
-    const evolutionUrl = `${baseUrl}/group/fetchAllGroups/${profile.instance_name}`;
+    const evolutionUrl = `${baseUrl}/group/fetchAllGroups/${profile.instance_name}?getParticipants=false`;
     
-    console.log('[FETCH-WHATSAPP-GROUPS] 🌐 URL da Evolution API (corrigida):', evolutionUrl);
+    console.log('[FETCH-WHATSAPP-GROUPS] 🌐 URL da Evolution API construída');
 
     // Fazer requisição para Evolution API
     const evolutionResponse = await fetch(evolutionUrl, {
@@ -194,16 +186,14 @@ serve(async (req) => {
       console.error('[FETCH-WHATSAPP-GROUPS] ❌ Erro na Evolution API:', {
         status: evolutionResponse.status,
         statusText: evolutionResponse.statusText,
-        body: errorText,
-        url: evolutionUrl
+        hasErrorBody: !!errorText
       });
       
       return new Response(
         JSON.stringify({ 
           error: 'Erro ao buscar grupos no WhatsApp',
           details: `Status: ${evolutionResponse.status} - ${evolutionResponse.statusText}`,
-          apiResponse: errorText,
-          url: evolutionUrl
+          apiResponse: errorText
         }),
         {
           status: 500,
@@ -214,11 +204,10 @@ serve(async (req) => {
 
     // Processar resposta da Evolution API
     const evolutionData = await evolutionResponse.json()
-    console.log('[FETCH-WHATSAPP-GROUPS] 📄 Resposta bruta da Evolution API:', {
+    console.log('[FETCH-WHATSAPP-GROUPS] 📄 Resposta da Evolution API recebida:', {
       dataType: typeof evolutionData,
       isArray: Array.isArray(evolutionData),
-      keysIfObject: typeof evolutionData === 'object' ? Object.keys(evolutionData) : null,
-      firstElement: Array.isArray(evolutionData) ? evolutionData[0] : null
+      keysIfObject: typeof evolutionData === 'object' ? Object.keys(evolutionData) : null
     });
 
     // Determinar array de grupos baseado na estrutura da resposta
@@ -231,22 +220,17 @@ serve(async (req) => {
     } else if (evolutionData && evolutionData.data && Array.isArray(evolutionData.data)) {
       groupsArray = evolutionData.data;
     } else {
-      console.log('[FETCH-WHATSAPP-GROUPS] ⚠️ Estrutura inesperada na resposta:', evolutionData);
+      console.log('[FETCH-WHATSAPP-GROUPS] ⚠️ Estrutura inesperada na resposta');
       groupsArray = [];
     }
 
     console.log('[FETCH-WHATSAPP-GROUPS] 📊 Grupos encontrados:', {
-      total: groupsArray.length,
-      sample: groupsArray.slice(0, 2)
+      total: groupsArray.length
     });
 
     // Formatar os dados dos grupos para o frontend
     const formattedGroups = groupsArray.map((group, index) => {
-      console.log('[FETCH-WHATSAPP-GROUPS] 🔄 Formatando grupo', index, ':', {
-        id: group.id || group.remoteJid,
-        subject: group.subject,
-        participantsCount: group.participants?.length || 0
-      });
+      console.log('[FETCH-WHATSAPP-GROUPS] 🔄 Formatando grupo', index);
 
       return {
         id: group.id || group.remoteJid || `group-${index}`,
@@ -259,8 +243,7 @@ serve(async (req) => {
     });
 
     console.log('[FETCH-WHATSAPP-GROUPS] ✅ Grupos formatados com sucesso:', {
-      total: formattedGroups.length,
-      sample: formattedGroups.slice(0, 2)
+      total: formattedGroups.length
     });
 
     return new Response(
@@ -283,8 +266,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[FETCH-WHATSAPP-GROUPS] 💥 Erro inesperado:', {
       message: error instanceof Error ? error.message : 'Erro desconhecido',
-      stack: error instanceof Error ? error.stack : null,
-      error: error
+      hasStack: error instanceof Error && !!error.stack
     });
     
     return new Response(
