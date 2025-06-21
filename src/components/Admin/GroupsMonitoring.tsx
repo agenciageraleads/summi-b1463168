@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -127,20 +128,40 @@ export const GroupsMonitoring: React.FC = () => {
     if (!user || selectedGroups.length === 0) return;
 
     try {
-      const groupsToAdd = groups.filter(g => selectedGroups.includes(g.id));
-      
-      const { error } = await supabase.functions.invoke('update-monitored-groups', {
-        body: {
-          userId: user.id,
-          action: 'add',
-          groups: groupsToAdd.map(g => ({
-            group_id: g.id,
-            group_name: g.name
-          }))
-        },
-      });
+      // Verificar limite de 3 grupos
+      if (monitoredGroups.length + selectedGroups.length > 3) {
+        toast({
+          title: "Limite atingido",
+          description: "Você pode monitorar no máximo 3 grupos",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      if (error) throw error;
+      // Adicionar cada grupo individualmente
+      for (const groupId of selectedGroups) {
+        const group = groups.find(g => g.id === groupId);
+        if (!group) continue;
+
+        const { error } = await supabase.functions.invoke('update-monitored-groups', {
+          body: {
+            userId: user.id,
+            groupId: group.id,
+            groupName: group.name,
+            action: 'add'
+          },
+        });
+
+        if (error) {
+          console.error(`Erro ao adicionar grupo ${group.name}:`, error);
+          toast({
+            title: "Erro",
+            description: `Erro ao adicionar grupo ${group.name}`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
 
       toast({
         title: "Sucesso",
@@ -163,11 +184,13 @@ export const GroupsMonitoring: React.FC = () => {
     if (!user) return;
 
     try {
-      const { error } = await supabase
-        .from('monitored_whatsapp_groups')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('group_id', groupId);
+      const { error } = await supabase.functions.invoke('update-monitored-groups', {
+        body: {
+          userId: user.id,
+          groupId: groupId,
+          action: 'remove'
+        },
+      });
 
       if (error) throw error;
 
@@ -250,7 +273,7 @@ export const GroupsMonitoring: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-green-600" />
-            Grupos Monitorados ({filteredMonitoredGroups.length})
+            Grupos Monitorados ({filteredMonitoredGroups.length}/3)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -313,6 +336,8 @@ export const GroupsMonitoring: React.FC = () => {
             <div className="space-y-3">
               {filteredGroups.map(group => {
                 const isAlreadyMonitored = monitoredGroups.some(mg => mg.id === group.id);
+                const isDisabled = isAlreadyMonitored || (monitoredGroups.length >= 3 && !selectedGroups.includes(group.id));
+                
                 return (
                   <div key={group.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
@@ -325,13 +350,16 @@ export const GroupsMonitoring: React.FC = () => {
                             setSelectedGroups(prev => prev.filter(id => id !== group.id));
                           }
                         }}
-                        disabled={isAlreadyMonitored}
+                        disabled={isDisabled}
                       />
                       <Users className="h-4 w-4 text-gray-500" />
                       <span className="font-medium">{group.name}</span>
                       <Badge variant="secondary">{group.participants} participantes</Badge>
                       {isAlreadyMonitored && (
                         <Badge className="bg-green-100 text-green-800">Já Monitorado</Badge>
+                      )}
+                      {monitoredGroups.length >= 3 && !isAlreadyMonitored && (
+                        <Badge variant="destructive">Limite atingido</Badge>
                       )}
                     </div>
                   </div>

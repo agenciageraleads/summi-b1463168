@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Megaphone, Send, Plus, Mail, MessageSquare, Users, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Megaphone, Send, Plus, Mail, MessageSquare, Users, Calendar, CheckCircle, XCircle, Clock, Upload, Image, Video } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -18,6 +18,8 @@ interface Announcement {
   id: string;
   title: string;
   message: string;
+  image_url?: string;
+  video_url?: string;
   send_via_whatsapp: boolean;
   send_via_email: boolean;
   created_at: string;
@@ -34,11 +36,14 @@ export const AnnouncementsManager: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
     title: '',
     message: '',
+    image_url: '',
+    video_url: '',
     send_via_whatsapp: false,
     send_via_email: false,
   });
@@ -67,6 +72,74 @@ export const AnnouncementsManager: React.FC = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    setUploadingMedia(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `announcement-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('announcements')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('announcements')
+        .getPublicUrl(fileName);
+
+      setFormData(prev => ({ ...prev, image_url: urlData.publicUrl }));
+      
+      toast({
+        title: "Sucesso",
+        description: "Imagem carregada com sucesso",
+      });
+    } catch (error) {
+      console.error('Erro ao fazer upload da imagem:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer upload da imagem",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const handleVideoUpload = async (file: File) => {
+    setUploadingMedia(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `announcement-video-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('announcements')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('announcements')
+        .getPublicUrl(fileName);
+
+      setFormData(prev => ({ ...prev, video_url: urlData.publicUrl }));
+      
+      toast({
+        title: "Sucesso",
+        description: "Vídeo carregado com sucesso",
+      });
+    } catch (error) {
+      console.error('Erro ao fazer upload do vídeo:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer upload do vídeo",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingMedia(false);
     }
   };
 
@@ -107,6 +180,8 @@ export const AnnouncementsManager: React.FC = () => {
         setFormData({
           title: '',
           message: '',
+          image_url: '',
+          video_url: '',
           send_via_whatsapp: false,
           send_via_email: false,
         });
@@ -200,7 +275,7 @@ export const AnnouncementsManager: React.FC = () => {
               Criar Anúncio
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Criar Novo Anúncio</DialogTitle>
             </DialogHeader>
@@ -222,6 +297,99 @@ export const AnnouncementsManager: React.FC = () => {
                   rows={6}
                 />
               </div>
+              
+              {/* Upload de Imagem */}
+              <div>
+                <label className="text-sm font-medium">Imagem (opcional)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  {formData.image_url ? (
+                    <div className="space-y-2">
+                      <img 
+                        src={formData.image_url} 
+                        alt="Preview" 
+                        className="max-w-full h-32 object-cover rounded"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                      >
+                        Remover Imagem
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file);
+                        }}
+                        className="hidden"
+                        id="image-upload"
+                        disabled={uploadingMedia}
+                      />
+                      <label
+                        htmlFor="image-upload"
+                        className="cursor-pointer flex flex-col items-center gap-2"
+                      >
+                        <Image className="h-8 w-8 text-gray-400" />
+                        <span className="text-sm text-gray-500">
+                          {uploadingMedia ? 'Carregando...' : 'Clique para adicionar uma imagem'}
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Upload de Vídeo */}
+              <div>
+                <label className="text-sm font-medium">Vídeo (opcional)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  {formData.video_url ? (
+                    <div className="space-y-2">
+                      <video 
+                        src={formData.video_url} 
+                        controls 
+                        className="max-w-full h-32"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData(prev => ({ ...prev, video_url: '' }))}
+                      >
+                        Remover Vídeo
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleVideoUpload(file);
+                        }}
+                        className="hidden"
+                        id="video-upload"
+                        disabled={uploadingMedia}
+                      />
+                      <label
+                        htmlFor="video-upload"
+                        className="cursor-pointer flex flex-col items-center gap-2"
+                      >
+                        <Video className="h-8 w-8 text-gray-400" />
+                        <span className="text-sm text-gray-500">
+                          {uploadingMedia ? 'Carregando...' : 'Clique para adicionar um vídeo'}
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <label className="text-sm font-medium">Métodos de Envio</label>
                 <div className="flex items-center space-x-2">
@@ -255,8 +423,8 @@ export const AnnouncementsManager: React.FC = () => {
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={createAnnouncement}>
-                  Criar Anúncio
+                <Button onClick={createAnnouncement} disabled={uploadingMedia}>
+                  {uploadingMedia ? 'Carregando mídia...' : 'Criar Anúncio'}
                 </Button>
               </div>
             </div>
@@ -299,6 +467,26 @@ export const AnnouncementsManager: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-700 mb-4">{announcement.message}</p>
+                
+                {/* Mídia do anúncio */}
+                {(announcement.image_url || announcement.video_url) && (
+                  <div className="mb-4 space-y-2">
+                    {announcement.image_url && (
+                      <img 
+                        src={announcement.image_url} 
+                        alt="Anúncio" 
+                        className="max-w-sm h-32 object-cover rounded border"
+                      />
+                    )}
+                    {announcement.video_url && (
+                      <video 
+                        src={announcement.video_url} 
+                        controls 
+                        className="max-w-sm h-32"
+                      />
+                    )}
+                  </div>
+                )}
                 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 text-sm">

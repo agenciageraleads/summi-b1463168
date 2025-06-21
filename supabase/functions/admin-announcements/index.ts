@@ -56,7 +56,7 @@ serve(async (req) => {
     const { action, ...body } = await req.json();
 
     if (action === 'create') {
-      const { title, message, send_via_whatsapp, send_via_email } = body;
+      const { title, message, image_url, video_url, send_via_whatsapp, send_via_email } = body;
 
       // Criar anúncio
       const { data: announcement, error } = await supabaseAdmin
@@ -64,6 +64,8 @@ serve(async (req) => {
         .insert({
           title,
           message,
+          image_url,
+          video_url,
           send_via_whatsapp: send_via_whatsapp || false,
           send_via_email: send_via_email || false,
           created_by: user.id,
@@ -118,13 +120,25 @@ serve(async (req) => {
       let sentCount = 0;
       let failedCount = 0;
 
+      // Preparar conteúdo da mensagem
+      let messageContent = announcement.message;
+      
+      // Adicionar imagem se existir
+      if (announcement.image_url) {
+        messageContent += `\n\n📷 Imagem: ${announcement.image_url}`;
+      }
+      
+      // Adicionar vídeo se existir
+      if (announcement.video_url) {
+        messageContent += `\n\n🎥 Vídeo: ${announcement.video_url}`;
+      }
+
       // Enviar para cada usuário
       for (const targetUser of users) {
         // Email
         if (announcement.send_via_email && targetUser.email) {
           try {
-            // Aqui você integraria com seu provedor de email
-            // Por enquanto, apenas registramos a tentativa
+            // Registrar tentativa de envio de email
             await supabaseAdmin
               .from('announcement_deliveries')
               .insert({
@@ -152,18 +166,40 @@ serve(async (req) => {
         // WhatsApp
         if (announcement.send_via_whatsapp && targetUser.numero && targetUser.instance_name) {
           try {
-            // Aqui você integraria com a Evolution API para enviar mensagem
-            // Por enquanto, apenas registramos a tentativa
-            await supabaseAdmin
-              .from('announcement_deliveries')
-              .insert({
-                announcement_id,
-                user_id: targetUser.id,
-                delivery_method: 'whatsapp',
-                status: 'sent',
-                sent_at: new Date().toISOString()
+            // Enviar via Evolution API
+            const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+            const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+            
+            if (evolutionApiUrl && evolutionApiKey) {
+              const sendMessageResponse = await fetch(`${evolutionApiUrl}/message/sendText/${targetUser.instance_name}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': evolutionApiKey,
+                },
+                body: JSON.stringify({
+                  number: targetUser.numero,
+                  text: `🔔 ${announcement.title}\n\n${messageContent}`,
+                }),
               });
-            sentCount++;
+
+              if (sendMessageResponse.ok) {
+                await supabaseAdmin
+                  .from('announcement_deliveries')
+                  .insert({
+                    announcement_id,
+                    user_id: targetUser.id,
+                    delivery_method: 'whatsapp',
+                    status: 'sent',
+                    sent_at: new Date().toISOString()
+                  });
+                sentCount++;
+              } else {
+                throw new Error('Falha ao enviar mensagem WhatsApp');
+              }
+            } else {
+              throw new Error('Configuração Evolution API não encontrada');
+            }
           } catch (error) {
             await supabaseAdmin
               .from('announcement_deliveries')
@@ -183,7 +219,7 @@ serve(async (req) => {
       await supabaseAdmin
         .from('admin_announcements')
         .update({
-          status: 'sent',
+          status: failedCount === 0 ? 'sent' : 'failed',
           sent_count: sentCount,
           failed_count: failedCount
         })
