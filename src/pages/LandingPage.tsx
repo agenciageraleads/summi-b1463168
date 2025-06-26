@@ -8,8 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Store, Target, Briefcase, Headphones, User, Clock, Brain, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const LandingPage = () => {
+  const isMobile = useIsMobile();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
@@ -60,15 +63,15 @@ const LandingPage = () => {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="py-20 lg:py-[92px]">
+      {/* Hero Section - Otimizada para Mobile-First */}
+      <section className={`${isMobile ? 'py-8' : 'py-20 lg:py-[92px]'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
-            <Badge className="mb-6 bg-green-100 text-green-700 border-green-200">
+            <Badge className="mb-4 bg-green-100 text-green-700 border-green-200">
               IA Avançada para WhatsApp
             </Badge>
             
-            <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6">
+            <h1 className={`${isMobile ? 'text-3xl' : 'text-5xl lg:text-7xl'} font-bold text-gray-900 mb-4`}>
               Automatize seu{" "}
               <br />
               <span className="bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent">
@@ -76,47 +79,68 @@ const LandingPage = () => {
               </span>
             </h1>
             
-            <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+            <p className={`${isMobile ? 'text-lg mb-6' : 'text-xl mb-8'} text-gray-600 leading-relaxed`}>
               Summi analisa e prioriza suas conversas de WhatsApp para que você não perca nenhuma oportunidade.
             </p>
 
-            {/* Destaques de Valor */}
-            <div className="grid md:grid-cols-3 gap-6 mb-12 max-w-4xl mx-auto">
-              <div className="flex flex-col items-center text-center p-6 bg-white/50 rounded-xl border border-green-100">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                  <Mic className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Transcreva áudios longos em segundos</h3>
-                <p className="text-gray-600 text-sm">Transforme mensagens de voz em texto instantaneamente</p>
-              </div>
-
-              <div className="flex flex-col items-center text-center p-6 bg-white/50 rounded-xl border border-green-100">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                  <Brain className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Resuma conversas e extraia insights</h3>
-                <p className="text-gray-600 text-sm">IA identifica informações importantes automaticamente</p>
-              </div>
-
-              <div className="flex flex-col items-center text-center p-6 bg-white/50 rounded-xl border border-green-100">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                  <TrendingUp className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Receba relatórios das conversas importantes</h3>
-                <p className="text-gray-600 text-sm">Acompanhe métricas e nunca perca oportunidades</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+            {/* CTA Principal - Posicionado estrategicamente */}
+            <div className={`${isMobile ? 'mb-8' : 'mb-12'}`}>
               <Link to="/register">
-                <Button size="lg" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl px-8 py-4 text-lg">
+                <Button 
+                  size="lg" 
+                  className={`${isMobile ? 'w-full py-4 text-xl font-semibold' : 'px-8 py-4 text-lg'} bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl`}
+                >
                   Conectar Agora
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-500 mb-6">
+            {/* Aviso destacado sobre teste gratuito - Mais visível */}
+            <div className={`bg-green-50 border border-green-200 rounded-lg ${isMobile ? 'p-3 mb-8' : 'p-4 mb-12'} max-w-2xl mx-auto`}>
+              <p className={`text-green-800 font-medium ${isMobile ? 'text-base' : 'text-lg'}`}>
+                🎉 <strong>30 dias grátis</strong> para testar todas as funcionalidades
+              </p>
+              <p className={`text-green-700 ${isMobile ? 'text-xs' : 'text-sm'} mt-1`}>
+                Ativação imediata • Sem compromisso • Comece agora mesmo
+              </p>
+            </div>
+
+            {/* Destaques de Valor - Compactos para mobile */}
+            <div className={`grid ${isMobile ? 'md:grid-cols-1 gap-4' : 'md:grid-cols-3 gap-6'} ${isMobile ? 'mb-8' : 'mb-12'} max-w-4xl mx-auto`}>
+              <div className={`flex ${isMobile ? 'flex-row items-center' : 'flex-col items-center'} text-center ${isMobile ? 'p-4' : 'p-6'} bg-white/50 rounded-xl border border-green-100`}>
+                <div className={`${isMobile ? 'w-12 h-12 mr-4' : 'w-16 h-16 mb-4'} bg-green-100 rounded-full flex items-center justify-center`}>
+                  <Mic className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} text-green-600`} />
+                </div>
+                <div>
+                  <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900 ${isMobile ? 'mb-1' : 'mb-2'}`}>Transcreva áudios longos em segundos</h3>
+                  <p className={`text-gray-600 ${isMobile ? 'text-xs' : 'text-sm'}`}>Transforme mensagens de voz em texto instantaneamente</p>
+                </div>
+              </div>
+
+              <div className={`flex ${isMobile ? 'flex-row items-center' : 'flex-col items-center'} text-center ${isMobile ? 'p-4' : 'p-6'} bg-white/50 rounded-xl border border-green-100`}>
+                <div className={`${isMobile ? 'w-12 h-12 mr-4' : 'w-16 h-16 mb-4'} bg-green-100 rounded-full flex items-center justify-center`}>
+                  <Brain className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} text-green-600`} />
+                </div>
+                <div>
+                  <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900 ${isMobile ? 'mb-1' : 'mb-2'}`}>Resuma conversas e extraia insights</h3>
+                  <p className={`text-gray-600 ${isMobile ? 'text-xs' : 'text-sm'}`}>IA identifica informações importantes automaticamente</p>
+                </div>
+              </div>
+
+              <div className={`flex ${isMobile ? 'flex-row items-center' : 'flex-col items-center'} text-center ${isMobile ? 'p-4' : 'p-6'} bg-white/50 rounded-xl border border-green-100`}>
+                <div className={`${isMobile ? 'w-12 h-12 mr-4' : 'w-16 h-16 mb-4'} bg-green-100 rounded-full flex items-center justify-center`}>
+                  <TrendingUp className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} text-green-600`} />
+                </div>
+                <div>
+                  <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900 ${isMobile ? 'mb-1' : 'mb-2'}`}>Receba relatórios das conversas importantes</h3>
+                  <p className={`text-gray-600 ${isMobile ? 'text-xs' : 'text-sm'}`}>Acompanhe métricas e nunca perca oportunidades</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Informações de credibilidade */}
+            <div className={`flex flex-wrap justify-center gap-6 ${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Configuração em 5 min
@@ -129,16 +153,6 @@ const LandingPage = () => {
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Ativação imediata
               </div>
-            </div>
-
-            {/* Aviso destacado sobre teste gratuito */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-2xl mx-auto">
-              <p className="text-green-800 font-medium text-lg">
-                🎉 <strong>30 dias grátis</strong> para testar todas as funcionalidades
-              </p>
-              <p className="text-green-700 text-sm mt-1">
-                Ativação imediata • Sem compromisso • Comece agora mesmo
-              </p>
             </div>
           </div>
         </div>
