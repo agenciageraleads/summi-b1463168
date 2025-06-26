@@ -1,8 +1,12 @@
+
+// ABOUTME: Landing page principal da Summi com seções otimizadas para conversão.
+// ABOUTME: Inclui hero section aprimorada, destaques de valor e estratégia de trial de 30 dias.
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Store, Target, Briefcase, Headphones, User } from "lucide-react";
+import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Store, Target, Briefcase, Headphones, User, Clock, Brain, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const LandingPage = () => {
@@ -48,7 +52,7 @@ const LandingPage = () => {
               </Link>
               <Link to="/register">
                 <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg">
-                  Começar Grátis
+                  Conectar Agora
                 </Button>
               </Link>
             </div>
@@ -76,10 +80,37 @@ const LandingPage = () => {
               Summi analisa e prioriza suas conversas de WhatsApp para que você não perca nenhuma oportunidade.
             </p>
 
+            {/* Destaques de Valor */}
+            <div className="grid md:grid-cols-3 gap-6 mb-12 max-w-4xl mx-auto">
+              <div className="flex flex-col items-center text-center p-6 bg-white/50 rounded-xl border border-green-100">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <Mic className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Transcreva áudios longos em segundos</h3>
+                <p className="text-gray-600 text-sm">Transforme mensagens de voz em texto instantaneamente</p>
+              </div>
+
+              <div className="flex flex-col items-center text-center p-6 bg-white/50 rounded-xl border border-green-100">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <Brain className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Resuma conversas e extraia insights</h3>
+                <p className="text-gray-600 text-sm">IA identifica informações importantes automaticamente</p>
+              </div>
+
+              <div className="flex flex-col items-center text-center p-6 bg-white/50 rounded-xl border border-green-100">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <TrendingUp className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Receba relatórios das conversas importantes</h3>
+                <p className="text-gray-600 text-sm">Acompanhe métricas e nunca perca oportunidades</p>
+              </div>
+            </div>
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
               <Link to="/register">
                 <Button size="lg" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl px-8 py-4 text-lg">
-                  Começar Grátis
+                  Conectar Agora
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
@@ -92,21 +123,21 @@ const LandingPage = () => {
               </div>
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
-                Sem cartão de crédito
+                30 dias grátis
               </div>
               <div className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
-                Cancele quando quiser
+                Ativação imediata
               </div>
             </div>
 
             {/* Aviso destacado sobre teste gratuito */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-2xl mx-auto">
               <p className="text-green-800 font-medium text-lg">
-                🎉 <strong>7 dias grátis</strong> para testar todas as funcionalidades
+                🎉 <strong>30 dias grátis</strong> para testar todas as funcionalidades
               </p>
               <p className="text-green-700 text-sm mt-1">
-                Nenhum cartão necessário • Sem compromisso • Ativação imediata
+                Ativação imediata • Sem compromisso • Comece agora mesmo
               </p>
             </div>
           </div>
@@ -462,14 +493,10 @@ const LandingPage = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-3">
                 🚀 Comece Grátis - Sem Riscos!
               </h3>
-              <div className="grid md:grid-cols-3 gap-4 text-sm">
+              <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center justify-center space-x-2">
                   <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-gray-700">Sem cartão de crédito</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-gray-700">Cancele quando quiser</span>
+                  <span className="text-gray-700">30 dias de teste completo</span>
                 </div>
                 <div className="flex items-center justify-center space-x-2">
                   <Check className="w-4 h-4 text-green-600" />
@@ -488,8 +515,7 @@ const LandingPage = () => {
                   <span className="text-5xl font-bold text-gray-900">R$ 29,90</span>
                   <span className="text-gray-500 ml-2 text-lg">por mês</span>
                 </div>
-                <CardDescription className="mt-4 text-gray-600 text-base text-center">Flexibilidade total com pagamento mensal. 
-Cancele quando quiser.</CardDescription>
+                <CardDescription className="mt-4 text-gray-600 text-base text-center">Flexibilidade total com pagamento mensal.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -515,13 +541,13 @@ Cancele quando quiser.</CardDescription>
                   </div>
                   <div className="flex items-center text-sm text-green-700 font-medium">
                     <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>7 dias para testar</span>
+                    <span>30 dias para testar</span>
                   </div>
                 </div>
                 
                 <Link to="/register" className="block">
                   <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 text-lg">
-                    Começar Agora
+                    Conectar Agora
                   </Button>
                 </Link>
               </CardContent>
@@ -601,7 +627,7 @@ Cancele quando quiser.</CardDescription>
                 
                 <Link to="/register" className="block">
                   <Button className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg shadow-lg transform hover:scale-[1.02] transition-all">
-                    Garantir Desconto Anual
+                    Conectar Agora
                     <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                 </Link>
@@ -611,9 +637,6 @@ Cancele quando quiser.</CardDescription>
 
           {/* Informações adicionais aprimoradas */}
           <div className="text-center mt-12 space-y-6">
-            {/* Seção principal de garantias */}
-            
-
             <p className="text-gray-500">
               💳 Aceitamos todos os cartões de crédito • 🔐 Pagamento 100% seguro via Stripe
             </p>
@@ -695,9 +718,9 @@ Cancele quando quiser.</CardDescription>
                 </span>
               </AccordionTrigger>
               <AccordionContent className="text-gray-600 pb-4">
-                Após os 7 dias de teste gratuito, você pode escolher um dos nossos planos ou simplesmente não fazer nada 
+                Após os 30 dias de teste gratuito, você pode escolher um dos nossos planos ou simplesmente não fazer nada 
                 - não cobramos automaticamente. Se decidir continuar, você escolhe entre o plano mensal (R$ 29,90) ou 
-                anual (R$ 19,90/mês) com 33% de desconto. Você pode cancelar a qualquer momento, sem multas ou taxas.
+                anual (R$ 19,90/mês) com 33% de desconto.
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -708,7 +731,7 @@ Cancele quando quiser.</CardDescription>
             </p>
             <Link to="/register">
               <Button size="lg" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white">
-                Começar Teste Gratuito
+                Conectar Agora
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
@@ -746,7 +769,7 @@ Cancele quando quiser.</CardDescription>
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#como-funciona" className="hover:text-white transition-colors">Como Funciona</a></li>
                 <li><a href="#recursos" className="hover:text-white transition-colors">Recursos</a></li>
-                <li><Link to="/register" className="hover:text-white transition-colors">Começar Agora</Link></li>
+                <li><Link to="/register" className="hover:text-white transition-colors">Conectar Agora</Link></li>
               </ul>
             </div>
 

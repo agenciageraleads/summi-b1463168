@@ -98,6 +98,7 @@ export type Database = {
           contexto: string | null
           conversa: Json | null
           criado_em: string | null
+          grupo: string | null
           id: string
           id_usuario: string
           modificado_em: string | null
@@ -110,6 +111,7 @@ export type Database = {
           contexto?: string | null
           conversa?: Json | null
           criado_em?: string | null
+          grupo?: string | null
           id?: string
           id_usuario: string
           modificado_em?: string | null
@@ -122,6 +124,7 @@ export type Database = {
           contexto?: string | null
           conversa?: Json | null
           criado_em?: string | null
+          grupo?: string | null
           id?: string
           id_usuario?: string
           modificado_em?: string | null

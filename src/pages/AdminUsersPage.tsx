@@ -1,4 +1,7 @@
 
+// ABOUTME: Página de administração de usuários com funcionalidades de gestão completa.
+// ABOUTME: Inclui listagem, edição, desconexão e exclusão de usuários.
+
 import { AdminRoute } from '@/components/Admin/AdminRoute';
 import { AdminLayout } from '@/components/Admin/AdminLayout';
 import { UsersTable } from '@/components/Admin/UsersTable';
@@ -56,6 +59,7 @@ const AdminUsersPage = () => {
             onDeleteUser={deleteUserAccount}
             onDisconnectUser={disconnectUser}
             onRestartInstance={restartUserInstance}
+            onRefreshUsers={handleRefresh}
           />
         </div>
       </AdminLayout>
