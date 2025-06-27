@@ -1,4 +1,3 @@
-
 // ABOUTME: Landing page principal da Summi com seções otimizadas para conversão.
 // ABOUTME: Inclui hero section aprimorada, destaques de valor e estratégia de trial de 30 dias.
 
@@ -96,16 +95,6 @@ const LandingPage = () => {
               </Link>
             </div>
 
-            {/* Aviso destacado sobre teste gratuito - Mais visível */}
-            <div className={`bg-green-50 border border-green-200 rounded-lg ${isMobile ? 'p-3 mb-8' : 'p-4 mb-12'} max-w-2xl mx-auto`}>
-              <p className={`text-green-800 font-medium ${isMobile ? 'text-base' : 'text-lg'}`}>
-                🎉 <strong>30 dias grátis</strong> para testar todas as funcionalidades
-              </p>
-              <p className={`text-green-700 ${isMobile ? 'text-xs' : 'text-sm'} mt-1`}>
-                Ativação imediata • Sem compromisso • Comece agora mesmo
-              </p>
-            </div>
-
             {/* Destaques de Valor - Compactos para mobile */}
             <div className={`grid ${isMobile ? 'md:grid-cols-1 gap-4' : 'md:grid-cols-3 gap-6'} ${isMobile ? 'mb-8' : 'mb-12'} max-w-4xl mx-auto`}>
               <div className={`flex ${isMobile ? 'flex-row items-center' : 'flex-col items-center'} text-center ${isMobile ? 'p-4' : 'p-6'} bg-white/50 rounded-xl border border-green-100`}>
@@ -136,22 +125,6 @@ const LandingPage = () => {
                   <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900 ${isMobile ? 'mb-1' : 'mb-2'}`}>Receba relatórios das conversas importantes</h3>
                   <p className={`text-gray-600 ${isMobile ? 'text-xs' : 'text-sm'}`}>Acompanhe métricas e nunca perca oportunidades</p>
                 </div>
-              </div>
-            </div>
-
-            {/* Informações de credibilidade */}
-            <div className={`flex flex-wrap justify-center gap-6 ${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Configuração em 5 min
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                30 dias grátis
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Ativação imediata
               </div>
             </div>
           </div>
@@ -654,21 +627,6 @@ const LandingPage = () => {
             <p className="text-gray-500">
               💳 Aceitamos todos os cartões de crédito • 🔐 Pagamento 100% seguro via Stripe
             </p>
-            
-            <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500">
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Ativação imediata
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Suporte em português
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Sem compromisso
-              </div>
-            </div>
           </div>
         </div>
       </section>
