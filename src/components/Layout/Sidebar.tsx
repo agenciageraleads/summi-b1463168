@@ -1,164 +1,169 @@
 
+// ABOUTME: Sidebar principal do dashboard com navegação simplificada.
+// ABOUTME: Remove aba de assinatura conforme estratégia de UX focada no produto.
+
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/utils';
-import { 
-  BarChart3, 
-  Settings, 
-  CreditCard, 
-  Users, 
-  MessageSquare, 
-  TestTube,
-  LogOut,
-  X,
-  Menu
-} from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { 
+  Home, 
+  MessageSquare, 
+  Settings, 
+  LogOut, 
+  User,
+  Shield,
+  Users,
+  Megaphone,
+  MessageCircle
+} from 'lucide-react';
 
-// Sidebar corrigida com funcionalidade mobile e itens corretos
-export const Sidebar = () => {
-  const location = useLocation();
+const Sidebar = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const location = useLocation();
+  const { signOut } = useAuth();
   const { profile } = useProfile();
-  const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
-  // Navegação principal do usuário
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-    { name: 'Configurações', href: '/settings', icon: Settings },
-    { name: 'Assinatura', href: '/subscription', icon: CreditCard },
-    { name: 'Indicações', href: '/referrals', icon: Users },
-    { name: 'Feedback', href: '/feedback', icon: MessageSquare },
-  ];
+  const isActive = (path: string) => location.pathname === path;
 
-  // Adicionar itens condicionais baseados no role do usuário
-  const conditionalNavigation = [];
-  
-  // Beta para admin e beta users
-  if (profile?.role === 'admin' || profile?.role === 'beta') {
-    conditionalNavigation.push({
-      name: 'Beta',
-      href: '/beta',
-      icon: TestTube,
-    });
-  }
-
-  // Admin panel apenas para admins
-  if (profile?.role === 'admin') {
-    conditionalNavigation.push({
-      name: 'Painel do Admin',
-      href: '/admin',
-      icon: BarChart3,
-    });
-  }
-
-  const allNavigation = [...navigation, ...conditionalNavigation];
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-    setIsMobileOpen(false);
+  const handleNavigation = (path: string) => {
+    navigate(path);
   };
 
-  const handleNavClick = () => {
-    setIsMobileOpen(false);
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200">
-      {/* Logo/Header */}
-      <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-summi-green rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">S</span>
+  return (
+    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+      {/* Header */}
+      <div className="p-6 border-b border-gray-200">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-summi-gradient rounded-lg flex items-center justify-center">
+            <MessageSquare className="w-6 h-6 text-white" />
           </div>
-          <span className="text-xl font-bold text-summi-gray-900">Summi</span>
+          <div>
+            <h2 className="font-bold text-summi-gray-900">Summi</h2>
+            <p className="text-sm text-summi-gray-600">
+              {profile?.nome?.split(' ')[0] || 'Usuário'}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-2">
-        {allNavigation.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.href;
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
-                isActive
-                  ? "bg-summi-green text-white"
-                  : "text-summi-gray-700 hover:bg-summi-gray-100 hover:text-summi-green"
-              )}
+      <nav className="flex-1 p-4 space-y-2">
+        <Button
+          variant={isActive('/dashboard') ? 'default' : 'ghost'}
+          className={`w-full justify-start ${
+            isActive('/dashboard') 
+              ? 'bg-summi-green text-white' 
+              : 'text-summi-gray-700 hover:text-summi-green hover:bg-summi-green/10'
+          }`}
+          onClick={() => handleNavigation('/dashboard')}
+        >
+          <Home className="mr-3 h-4 w-4" />
+          Dashboard
+        </Button>
+
+        <Button
+          variant={isActive('/whatsapp-connection') ? 'default' : 'ghost'}
+          className={`w-full justify-start ${
+            isActive('/whatsapp-connection') 
+              ? 'bg-summi-green text-white' 
+              : 'text-summi-gray-700 hover:text-summi-green hover:bg-summi-green/10'
+          }`}
+          onClick={() => handleNavigation('/whatsapp-connection')}
+        >
+          <MessageCircle className="mr-3 h-4 w-4" />
+          Conexão WhatsApp
+        </Button>
+
+        <Button
+          variant={isActive('/settings') ? 'default' : 'ghost'}
+          className={`w-full justify-start ${
+            isActive('/settings') 
+              ? 'bg-summi-green text-white' 
+              : 'text-summi-gray-700 hover:text-summi-green hover:bg-summi-green/10'
+          }`}
+          onClick={() => handleNavigation('/settings')}
+        >
+          <Settings className="mr-3 h-4 w-4" />
+          Configurações
+        </Button>
+
+        {/* Admin Section */}
+        {profile?.role === 'admin' && (
+          <>
+            <Separator className="my-4" />
+            <div className="px-2 py-2">
+              <h3 className="text-xs font-semibold text-summi-gray-500 uppercase tracking-wider">
+                Admin
+              </h3>
+            </div>
+            
+            <Button
+              variant={isActive('/admin') ? 'default' : 'ghost'}
+              className={`w-full justify-start ${
+                isActive('/admin') 
+                  ? 'bg-red-600 text-white' 
+                  : 'text-red-600 hover:text-red-700 hover:bg-red-50'
+              }`}
+              onClick={() => handleNavigation('/admin')}
             >
-              <Icon className="mr-3 h-5 w-5" />
-              {item.name}
-            </Link>
-          );
-        })}
+              <Shield className="mr-3 h-4 w-4" />
+              Painel Admin
+            </Button>
+
+            <Button
+              variant={isActive('/admin/users') ? 'default' : 'ghost'}
+              className={`w-full justify-start ${
+                isActive('/admin/users') 
+                  ? 'bg-red-600 text-white' 
+                  : 'text-red-600 hover:text-red-700 hover:bg-red-50'
+              }`}
+              onClick={() => handleNavigation('/admin/users')}
+            >
+              <Users className="mr-3 h-4 w-4" />
+              Usuários
+            </Button>
+
+            <Button
+              variant={isActive('/admin/announcements') ? 'default' : 'ghost'}
+              className={`w-full justify-start ${
+                isActive('/admin/announcements') 
+                  ? 'bg-red-600 text-white' 
+                  : 'text-red-600 hover:text-red-700 hover:bg-red-50'
+              }`}
+              onClick={() => handleNavigation('/admin/announcements')}
+            >
+              <Megaphone className="mr-3 h-4 w-4" />
+              Anúncios
+            </Button>
+          </>
+        )}
       </nav>
 
-      {/* User section */}
-      <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="w-8 h-8 rounded-full bg-summi-green flex items-center justify-center">
-            <span className="text-white text-sm font-medium">
-              {profile?.nome?.charAt(0) || user?.email?.charAt(0) || 'U'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-summi-gray-900 truncate">
-              {profile?.nome || 'Usuário'}
-            </p>
-            <p className="text-xs text-summi-gray-500 truncate">
-              {user?.email}
-            </p>
-          </div>
-        </div>
-        
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-200 space-y-2">
         <Button
-          onClick={handleLogout}
-          variant="outline"
-          className="w-full flex items-center justify-center space-x-2 text-summi-gray-700 hover:text-red-600 hover:border-red-300"
+          variant="ghost"
+          className="w-full justify-start text-summi-gray-700 hover:text-summi-gray-900"
+          onClick={handleSignOut}
         >
-          <LogOut className="h-4 w-4" />
-          <span>Sair</span>
+          <LogOut className="mr-3 h-4 w-4" />
+          Sair
         </Button>
       </div>
     </div>
   );
-
-  return (
-    <>
-      {/* Mobile Menu Button - Visível apenas no mobile */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="bg-white shadow-lg border-gray-200"
-              aria-label="Abrir menu"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
-            <SidebarContent />
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* Desktop Sidebar - Visível apenas no desktop */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
-        <SidebarContent />
-      </div>
-    </>
-  );
 };
+
+export { Sidebar };
