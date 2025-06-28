@@ -2,7 +2,6 @@
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { WhatsAppSection } from '@/components/Dashboard/WhatsAppSection';
 import { ChatsList } from '@/components/Dashboard/ChatsList';
-import { WhatsAppStatusCard } from '@/components/Dashboard/WhatsAppStatusCard';
 import { OnboardingTour } from '@/components/Onboarding/OnboardingTour';
 import { OnboardingHighlight } from '@/components/Onboarding/OnboardingHighlight';
 
@@ -24,9 +23,6 @@ const DashboardPage = () => {
           </p>
         </div>
 
-        {/* Novo Componente de Status da Conexão */}
-        <WhatsAppStatusCard />
-
         {/* Grid Principal Reorganizada */}
         <div className="space-y-6">
           {/* Lista de Chats em destaque - com highlight para onboarding */}
@@ -34,13 +30,10 @@ const DashboardPage = () => {
             <ChatsList />
           </OnboardingHighlight>
 
-          {/* Grid para os outros widgets */}
-          <div className="grid gap-6 md:grid-cols-1">
-            {/* Seção do WhatsApp - com highlight para onboarding */}
-            <OnboardingHighlight targetId="whatsapp-section">
-              <WhatsAppSection />
-            </OnboardingHighlight>
-          </div>
+          {/* Seção do WhatsApp integrada - com highlight para onboarding */}
+          <OnboardingHighlight targetId="whatsapp-section">
+            <WhatsAppSection />
+          </OnboardingHighlight>
         </div>
       </div>
     </DashboardLayout>

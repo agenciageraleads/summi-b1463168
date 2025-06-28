@@ -46,16 +46,16 @@ export const WhatsAppStatusCard: React.FC = () => {
   const phoneNumber = profile?.numero ? formatPhoneNumber(profile.numero) : '';
 
   return (
-    <Card className="w-full bg-gradient-to-r from-gray-900 to-gray-800 text-white border-0 shadow-xl">
+    <Card className="w-full bg-white border border-gray-200 shadow-sm">
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           {/* Lado esquerdo - Número e Status */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
-              <Phone className="w-6 h-6 text-gray-300" />
+              <Phone className="w-6 h-6 text-gray-600" />
               <div>
                 <div className="flex items-center space-x-3 mb-2">
-                  <span className="text-lg font-medium">
+                  <span className="text-lg font-medium text-gray-900">
                     {phoneNumber || 'Não conectado'}
                   </span>
                   <Link className="w-4 h-4 text-gray-400" />
@@ -65,7 +65,7 @@ export const WhatsAppStatusCard: React.FC = () => {
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
                   <span>Última atualização: {getLastUpdate()}</span>
                 </div>
               </div>
@@ -75,7 +75,7 @@ export const WhatsAppStatusCard: React.FC = () => {
           {/* Lado direito - Ícone de energia e botões */}
           <div className="flex items-center space-x-4">
             {isConnected && (
-              <Zap className="w-6 h-6 text-green-400" />
+              <Zap className="w-6 h-6 text-green-500" />
             )}
             
             <div className="flex space-x-3">
@@ -83,7 +83,7 @@ export const WhatsAppStatusCard: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/settings')}
-                className="bg-transparent border-gray-500 text-white hover:bg-gray-700 flex items-center space-x-2"
+                className="border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
               >
                 <Settings className="w-4 h-4" />
                 <span>Preferências</span>
@@ -94,7 +94,7 @@ export const WhatsAppStatusCard: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleDisconnect}
-                  className="bg-transparent border-red-500 text-red-400 hover:bg-red-500/10 flex items-center space-x-2"
+                  className="border-red-300 text-red-600 hover:bg-red-50 flex items-center space-x-2"
                 >
                   <Power className="w-4 h-4" />
                   <span>Desconectar</span>
