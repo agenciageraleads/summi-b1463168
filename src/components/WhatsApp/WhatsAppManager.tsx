@@ -10,18 +10,13 @@ import { ErrorState } from './ConnectionStates/ErrorState';
 
 export const WhatsAppManager = () => {
   const { profile } = useProfile();
-  const { connectionData, connect, generateNewCode, reset } = useWhatsAppConnection();
+  const { connectionData, connect, disconnect, generateNewCode, reset } = useWhatsAppConnection();
 
   const hasValidProfile = Boolean(profile?.nome && profile?.numero);
 
   const handlePreferences = () => {
     // TODO: Implementar abertura de modal de preferências
     console.log('Abrir preferências');
-  };
-
-  const handleDisconnect = () => {
-    // TODO: Implementar na próxima etapa
-    console.log('Desconectar - será implementado na próxima etapa');
   };
 
   // Renderizar componente baseado no estado atual
@@ -53,7 +48,7 @@ export const WhatsAppManager = () => {
           instanceName={connectionData.instanceName}
           phoneNumber={profile?.numero || null}
           message={connectionData.message}
-          onDisconnect={handleDisconnect}
+          onDisconnect={disconnect}
           onPreferences={handlePreferences}
           isLoading={connectionData.isLoading}
         />

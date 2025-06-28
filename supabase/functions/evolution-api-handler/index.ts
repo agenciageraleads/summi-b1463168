@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -47,6 +46,51 @@ const validatePhoneNumber = (phone: string): boolean => {
   const cleanPhone = phone.replace(/\D/g, '');
   console.log(`[EVOLUTION-HANDLER] Validando telefone: ${cleanPhone} - Válido: ${phoneRegex.test(cleanPhone)}`);
   return phoneRegex.test(cleanPhone);
+};
+
+// NOVA FUNÇÃO: Aguardar por X segundos
+const waitFor = (seconds: number) => {
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+};
+
+// NOVA FUNÇÃO: Deletar instância se existir
+const deleteInstanceIfExists = async (instanceName: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+  try {
+    console.log(`[EVOLUTION-HANDLER] Verificando se instância ${instanceName} existe...`);
+    
+    // Primeiro, tentar fazer logout
+    try {
+      const logoutResponse = await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+        method: 'DELETE',
+        headers: { 'apikey': evolutionApiKey }
+      });
+      if (logoutResponse.ok) {
+        console.log(`[EVOLUTION-HANDLER] Logout realizado com sucesso para ${instanceName}`);
+      }
+    } catch (logoutError) {
+      console.log(`[EVOLUTION-HANDLER] Logout falhou (continuando): ${logoutError.message}`);
+    }
+
+    // Aguardar 2 segundos após logout
+    await waitFor(2);
+    
+    // Tentar deletar a instância
+    const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+      method: 'DELETE',
+      headers: { 'apikey': evolutionApiKey }
+    });
+    
+    if (deleteResponse.ok) {
+      console.log(`[EVOLUTION-HANDLER] Instância ${instanceName} deletada com sucesso`);
+      return true;
+    } else {
+      console.log(`[EVOLUTION-HANDLER] Delete retornou ${deleteResponse.status} - pode não existir`);
+      return false;
+    }
+  } catch (error) {
+    console.log(`[EVOLUTION-HANDLER] Erro ao deletar instância ${instanceName}: ${error.message}`);
+    return false;
+  }
 };
 
 serve(async (req) => {
@@ -163,58 +207,22 @@ serve(async (req) => {
         
         console.log(`[EVOLUTION-HANDLER] Instance name: ${instanceNameToUse}`);
 
-        // Verificar se a instância já existe e está conectada
-        try {
-          const checkResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceNameToUse}`, {
-            headers: { 'apikey': evolutionApiKey }
-          });
-          
-          if (checkResponse.ok) {
-            const statusData = await checkResponse.json();
-            console.log(`[EVOLUTION-HANDLER] Instance exists with state: ${statusData.state}`);
-            
-            if (statusData.state === 'open') {
-              // Garantir que o perfil tem o instance_name salvo
-              if (!profile.instance_name) {
-                const { error: updateError } = await supabaseServiceRole
-                  .from('profiles')
-                  .update({ instance_name: instanceNameToUse })
-                  .eq('id', user.id);
-                if (updateError) {
-                  console.error("[EVOLUTION-HANDLER] Erro ao atualizar instance_name no profile:", updateError);
-                }
-              }
-              return new Response(JSON.stringify({ 
-                success: true,
-                state: 'already_connected',
-                instanceName: instanceNameToUse,
-                message: 'WhatsApp já está conectado'
-              }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" }
-              });
-            }
-          }
-        } catch (error) {
-          console.log(`[EVOLUTION-HANDLER] Instance não existe, criando nova instância`);
-        }
+        // FLUXO CORRIGIDO: Sempre deletar instância existente primeiro
+        console.log(`[EVOLUTION-HANDLER] PASSO 1: Deletando instância existente (se houver): ${instanceNameToUse}`);
+        await deleteInstanceIfExists(instanceNameToUse, cleanApiUrl, evolutionApiKey);
         
-        // Auto-correção: se existe instance_name mas instância não existe na API, limpar estado
-        if (profile.instance_name) {
-          console.log(`[EVOLUTION-HANDLER] Limpando estado inconsistente - instance_name existe mas instância não foi encontrada na API`);
-          await supabaseServiceRole
-            .from('profiles')
-            .update({ instance_name: null })
-            .eq('id', user.id);
-        }
-        
-        // Criar nova instância com PAIRING CODE como padrão
-        console.log(`[EVOLUTION-HANDLER] Criando nova instância com Pairing Code: ${instanceNameToUse}`);
+        // PASSO 2: Aguardar 5 segundos para garantir limpeza
+        console.log(`[EVOLUTION-HANDLER] PASSO 2: Aguardando 5 segundos para limpeza...`);
+        await waitFor(5);
+
+        // PASSO 3: Criar nova instância
+        console.log(`[EVOLUTION-HANDLER] PASSO 3: Criando nova instância: ${instanceNameToUse}`);
         
         try {
           const createPayload = {
             instanceName: instanceNameToUse,
             token: evolutionApiKey,
-            qrcode: true, // Mantém QR Code disponível como fallback
+            qrcode: true,
             number: profile.numero,
             integration: "WHATSAPP-BAILEYS",
             webhook: {
@@ -315,27 +323,13 @@ serve(async (req) => {
         console.log(`[EVOLUTION-HANDLER] Recriando instância: ${instanceNameToRecreate}`);
 
         try {
-          // PASSO 1: Deletar instância atual (mesmo se retornar erro)
+          // PASSO 1: Deletar instância atual
           console.log(`[EVOLUTION-HANDLER] PASSO 1: Deletando instância: ${instanceNameToRecreate}`);
-          
-          try {
-            const deleteResponse = await fetch(`${cleanApiUrl}/instance/delete/${instanceNameToRecreate}`, {
-              method: 'DELETE',
-              headers: { 'apikey': evolutionApiKey }
-            });
-            
-            if (deleteResponse.ok) {
-              console.log(`[EVOLUTION-HANDLER] Instância deletada com sucesso`);
-            } else {
-              console.log(`[EVOLUTION-HANDLER] Delete retornou ${deleteResponse.status} - continuando mesmo assim`);
-            }
-          } catch (deleteError) {
-            console.log(`[EVOLUTION-HANDLER] Erro no delete (continuando): ${deleteError.message}`);
-          }
+          await deleteInstanceIfExists(instanceNameToRecreate, cleanApiUrl, evolutionApiKey);
 
-          // PASSO 2: Aguardar 10 segundos para garantir que a instância foi removida
-          console.log(`[EVOLUTION-HANDLER] PASSO 2: Aguardando 10 segundos...`);
-          await new Promise(resolve => setTimeout(resolve, 10000));
+          // PASSO 2: Aguardar 5 segundos para garantir que a instância foi removida
+          console.log(`[EVOLUTION-HANDLER] PASSO 2: Aguardando 5 segundos...`);
+          await waitFor(5);
 
           // PASSO 3: Criar nova instância COM O MESMO NOME
           console.log(`[EVOLUTION-HANDLER] PASSO 3: Criando nova instância: ${instanceNameToRecreate}`);
