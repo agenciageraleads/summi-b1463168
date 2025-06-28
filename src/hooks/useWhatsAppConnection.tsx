@@ -1,389 +1,318 @@
 
-// ABOUTME: Hook simplificado para gerenciar conexão WhatsApp com máquina de estados clara
-// ABOUTME: Foca apenas nos 4 estados principais e transições entre eles
-import { useState, useEffect, useRef, useCallback } from 'react';
+// ABOUTME: Hook principal para gerenciar conexão WhatsApp - VERSÃO CORRIGIDA
+// ABOUTME: Implementa estado de conexão com códigos de pareamento e QR code
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
-import { supabase } from '@/integrations/supabase/client';
+import { createInstance, getConnectionState, deleteInstance, ConnectionResult } from '@/services/evolutionApi';
 
-// Estados da máquina de estados
-export type ConnectionState = 
-  | 'NO_CONNECTION'       // Usuário nunca conectou ou desconectou completamente
-  | 'AWAITING_CONNECTION' // Instância criada, aguardando pareamento
-  | 'CONNECTED'          // WhatsApp conectado e funcionando
-  | 'ERROR';             // Erro que requer intervenção do usuário
+export type ConnectionState = 'NO_CONNECTION' | 'AWAITING_CONNECTION' | 'CONNECTED' | 'ERROR';
 
 export interface WhatsAppConnectionData {
   state: ConnectionState;
-  isLoading: boolean;
+  instanceName: string | null;
   pairingCode: string | null;
   qrCode: string | null;
-  instanceName: string | null;
   message: string;
   error: string | null;
+  isLoading: boolean;
+  isPolling: boolean;
 }
 
 export const useWhatsAppConnection = () => {
   const { toast } = useToast();
   const { profile, refreshProfile } = useProfile();
   
-  // Estado principal unificado
   const [connectionData, setConnectionData] = useState<WhatsAppConnectionData>({
     state: 'NO_CONNECTION',
-    isLoading: false,
+    instanceName: null,
     pairingCode: null,
     qrCode: null,
-    instanceName: null,
-    message: 'Configure seu WhatsApp para começar',
-    error: null
+    message: 'Pronto para conectar',
+    error: null,
+    isLoading: false,
+    isPolling: false
   });
 
-  // Refs para controle de polling
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
-  // Função para obter sessão válida
-  const getSession = useCallback(async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      throw new Error('Usuário não autenticado');
-    }
-    return sessionData.session;
-  }, []);
-
-  // Função para limpar polling
+  // Limpar polling
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
+    setConnectionData(prev => ({ ...prev, isPolling: false }));
   }, []);
 
-  // Função para verificar status da conexão
-  const checkConnectionStatus = useCallback(async (instanceName: string) => {
-    try {
-      const session = await getSession();
-      
-      const { data, error } = await supabase.functions.invoke('evolution-connection-state', {
-        body: { instanceName },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-      
-      const status = data?.state || 'disconnected';
-      return status === 'open' || status === 'connected';
-    } catch (error) {
-      console.error('[WhatsApp Connection] Erro ao verificar status:', error);
-      return false;
-    }
-  }, [getSession]);
-
-  // Função para iniciar polling de status
+  // Iniciar polling para verificar conexão
   const startPolling = useCallback((instanceName: string) => {
-    stopPolling();
+    console.log(`[WhatsApp Connection] 🔄 Iniciando polling para ${instanceName}`);
     
-    const checkAndUpdate = async () => {
+    stopPolling();
+    setConnectionData(prev => ({ ...prev, isPolling: true }));
+
+    const checkConnection = async () => {
       if (!isMountedRef.current) return;
       
-      const isConnected = await checkConnectionStatus(instanceName);
-      if (isConnected) {
-        stopPolling();
-        setConnectionData(prev => ({
-          ...prev,
-          state: 'CONNECTED',
-          isLoading: false,
-          message: 'WhatsApp conectado com sucesso!'
-        }));
+      try {
+        const state = await getConnectionState(instanceName);
+        console.log(`[WhatsApp Connection] 📊 Estado atual: ${state}`);
         
-        toast({
-          title: "✅ Conectado!",
-          description: "Seu WhatsApp foi conectado com sucesso.",
-          duration: 3000
-        });
-        
-        await refreshProfile();
+        if (state === 'open' || state === 'connected') {
+          console.log(`[WhatsApp Connection] ✅ Conectado com sucesso!`);
+          stopPolling();
+          setConnectionData(prev => ({
+            ...prev,
+            state: 'CONNECTED',
+            message: 'WhatsApp conectado com sucesso!',
+            isPolling: false,
+            pairingCode: null,
+            qrCode: null
+          }));
+          
+          toast({
+            title: "Conectado!",
+            description: "Seu WhatsApp foi conectado com sucesso.",
+            duration: 5000
+          });
+          
+          await refreshProfile();
+        }
+      } catch (error) {
+        console.error(`[WhatsApp Connection] ❌ Erro no polling:`, error);
       }
     };
 
-    // Primeira verificação após 3 segundos
-    setTimeout(checkAndUpdate, 3000);
+    // Verificação inicial após 3 segundos
+    setTimeout(checkConnection, 3000);
     
-    // Polling a cada 5 segundos
-    pollingIntervalRef.current = setInterval(checkAndUpdate, 5000);
-    
-    // Timeout de 60 segundos para expirar código
+    // Polling a cada 7 segundos
+    pollingIntervalRef.current = setInterval(checkConnection, 7000);
+
+    // Timeout após 90 segundos
     setTimeout(() => {
-      if (connectionData.state === 'AWAITING_CONNECTION') {
+      if (isMountedRef.current && pollingIntervalRef.current) {
+        stopPolling();
         setConnectionData(prev => ({
           ...prev,
-          message: 'Código expirado. Clique em "Gerar novo código" para continuar.'
+          message: 'Código expirado. Gere um novo código para continuar.',
+          isPolling: false
         }));
       }
-    }, 60000);
-  }, [checkConnectionStatus, stopPolling, connectionData.state, toast, refreshProfile]);
+    }, 90000);
+  }, [stopPolling, toast, refreshProfile]);
 
-  // Função principal para conectar - MELHORADA
+  // Função principal para conectar
   const connect = useCallback(async () => {
+    console.log(`[WhatsApp Connection] 🚀 Iniciando processo de conexão`);
+    
     if (!profile?.numero) {
       toast({
-        title: 'Informações incompletas',
-        description: 'Configure seu número de telefone no perfil.',
-        variant: 'destructive'
+        title: "Configuração necessária",
+        description: "Configure seu número de telefone no perfil antes de conectar.",
+        variant: "destructive"
       });
       return;
     }
 
-    console.log('[WhatsApp Connection] Iniciando processo de conexão...');
-
     setConnectionData(prev => ({
       ...prev,
-      state: 'AWAITING_CONNECTION',
+      state: 'NO_CONNECTION',
       isLoading: true,
-      message: 'Preparando conexão WhatsApp...',
+      message: 'Criando instância do WhatsApp...',
       error: null,
       pairingCode: null,
       qrCode: null
     }));
 
     try {
-      const session = await getSession();
-
-      console.log('[WhatsApp Connection] Chamando evolution-api-handler com action: connect');
-
-      const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
-        body: { action: 'connect' },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+      console.log(`[WhatsApp Connection] 📡 Chamando serviço de criação`);
+      
+      const result: ConnectionResult = await createInstance();
+      
+      console.log(`[WhatsApp Connection] 📨 Resultado recebido:`, {
+        success: result.success,
+        hasInstanceName: !!result.instanceName,
+        hasPairingCode: !!result.pairingCode,
+        hasQrCode: !!result.qrCode,
+        state: result.state
       });
 
-      console.log('[WhatsApp Connection] Resposta recebida:', { data, error });
-
-      if (error) {
-        console.error('[WhatsApp Connection] Erro da função:', error);
-        throw error;
-      }
-      
-      if (!data.success) {
-        console.error('[WhatsApp Connection] Função retornou erro:', data.error);
-        throw new Error(data.error || 'Erro ao conectar');
+      if (!result.success) {
+        throw new Error(result.error || 'Erro na criação da instância');
       }
 
-      // Se já está conectado
-      if (data.state === 'already_connected') {
+      // Verificar se já está conectado
+      if (result.state === 'already_connected') {
         setConnectionData(prev => ({
           ...prev,
           state: 'CONNECTED',
-          isLoading: false,
-          message: 'WhatsApp já está conectado!'
+          instanceName: result.instanceName || prev.instanceName,
+          message: result.message || 'WhatsApp já conectado',
+          isLoading: false
         }));
+        
+        toast({
+          title: "Já conectado",
+          description: "Seu WhatsApp já está conectado!",
+          duration: 3000
+        });
+        
+        await refreshProfile();
         return;
       }
 
-      // Se gerou códigos com sucesso
-      console.log('[WhatsApp Connection] Códigos gerados com sucesso');
+      // Configurar estado de aguardando conexão
       setConnectionData(prev => ({
         ...prev,
         state: 'AWAITING_CONNECTION',
-        isLoading: false,
-        pairingCode: data.pairingCode,
-        qrCode: data.qrCode,
-        instanceName: data.instanceName,
-        message: 'Use o código de pareamento para conectar seu WhatsApp'
+        instanceName: result.instanceName || null,
+        pairingCode: result.pairingCode || null,
+        qrCode: result.qrCode || null,
+        message: result.pairingCode 
+          ? 'Use o código de pareamento ou escaneie o QR Code'
+          : result.qrCode 
+            ? 'Escaneie o QR Code com seu WhatsApp'
+            : 'Conectando...',
+        isLoading: false
       }));
 
-      if (data.instanceName) {
-        startPolling(data.instanceName);
-      }
-
-    } catch (error: any) {
-      console.error('[WhatsApp Connection] Erro na conexão:', error);
-      setConnectionData(prev => ({
-        ...prev,
-        state: 'ERROR',
-        isLoading: false,
-        error: error.message || 'Erro inesperado ao conectar',
-        message: 'Ocorreu um erro ao tentar conectar'
-      }));
-      
-      toast({
-        title: "Erro na Conexão",
-        description: error.message || 'Ocorreu um erro.',
-        variant: 'destructive'
-      });
-    }
-  }, [profile, getSession, toast, startPolling]);
-
-  // Função para gerar novo código - MELHORADA
-  const generateNewCode = useCallback(async () => {
-    console.log('[WhatsApp Connection] Gerando novo código...');
-    
-    setConnectionData(prev => ({
-      ...prev,
-      isLoading: true,
-      message: 'Gerando novo código...'
-    }));
-
-    try {
-      const session = await getSession();
-
-      const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
-        body: { action: 'recreate-for-pairing-code' },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Erro ao gerar novo código');
-
-      setConnectionData(prev => ({
-        ...prev,
-        isLoading: false,
-        pairingCode: data.pairingCode,
-        qrCode: data.qrCode,
-        instanceName: data.instanceName,
-        message: 'Novo código gerado com sucesso!'
-      }));
-
-      if (data.instanceName) {
-        startPolling(data.instanceName);
+      // Iniciar polling se temos uma instância
+      if (result.instanceName) {
+        startPolling(result.instanceName);
       }
 
       toast({
-        title: "Novo código gerado",
-        description: "Use o novo código de pareamento para conectar.",
+        title: "Códigos gerados",
+        description: result.pairingCode 
+          ? "Use o código de pareamento para conectar rapidamente"
+          : "Escaneie o QR Code para conectar",
         duration: 5000
       });
 
     } catch (error: any) {
-      console.error('[WhatsApp Connection] Erro ao gerar novo código:', error);
+      console.error(`[WhatsApp Connection] ❌ Erro no processo:`, error);
+      
       setConnectionData(prev => ({
         ...prev,
         state: 'ERROR',
-        isLoading: false,
-        error: error.message || 'Erro ao gerar novo código',
-        message: 'Erro ao gerar novo código'
+        error: error.message,
+        message: 'Erro ao criar instância',
+        isLoading: false
       }));
-    }
-  }, [getSession, startPolling, toast]);
 
-  // NOVA FUNÇÃO: Desconectar WhatsApp
-  const disconnect = useCallback(async () => {
-    if (!profile?.instance_name) {
       toast({
-        title: 'Nenhuma conexão encontrada',
-        description: 'Não há instância para desconectar.',
-        variant: 'destructive'
+        title: "Erro na conexão",
+        description: error.message || 'Não foi possível criar a instância do WhatsApp',
+        variant: "destructive"
       });
-      return;
     }
+  }, [profile, toast, refreshProfile, startPolling]);
 
-    setConnectionData(prev => ({
-      ...prev,
-      isLoading: true,
-      message: 'Desconectando WhatsApp...'
-    }));
-
+  // Função para desconectar
+  const disconnect = useCallback(async () => {
+    if (!profile?.instance_name) return;
+    
+    console.log(`[WhatsApp Connection] 🔌 Desconectando instância: ${profile.instance_name}`);
+    
+    setConnectionData(prev => ({ ...prev, isLoading: true, message: 'Desconectando...' }));
+    stopPolling();
+    
     try {
-      const session = await getSession();
-
-      const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
-        body: { action: 'delete' },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Erro ao desconectar');
-
-      // Resetar para estado inicial
+      await deleteInstance(profile.instance_name);
+      
       setConnectionData({
         state: 'NO_CONNECTION',
-        isLoading: false,
+        instanceName: null,
         pairingCode: null,
         qrCode: null,
-        instanceName: null,
-        message: 'WhatsApp desconectado com sucesso',
-        error: null
+        message: 'Pronto para conectar',
+        error: null,
+        isLoading: false,
+        isPolling: false
       });
-
+      
       await refreshProfile();
-
+      
       toast({
         title: "Desconectado",
-        description: "WhatsApp desconectado com sucesso.",
-        duration: 3000
+        description: "WhatsApp desconectado com sucesso."
       });
-
     } catch (error: any) {
-      console.error('[WhatsApp Connection] Erro ao desconectar:', error);
       setConnectionData(prev => ({
         ...prev,
-        state: 'ERROR',
         isLoading: false,
-        error: error.message || 'Erro ao desconectar',
-        message: 'Erro ao desconectar WhatsApp'
+        error: error.message,
+        message: 'Erro ao desconectar'
       }));
       
       toast({
-        title: "Erro ao Desconectar",
-        description: error.message || 'Ocorreu um erro.',
-        variant: 'destructive'
+        title: "Erro",
+        description: error.message,
+        variant: "destructive"
       });
     }
-  }, [profile, getSession, toast, refreshProfile]);
+  }, [profile, stopPolling, refreshProfile, toast]);
 
-  // Função para resetar para o estado inicial
+  // Função para gerar novo código
+  const generateNewCode = useCallback(async () => {
+    console.log(`[WhatsApp Connection] 🔄 Gerando novo código`);
+    await connect();
+  }, [connect]);
+
+  // Função para resetar estado
   const reset = useCallback(() => {
+    console.log(`[WhatsApp Connection] 🔄 Resetando estado`);
     stopPolling();
     setConnectionData({
       state: 'NO_CONNECTION',
-      isLoading: false,
+      instanceName: null,
       pairingCode: null,
       qrCode: null,
-      instanceName: null,
-      message: 'Configure seu WhatsApp para começar',
-      error: null
+      message: 'Pronto para conectar',
+      error: null,
+      isLoading: false,
+      isPolling: false
     });
   }, [stopPolling]);
 
   // Definir estado inicial baseado no perfil
   useEffect(() => {
-    if (!profile) return;
-
-    if (!profile.numero) {
-      setConnectionData(prev => ({
-        ...prev,
-        state: 'NO_CONNECTION',
-        message: 'Configure seu número de telefone no perfil'
-      }));
-    } else if (profile.instance_name) {
-      // Verificar se já está conectado
-      checkConnectionStatus(profile.instance_name).then(isConnected => {
-        if (isConnected) {
-          setConnectionData(prev => ({
-            ...prev,
-            state: 'CONNECTED',
-            instanceName: profile.instance_name,
-            message: 'WhatsApp conectado e funcionando!'
-          }));
-        } else {
-          setConnectionData(prev => ({
-            ...prev,
-            state: 'NO_CONNECTION',
-            message: 'Pronto para conectar seu WhatsApp'
-          }));
+    if (profile?.instance_name && connectionData.state === 'NO_CONNECTION' && !connectionData.isLoading) {
+      console.log(`[WhatsApp Connection] 📋 Perfil carregado com instância: ${profile.instance_name}`);
+      
+      // Verificar automaticamente o estado da conexão
+      const checkInitialState = async () => {
+        try {
+          const state = await getConnectionState(profile.instance_name!);
+          
+          if (state === 'open' || state === 'connected') {
+            setConnectionData(prev => ({
+              ...prev,
+              state: 'CONNECTED',
+              instanceName: profile.instance_name,
+              message: 'WhatsApp conectado'
+            }));
+          } else {
+            setConnectionData(prev => ({
+              ...prev,
+              state: 'NO_CONNECTION',
+              instanceName: profile.instance_name,
+              message: 'Pronto para conectar'
+            }));
+          }
+        } catch (error) {
+          console.error(`[WhatsApp Connection] ❌ Erro na verificação inicial:`, error);
         }
-      });
+      };
+      
+      checkInitialState();
     }
-  }, [profile, checkConnectionStatus]);
+  }, [profile, connectionData.state, connectionData.isLoading]);
 
-  // Cleanup
+  // Cleanup ao desmontar
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
