@@ -143,7 +143,7 @@ export type Database = {
           status: string | null
           title: string
           type: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string
@@ -153,7 +153,7 @@ export type Database = {
           status?: string | null
           title: string
           type: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string
@@ -163,7 +163,7 @@ export type Database = {
           status?: string | null
           title?: string
           type?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -361,6 +361,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_secure_instance_name: {
+        Args: { user_nome: string; user_numero: string }
+        Returns: string
+      }
       is_admin: {
         Args: { user_id: string }
         Returns: boolean
@@ -368,6 +372,10 @@ export type Database = {
       sync_profile_emails: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      validate_brazilian_phone: {
+        Args: { phone_number: string }
+        Returns: boolean
       }
       verify_admin_access: {
         Args: { user_id: string }

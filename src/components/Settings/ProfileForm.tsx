@@ -1,273 +1,367 @@
-import React, { useState, useEffect } from 'react';
+
+// ABOUTME: Formulário de perfil com validações de segurança aprimoradas
+// ABOUTME: Implementa validação de telefone brasileiro e sanitização de entrada
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useProfile } from '@/hooks/useProfile';
+import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { Profile } from '@/hooks/useProfile';
 
-interface ProfileFormProps {
-  profile: Profile;
-  onSave: (data: Partial<Profile>) => Promise<void>;
-  isUpdating: boolean;
-}
+// Função para validar telefone brasileiro
+const validateBrazilianPhone = (phone: string): boolean => {
+  if (!phone) return true; // Campo opcional
+  const cleanPhone = phone.replace(/\D/g, '');
+  return /^55[1-9][1-9][0-9]{8,9}$/.test(cleanPhone);
+};
 
-export const ProfileForm: React.FC<ProfileFormProps> = ({
-  profile,
-  onSave,
-  isUpdating
-}) => {
-  // Função para formatar número de telefone brasileiro
-  const formatPhoneNumber = (value: string) => {
-    // Remove tudo que não é dígito
-    const cleanValue = value.replace(/\D/g, '');
-    
-    // Se começar com 55, remove o código do país para formatação visual
-    let phoneNumber = cleanValue;
-    if (cleanValue.startsWith('55') && cleanValue.length >= 4) {
-      phoneNumber = cleanValue.substring(2);
+// Função para sanitizar texto
+const sanitizeText = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/[<>\"'&]/g, '') // Remove caracteres perigosos
+    .trim()
+    .substring(0, 255); // Limita tamanho
+};
+
+// Schema de validação com Zod
+const profileSchema = z.object({
+  nome: z.string()
+    .min(2, 'Nome deve ter pelo menos 2 caracteres')
+    .max(100, 'Nome deve ter no máximo 100 caracteres')
+    .transform(sanitizeText),
+  numero: z.string()
+    .optional()
+    .refine(validateBrazilianPhone, {
+      message: 'Número deve seguir o formato brasileiro: 55 + DDD + número (ex: 5511999999999)'
+    }),
+  temas_importantes: z.string()
+    .optional()
+    .transform((val) => val ? sanitizeText(val) : val),
+  temas_urgentes: z.string()
+    .optional()
+    .transform((val) => val ? sanitizeText(val) : val),
+  transcreve_audio_recebido: z.boolean(),
+  transcreve_audio_enviado: z.boolean(),
+  resume_audio: z.boolean(),
+  segundos_para_resumir: z.number()
+    .min(15, 'Mínimo 15 segundos')
+    .max(300, 'Máximo 300 segundos'),
+  'Summi em Audio?': z.boolean(),
+  apenas_horario_comercial: z.boolean()
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
+
+export const ProfileForm: React.FC = () => {
+  const { profile, updateProfile } = useProfile();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      nome: profile?.nome || '',
+      numero: profile?.numero || '',
+      temas_importantes: profile?.temas_importantes || '',
+      temas_urgentes: profile?.temas_urgentes || '',
+      transcreve_audio_recebido: profile?.transcreve_audio_recebido ?? true,
+      transcreve_audio_enviado: profile?.transcreve_audio_enviado ?? true,
+      resume_audio: profile?.resume_audio ?? false,
+      segundos_para_resumir: profile?.segundos_para_resumir ?? 45,
+      'Summi em Audio?': profile?.['Summi em Audio?'] ?? false,
+      apenas_horario_comercial: profile?.apenas_horario_comercial ?? true
     }
-    
-    // Aplica a máscara (XX) XXXXX-XXXX
-    if (phoneNumber.length <= 2) {
-      return phoneNumber;
-    } else if (phoneNumber.length <= 7) {
-      return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2)}`;
-    } else if (phoneNumber.length <= 11) {
-      return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7)}`;
-    }
-    
-    return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`;
-  };
-
-  // Função para remover a formatação e adicionar o código do país
-  const unformatPhoneNumber = (formattedValue: string) => {
-    const cleanValue = formattedValue.replace(/\D/g, '');
-    // Adiciona o código do país 55 se não tiver
-    if (cleanValue.length === 11 && !cleanValue.startsWith('55')) {
-      return `55${cleanValue}`;
-    }
-    return cleanValue;
-  };
-
-  // Estados para controlar os valores dos campos
-  const [formData, setFormData] = useState({
-    nome: profile.nome || '',
-    numero: profile.numero || '',
-    temas_importantes: profile.temas_importantes || '',
-    temas_urgentes: profile.temas_urgentes || '',
-    transcreve_audio_recebido: profile.transcreve_audio_recebido ?? true,
-    transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
-    resume_audio: profile.resume_audio ?? false,
-    segundos_para_resumir: profile.segundos_para_resumir ?? 45,
-    'Summi em Audio?': profile['Summi em Audio?'] ?? false,
-    apenas_horario_comercial: profile.apenas_horario_comercial ?? true
   });
 
-  // Estado para controlar a exibição formatada do número
-  const [displayNumber, setDisplayNumber] = useState('');
-
-  // Verificar se o WhatsApp está conectado (tem instance_name)
-  const isWhatsAppConnected = Boolean(profile.instance_name);
-
-  // Atualizar formData quando o profile mudar
-  useEffect(() => {
-    console.log('[PROFILE_FORM] Profile updated, refreshing form data:', profile);
-    const newFormData = {
-      nome: profile.nome || '',
-      numero: profile.numero || '',
-      temas_importantes: profile.temas_importantes || '',
-      temas_urgentes: profile.temas_urgentes || '',
-      transcreve_audio_recebido: profile.transcreve_audio_recebido ?? true,
-      transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
-      resume_audio: profile.resume_audio ?? false,
-      segundos_para_resumir: profile.segundos_para_resumir ?? 45,
-      'Summi em Audio?': profile['Summi em Audio?'] ?? false,
-      apenas_horario_comercial: profile.apenas_horario_comercial ?? true
-    };
+  const onSubmit = async (data: ProfileFormData) => {
+    setIsSubmitting(true);
     
-    setFormData(newFormData);
-    
-    // Atualizar a exibição formatada do número
-    if (newFormData.numero) {
-      setDisplayNumber(formatPhoneNumber(newFormData.numero));
-    }
-  }, [profile]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('[PROFILE_FORM] Submitting form with data:', formData);
     try {
-      await onSave(formData);
-      console.log('[PROFILE_FORM] Form submission completed successfully');
-    } catch (error) {
-      console.error('[PROFILE_FORM] Error during form submission:', error);
+      console.log('[ProfileForm] Enviando dados:', data);
+      
+      // Validação adicional de segurança no frontend
+      if (data.numero && !validateBrazilianPhone(data.numero)) {
+        toast({
+          title: "Erro de validação",
+          description: "Formato de telefone inválido. Use: 55 + DDD + número",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const result = await updateProfile(data);
+      
+      if (result.success) {
+        toast({
+          title: "Perfil atualizado",
+          description: "Suas informações foram salvas com sucesso"
+        });
+      } else {
+        throw new Error(result.error || 'Erro desconhecido');
+      }
+    } catch (error: any) {
+      console.error('[ProfileForm] Erro ao salvar:', error);
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Ocorreu um erro inesperado",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
-    console.log(`[PROFILE_FORM] Field ${field} changed to:`, value);
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Função especial para lidar com mudanças no número de telefone
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    const formattedValue = formatPhoneNumber(inputValue);
-    const unformattedValue = unformatPhoneNumber(inputValue);
-    
-    setDisplayNumber(formattedValue);
-    handleInputChange('numero', unformattedValue);
-  };
+  if (!profile) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações Pessoais</CardTitle>
-          <CardDescription>
-            Suas informações básicas de perfil
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="nome">Nome</Label>
-            <Input 
-              id="nome" 
-              value={formData.nome} 
-              onChange={e => handleInputChange('nome', e.target.value)} 
-              placeholder="Seu nome completo" 
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Informações Pessoais</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="nome"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome Completo *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Seu nome completo" 
+                      {...field}
+                      maxLength={100}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="numero">Número de WhatsApp</Label>
-            <Input 
-              id="numero" 
-              value={displayNumber} 
-              onChange={handlePhoneChange} 
-              placeholder="(11) 99999-9999" 
-              disabled={isWhatsAppConnected}
-              maxLength={15}
+            <FormField
+              control={form.control}
+              name="numero"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Número do WhatsApp</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="5511999999999 (com código do país)" 
+                      {...field}
+                      maxLength={13}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                  <p className="text-sm text-gray-500">
+                    Formato: 55 + DDD + número (sem espaços ou símbolos)
+                  </p>
+                </FormItem>
+              )}
             />
-            {isWhatsAppConnected && (
-              <p className="text-sm text-orange-600">
-                ⚠️ Para alterar o número, desconecte primeiro o WhatsApp na aba Dashboard
-              </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Configurações de Mensagens</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="temas_importantes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Temas Importantes</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Palavras-chave para identificar mensagens importantes (separadas por vírgula)"
+                      {...field}
+                      maxLength={500}
+                      rows={3}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="temas_urgentes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Temas Urgentes</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Palavras-chave para identificar mensagens urgentes (separadas por vírgula)"
+                      {...field}
+                      maxLength={500}
+                      rows={3}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Configurações de Áudio</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="transcreve_audio_recebido"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Transcrever áudios recebidos</FormLabel>
+                    <p className="text-sm text-gray-500">
+                      Converte automaticamente áudios recebidos em texto
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="transcreve_audio_enviado"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Transcrever áudios enviados</FormLabel>
+                    <p className="text-sm text-gray-500">
+                      Converte automaticamente áudios enviados em texto
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <Separator />
+
+            <FormField
+              control={form.control}
+              name="resume_audio"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Resumir áudios longos</FormLabel>
+                    <p className="text-sm text-gray-500">
+                      Cria resumos automáticos de áudios longos
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {form.watch('resume_audio') && (
+              <FormField
+                control={form.control}
+                name="segundos_para_resumir"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Resumir áudios acima de (segundos)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={15}
+                        max={300}
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 45)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             )}
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Configurações de Áudio</CardTitle>
-          <CardDescription>
-            Configure como os áudios são processados
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Transcrever áudios recebidos</Label>
-              <p className="text-sm text-muted-foreground">
-                Converter áudios recebidos em texto automaticamente
-              </p>
-            </div>
-            <Switch checked={formData.transcreve_audio_recebido} onCheckedChange={checked => handleInputChange('transcreve_audio_recebido', checked)} />
-          </div>
+            <FormField
+              control={form.control}
+              name="Summi em Audio?"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Resumos em áudio</FormLabel>
+                    <p className="text-sm text-gray-500">
+                      Converte resumos de texto em áudio
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
 
-          <Separator />
+        <Card>
+          <CardHeader>
+            <CardTitle>Configurações Gerais</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FormField
+              control={form.control}
+              name="apenas_horario_comercial"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Apenas horário comercial</FormLabel>
+                    <p className="text-sm text-gray-500">
+                      Processar mensagens apenas em horário comercial (8h-18h)
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Transcrever áudios enviados</Label>
-              <p className="text-sm text-muted-foreground">
-                Converter áudios enviados em texto automaticamente
-              </p>
-            </div>
-            <Switch checked={formData.transcreve_audio_enviado} onCheckedChange={checked => handleInputChange('transcreve_audio_enviado', checked)} />
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Resumir áudios</Label>
-              <p className="text-sm text-muted-foreground">
-                Gerar resumos automáticos dos áudios
-              </p>
-            </div>
-            <Switch checked={formData.resume_audio} onCheckedChange={checked => handleInputChange('resume_audio', checked)} />
-          </div>
-
-          {formData.resume_audio && <div className="space-y-2">
-              <Label htmlFor="segundos_para_resumir">Segundos mínimos para resumir</Label>
-              <Input id="segundos_para_resumir" type="number" min="10" max="300" value={formData.segundos_para_resumir} onChange={e => handleInputChange('segundos_para_resumir', parseInt(e.target.value))} />
-            </div>}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Configurações Gerais</CardTitle>
-          <CardDescription>
-            Configurações gerais do sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Summi em Áudio</Label>
-              <p className="text-sm text-muted-foreground">
-                Ativar função Summi em áudio
-              </p>
-            </div>
-            <Switch checked={formData['Summi em Audio?']} onCheckedChange={checked => handleInputChange('Summi em Audio?', checked)} />
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Apenas Horário Comercial</Label>
-              <p className="text-sm text-muted-foreground">
-                Processar mensagens apenas em horário comercial
-              </p>
-            </div>
-            <Switch checked={formData.apenas_horario_comercial} onCheckedChange={checked => handleInputChange('apenas_horario_comercial', checked)} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Temas de Interesse</CardTitle>
-          <CardDescription>
-            Configure palavras-chave para categorização automática
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="temas_importantes">Temas Importantes</Label>
-            <Textarea id="temas_importantes" value={formData.temas_importantes} onChange={e => handleInputChange('temas_importantes', e.target.value)} placeholder="Ex: orçamentos, material elétrico, comprar..." className="min-h-[80px]" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="temas_urgentes">Temas Urgentes</Label>
-            <Textarea id="temas_urgentes" value={formData.temas_urgentes} onChange={e => handleInputChange('temas_urgentes', e.target.value)} placeholder="Ex: urgente, amor, falar com você, me liga..." className="min-h-[80px]" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Button type="submit" className="w-full" disabled={isUpdating}>
-        {isUpdating ? 'Salvando...' : 'Salvar Alterações'}
-      </Button>
-    </form>
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
+        </Button>
+      </form>
+    </Form>
   );
 };
