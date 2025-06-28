@@ -83,9 +83,13 @@ serve(async (req) => {
       );
     }
 
+    // 5.1. Limpeza defensiva da URL da Evolution API
+    const cleanedApiUrl = evolutionApiUrl.replace(/(?<!:)\/\//g, '/').replace(/\/$/, '');
+    logStep("🔧 URL da API limpa", { original: evolutionApiUrl, cleaned: cleanedApiUrl });
+
     // 6. Verificar status da instância existente
     logStep("🔍 Verificando instância existente");
-    const fetchResponse = await fetch(`${evolutionApiUrl}/instance/fetch/${instanceName}`, {
+    const fetchResponse = await fetch(`${cleanedApiUrl}/instance/fetch/${instanceName}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -126,7 +130,7 @@ serve(async (req) => {
         }
       };
 
-      const createResponse = await fetch(`${evolutionApiUrl}/instance/create`, {
+      const createResponse = await fetch(`${cleanedApiUrl}/instance/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
