@@ -1,4 +1,3 @@
-
 // ABOUTME: Hook simplificado para gerenciar conexão WhatsApp com máquina de estados clara
 // ABOUTME: Foca apenas nos 4 estados principais e transições entre eles
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -255,6 +254,73 @@ export const useWhatsAppConnection = () => {
     }
   }, [getSession, startPolling, toast]);
 
+  // NOVA FUNÇÃO: Desconectar WhatsApp
+  const disconnect = useCallback(async () => {
+    if (!profile?.instance_name) {
+      toast({
+        title: 'Nenhuma conexão encontrada',
+        description: 'Não há instância para desconectar.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setConnectionData(prev => ({
+      ...prev,
+      isLoading: true,
+      message: 'Desconectando WhatsApp...'
+    }));
+
+    try {
+      const session = await getSession();
+
+      const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
+        body: { action: 'delete' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Erro ao desconectar');
+
+      // Resetar para estado inicial
+      setConnectionData({
+        state: 'NO_CONNECTION',
+        isLoading: false,
+        pairingCode: null,
+        qrCode: null,
+        instanceName: null,
+        message: 'WhatsApp desconectado com sucesso',
+        error: null
+      });
+
+      await refreshProfile();
+
+      toast({
+        title: "Desconectado",
+        description: "WhatsApp desconectado com sucesso.",
+        duration: 3000
+      });
+
+    } catch (error: any) {
+      console.error('[WhatsApp Connection] Erro ao desconectar:', error);
+      setConnectionData(prev => ({
+        ...prev,
+        state: 'ERROR',
+        isLoading: false,
+        error: error.message || 'Erro ao desconectar',
+        message: 'Erro ao desconectar WhatsApp'
+      }));
+      
+      toast({
+        title: "Erro ao Desconectar",
+        description: error.message || 'Ocorreu um erro.',
+        variant: 'destructive'
+      });
+    }
+  }, [profile, getSession, toast, refreshProfile]);
+
   // Função para resetar para o estado inicial
   const reset = useCallback(() => {
     stopPolling();
@@ -312,6 +378,7 @@ export const useWhatsAppConnection = () => {
   return {
     connectionData,
     connect,
+    disconnect,
     generateNewCode,
     reset
   };
