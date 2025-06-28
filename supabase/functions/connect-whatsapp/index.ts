@@ -145,7 +145,10 @@ serve(async (req) => {
       }
 
       const createData = await createResponse.json();
-      logStep("✅ Instância criada", { hasQrcode: !!createData.qrcode, hasPairingCode: !!createData.pairingCode });
+      logStep("✅ Instância criada", { 
+        hasQrcode: !!createData.qrcode, 
+        hasPairingCode: !!createData.qrcode?.pairingCode 
+      });
 
       // Atualizar perfil com nome da instância
       await supabaseClient
@@ -157,7 +160,7 @@ serve(async (req) => {
         JSON.stringify({
           status: 'awaiting_pairing',
           instanceName: instanceName,
-          pairingCode: createData.pairingCode,
+          pairingCode: createData.qrcode?.pairingCode || null,
           qrBase64: createData.qrcode?.base64 || null,
         }),
         { status: 200, headers: corsHeaders }
