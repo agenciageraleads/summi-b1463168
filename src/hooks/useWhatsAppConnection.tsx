@@ -1,3 +1,4 @@
+
 // ABOUTME: Hook simplificado para gerenciar conexão WhatsApp com máquina de estados clara
 // ABOUTME: Foca apenas nos 4 estados principais e transições entre eles
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -124,7 +125,7 @@ export const useWhatsAppConnection = () => {
     }, 60000);
   }, [checkConnectionStatus, stopPolling, connectionData.state, toast, refreshProfile]);
 
-  // Função principal para conectar
+  // Função principal para conectar - MELHORADA
   const connect = useCallback(async () => {
     if (!profile?.numero) {
       toast({
@@ -135,11 +136,13 @@ export const useWhatsAppConnection = () => {
       return;
     }
 
+    console.log('[WhatsApp Connection] Iniciando processo de conexão...');
+
     setConnectionData(prev => ({
       ...prev,
       state: 'AWAITING_CONNECTION',
       isLoading: true,
-      message: 'Criando instância e gerando código...',
+      message: 'Preparando conexão WhatsApp...',
       error: null,
       pairingCode: null,
       qrCode: null
@@ -148,6 +151,8 @@ export const useWhatsAppConnection = () => {
     try {
       const session = await getSession();
 
+      console.log('[WhatsApp Connection] Chamando evolution-api-handler com action: connect');
+
       const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
         body: { action: 'connect' },
         headers: {
@@ -155,8 +160,17 @@ export const useWhatsAppConnection = () => {
         },
       });
 
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Erro ao conectar');
+      console.log('[WhatsApp Connection] Resposta recebida:', { data, error });
+
+      if (error) {
+        console.error('[WhatsApp Connection] Erro da função:', error);
+        throw error;
+      }
+      
+      if (!data.success) {
+        console.error('[WhatsApp Connection] Função retornou erro:', data.error);
+        throw new Error(data.error || 'Erro ao conectar');
+      }
 
       // Se já está conectado
       if (data.state === 'already_connected') {
@@ -170,6 +184,7 @@ export const useWhatsAppConnection = () => {
       }
 
       // Se gerou códigos com sucesso
+      console.log('[WhatsApp Connection] Códigos gerados com sucesso');
       setConnectionData(prev => ({
         ...prev,
         state: 'AWAITING_CONNECTION',
@@ -202,8 +217,10 @@ export const useWhatsAppConnection = () => {
     }
   }, [profile, getSession, toast, startPolling]);
 
-  // Função para gerar novo código
+  // Função para gerar novo código - MELHORADA
   const generateNewCode = useCallback(async () => {
+    console.log('[WhatsApp Connection] Gerando novo código...');
+    
     setConnectionData(prev => ({
       ...prev,
       isLoading: true,
