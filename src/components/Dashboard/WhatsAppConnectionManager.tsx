@@ -1,5 +1,5 @@
 
-// Componente simplificado que usa apenas o hook unificado - VERSÃO FINAL
+// Componente com foco no Pairing Code como método principal de conexão
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,76 +8,44 @@ import { useProfile } from '@/hooks/useProfile';
 import { useNavigate } from 'react-router-dom';
 import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { MessageSquare, Loader2, Wifi, WifiOff, QrCode, Phone, CheckCircle, AlertCircle, Unlink, Settings, RefreshCw } from 'lucide-react';
+import { 
+  MessageSquare, 
+  Loader2, 
+  CheckCircle, 
+  AlertCircle, 
+  Unlink, 
+  Settings, 
+  RefreshCw,
+  Copy,
+  QrCode,
+  Smartphone,
+  ArrowLeft
+} from 'lucide-react';
 
 export const WhatsAppConnectionManager: React.FC = () => {
-  const { profile, refreshProfile } = useProfile();
+  const { profile } = useProfile();
   const navigate = useNavigate();
-  const { state, handleConnect, handleDisconnect } = useWhatsAppManager();
+  const { state, handleConnect, handleDisconnect, handleRecreateForPairingCode, handleToggleQrFallback } = useWhatsAppManager();
   const { toast } = useToast();
-  const [isRecreating, setIsRecreating] = React.useState(false);
 
-  // Função para recriar instância (deletar e criar nova)
-  const handleRecreateInstance = async () => {
-    if (!profile?.instance_name) {
-      toast({
-        title: "Erro",
-        description: "Nenhuma instância encontrada para recriar",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsRecreating(true);
+  // Função para copiar pairing code
+  const handleCopyPairingCode = async () => {
+    if (!state.pairingCode) return;
     
     try {
-      console.log('[WhatsApp Manager] 🔄 Iniciando recriação da instância...');
-      
-      // Obter sessão atual para autenticação
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        throw new Error('Usuário não autenticado');
-      }
-
-      // Passo 1: Deletar instância atual
-      console.log('[WhatsApp Manager] 🗑️ Deletando instância atual...');
-      const { data: deleteData, error: deleteError } = await supabase.functions.invoke('evolution-delete-instance', {
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-
-      if (deleteError) {
-        console.error('[WhatsApp Manager] ❌ Erro ao deletar instância:', deleteError);
-        throw new Error('Erro ao deletar instância atual');
-      }
-
-      console.log('[WhatsApp Manager] ✅ Instância deletada com sucesso');
-
-      // Passo 2: Aguardar um pouco e atualizar o perfil
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      await refreshProfile();
-
-      // Passo 3: Iniciar nova conexão
-      console.log('[WhatsApp Manager] 🚀 Iniciando nova conexão...');
-      await handleConnect();
-
+      await navigator.clipboard.writeText(state.pairingCode);
       toast({
-        title: "Instância Recriada",
-        description: "A instância foi recriada com sucesso. Escaneie o novo QR Code.",
-        duration: 5000
+        title: "Código copiado!",
+        description: "O código de pareamento foi copiado para a área de transferência.",
+        duration: 3000
       });
-
-    } catch (error: any) {
-      console.error('[WhatsApp Manager] ❌ Erro ao recriar instância:', error);
+    } catch (error) {
+      console.error('Erro ao copiar código:', error);
       toast({
-        title: "Erro ao Recriar Instância",
-        description: error.message || 'Erro inesperado ao recriar instância',
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar o código. Tente novamente.",
         variant: "destructive"
       });
-    } finally {
-      setIsRecreating(false);
     }
   };
 
@@ -92,6 +60,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
           </Badge>
         );
       case 'is_connecting':
+      case 'needs_pairing_code':
       case 'needs_qr_code':
         return (
           <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
@@ -109,7 +78,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
       default:
         return (
           <Badge className="bg-gray-100 text-gray-800 border-gray-200">
-            <WifiOff className="w-3 h-3 mr-1" />
+            <Smartphone className="w-3 h-3 mr-1" />
             Desconectado
           </Badge>
         );
@@ -118,11 +87,11 @@ export const WhatsAppConnectionManager: React.FC = () => {
 
   // Renderizar botões de ação
   const renderActionButtons = () => {
-    if (state.isLoading || isRecreating) {
+    if (state.isLoading) {
       return (
         <Button disabled size="sm">
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          {isRecreating ? 'Recriando...' : 'Processando...'}
+          Processando...
         </Button>
       );
     }
@@ -135,23 +104,23 @@ export const WhatsAppConnectionManager: React.FC = () => {
             Configurar Telefone
           </Button>
         );
+      case 'needs_pairing_code':
       case 'needs_qr_code':
         return (
-          <div className="flex space-x-2">
+          <div className="flex flex-col space-y-2">
             <Button onClick={handleConnect} size="sm">
-              <QrCode className="w-4 h-4 mr-2" />
+              <Smartphone className="w-4 h-4 mr-2" />
               Conectar WhatsApp
             </Button>
-            {/* Botão para recriar instância quando desconectado */}
             {profile?.instance_name && (
               <Button 
-                onClick={handleRecreateInstance} 
+                onClick={handleRecreateForPairingCode} 
                 variant="outline" 
                 size="sm"
-                title="Recriar instância (útil para resolver problemas de conexão)"
+                title="Gerar novo código de pareamento"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Recriar Instância
+                Gerar novo código
               </Button>
             )}
           </div>
@@ -165,17 +134,16 @@ export const WhatsAppConnectionManager: React.FC = () => {
         );
       case 'error':
         return (
-          <div className="flex space-x-2">
+          <div className="flex flex-col space-y-2">
             <Button onClick={handleConnect} variant="outline" size="sm">
               Tentar Novamente
             </Button>
-            {/* Botão para recriar instância em caso de erro */}
             {profile?.instance_name && (
               <Button 
-                onClick={handleRecreateInstance} 
+                onClick={handleRecreateForPairingCode} 
                 variant="outline" 
                 size="sm"
-                title="Recriar instância (útil para resolver problemas de conexão)"
+                title="Recriar instância para resolver problemas"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Recriar Instância
@@ -186,7 +154,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
       default:
         return (
           <Button onClick={handleConnect} size="sm">
-            <QrCode className="w-4 h-4 mr-2" />
+            <Smartphone className="w-4 h-4 mr-2" />
             Conectar WhatsApp
           </Button>
         );
@@ -219,12 +187,122 @@ export const WhatsAppConnectionManager: React.FC = () => {
         {/* Mensagem de Status */}
         <p className="text-sm text-muted-foreground text-center">{state.message}</p>
 
+        {/* PAIRING CODE - MÉTODO PRINCIPAL */}
+        {state.pairingCode && !state.showQrFallback && (
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center space-x-2">
+                  <Smartphone className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-semibold text-blue-800">Código de Pareamento</h3>
+                </div>
+                
+                {/* Código em destaque */}
+                <div className="p-4 bg-white rounded-lg border-2 border-blue-300">
+                  <div className="text-3xl font-mono font-bold text-blue-900 tracking-wider">
+                    {state.pairingCode}
+                  </div>
+                </div>
+                
+                {/* Botão para copiar */}
+                <Button 
+                  onClick={handleCopyPairingCode}
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copiar Código
+                </Button>
+                
+                {/* Instruções */}
+                <div className="text-sm text-blue-700 space-y-2">
+                  <p className="font-medium">Como usar:</p>
+                  <ol className="text-left space-y-1 list-decimal list-inside">
+                    <li>Abra o WhatsApp no seu celular</li>
+                    <li>Menu → Aparelhos Conectados</li>
+                    <li>Conectar um aparelho</li>
+                    <li>Conectar com número de telefone</li>
+                    <li>Digite o código acima</li>
+                  </ol>
+                </div>
+                
+                {/* Link para fallback QR Code */}
+                {state.qrCode && (
+                  <div className="pt-2 border-t border-blue-200">
+                    <Button
+                      onClick={handleToggleQrFallback}
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Prefere usar o QR Code?
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* QR CODE - MÉTODO FALLBACK */}
+        {state.qrCode && state.showQrFallback && (
+          <Card className="bg-gray-50 border-gray-200">
+            <CardContent className="p-4">
+              <div className="text-center space-y-4">
+                {/* Botão voltar para pairing code */}
+                {state.pairingCode && (
+                  <div className="flex justify-start">
+                    <Button
+                      onClick={handleToggleQrFallback}
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-600 hover:text-gray-800"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Voltar ao código
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-center space-x-2">
+                  <QrCode className="w-5 h-5 text-gray-600" />
+                  <h3 className="font-semibold text-gray-800">QR Code</h3>
+                </div>
+                
+                <div className="flex justify-center">
+                  <img 
+                    src={state.qrCode} 
+                    alt="QR Code para conectar WhatsApp" 
+                    className="max-w-[200px] max-h-[200px] border rounded-lg" 
+                  />
+                </div>
+                
+                <div className="text-sm text-gray-600 space-y-2">
+                  <p className="font-medium">Como usar:</p>
+                  <ol className="text-left space-y-1 list-decimal list-inside">
+                    <li>Abra o WhatsApp no seu celular</li>
+                    <li>Menu → Aparelhos Conectados</li>
+                    <li>Conectar um aparelho</li>
+                    <li>Escaneie o QR Code acima</li>
+                  </ol>
+                </div>
+                
+                <p className="text-xs text-gray-500">
+                  O código expira em aproximadamente 60 segundos
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Número de Telefone (se conectado) */}
         {state.connectionState === 'already_connected' && profile?.numero && (
           <div className="flex justify-center">
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center space-x-2">
-                <Phone className="w-4 h-4 text-green-600" />
+                <Smartphone className="w-4 h-4 text-green-600" />
                 <span className="text-sm font-medium text-green-800">
                   Telefone: ({profile.numero.slice(2, 4)}) {profile.numero.length === 13 ? profile.numero.slice(4, 5) + ' ' : ''}{profile.numero.slice(-8)}
                 </span>
@@ -237,30 +315,6 @@ export const WhatsAppConnectionManager: React.FC = () => {
         <div className="flex justify-center">
           {renderActionButtons()}
         </div>
-
-        {/* QR Code */}
-        {state.qrCode && state.connectionState === 'needs_qr_code' && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center space-y-3">
-                <h3 className="font-medium">Escaneie o QR Code</h3>
-                <p className="text-sm text-muted-foreground">
-                  Abra o WhatsApp → Menu → Dispositivos conectados → Conectar dispositivo
-                </p>
-                <div className="flex justify-center">
-                  <img 
-                    src={state.qrCode} 
-                    alt="QR Code para conectar WhatsApp" 
-                    className="max-w-[200px] max-h-[200px] border rounded-lg" 
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  O QR Code expira em aproximadamente 45 segundos
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </CardContent>
     </Card>
   );

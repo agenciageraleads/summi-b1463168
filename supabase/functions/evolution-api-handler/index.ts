@@ -198,7 +198,6 @@ serve(async (req) => {
                 } else {
                   console.log(`[EVOLUTION-HANDLER] instance_name atualizado no profile para: ${instanceNameToUse}`);
                 }
-                // Adicione mais logging
               }
               return new Response(JSON.stringify({ 
                 success: true,
@@ -209,12 +208,12 @@ serve(async (req) => {
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               });
             } else {
-              // Instância existe mas não está conectada
+              // Instância existe mas não está conectada - gerar pairing code
               return new Response(JSON.stringify({ 
                 success: true,
-                state: 'needs_qr_code',
+                state: 'needs_pairing_code',
                 instanceName: instanceNameToUse,
-                message: 'Instância encontrada, gere o QR Code para conectar'
+                message: 'Instância encontrada, gere o código de pareamento para conectar'
               }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               });
@@ -224,25 +223,25 @@ serve(async (req) => {
           console.log(`[EVOLUTION-HANDLER] Instance não existe, criando nova instância`);
         }
         
-        // Criar nova instância com estrutura CORRETA conforme Evolution API v2.2.3
-        console.log(`[EVOLUTION-HANDLER] Criando nova instância: ${instanceNameToUse}`);
+        // Criar nova instância com PAIRING CODE como padrão
+        console.log(`[EVOLUTION-HANDLER] Criando nova instância com Pairing Code: ${instanceNameToUse}`);
         
         try {
-          // PAYLOAD CORRIGIDO conforme documentação Evolution API v2.2.3
+          // PAYLOAD MODIFICADO para solicitar Pairing Code por padrão
           const createPayload = {
             instanceName: instanceNameToUse,
             token: evolutionApiKey,
-            qrcode: true,
+            qrcode: true, // Mantém QR Code disponível como fallback
             number: profile.numero,
             integration: "WHATSAPP-BAILEYS",
             webhook: {
-              url: webhookUrl, // Usando a variável correta do N8N
+              url: webhookUrl,
               byEvents: false,
               base64: true,
               headers: {
                 "Content-Type": "application/json"
               },
-              events: ["MESSAGES_UPSERT"] // Array obrigatório mesmo com byEvents: false
+              events: ["MESSAGES_UPSERT"]
             },
             settings: {
               reject_call: false,
@@ -254,7 +253,7 @@ serve(async (req) => {
             }
           };
 
-          console.log(`[EVOLUTION-HANDLER] Payload de criação (Evolution v2.2.3):`, JSON.stringify(createPayload, null, 2));
+          console.log(`[EVOLUTION-HANDLER] Payload de criação com Pairing Code:`, JSON.stringify(createPayload, null, 2));
 
           const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
             method: 'POST',
@@ -280,13 +279,19 @@ serve(async (req) => {
             .update({ instance_name: instanceNameToUse })
             .eq('id', user.id);
           
-          auditLog("INSTANCE_CREATED", user.id, { instanceName: instanceNameToUse });
+          // EXTRAIR PAIRING CODE da resposta
+          const pairingCode = createData?.qrcode?.pairingCode;
+          const qrCodeBase64 = createData?.qrcode?.base64;
+          
+          auditLog("INSTANCE_CREATED_WITH_PAIRING", user.id, { instanceName: instanceNameToUse, hasPairingCode: !!pairingCode });
           
           return new Response(JSON.stringify({ 
             success: true,
-            state: 'needs_qr_code',
+            state: 'needs_pairing_code',
             instanceName: instanceNameToUse,
-            message: 'Instância criada com sucesso, gere o QR Code para conectar'
+            pairingCode: pairingCode,
+            qrCode: qrCodeBase64, // Mantém QR Code como fallback
+            message: 'Instância criada com sucesso. Use o código de pareamento ou QR Code para conectar.'
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
@@ -298,6 +303,119 @@ serve(async (req) => {
           return new Response(JSON.stringify({ 
             success: false, 
             error: `Erro ao criar instância: ${error.message}` 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      }
+
+      case "recreate-for-pairing-code": {
+        auditLog("RECREATE_FOR_PAIRING_CODE", user.id);
+        
+        console.log(`[EVOLUTION-HANDLER] Recriando instância para novo pairing code - User: ${user.id}`);
+        
+        if (!profile.instance_name) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "Nenhuma instância encontrada para recriar" 
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        try {
+          // Passo 1: Deletar instância atual
+          console.log(`[EVOLUTION-HANDLER] Deletando instância atual: ${profile.instance_name}`);
+          
+          const deleteResponse = await fetch(`${cleanApiUrl}/instance/delete/${profile.instance_name}`, {
+            method: 'GET',
+            headers: { 'apikey': evolutionApiKey }
+          });
+
+          if (!deleteResponse.ok) {
+            console.log(`[EVOLUTION-HANDLER] Aviso: Erro ao deletar instância (pode já ter sido deletada): ${deleteResponse.status}`);
+          }
+
+          // Passo 2: Aguardar um momento para garantir que a instância foi removida
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          // Passo 3: Criar nova instância com novo pairing code
+          const instanceNameToUse = createValidInstanceName(profile.nome, profile.numero);
+          
+          const createPayload = {
+            instanceName: instanceNameToUse,
+            token: evolutionApiKey,
+            qrcode: true,
+            number: profile.numero,
+            integration: "WHATSAPP-BAILEYS",
+            webhook: {
+              url: webhookUrl,
+              byEvents: false,
+              base64: true,
+              headers: {
+                "Content-Type": "application/json"
+              },
+              events: ["MESSAGES_UPSERT"]
+            },
+            settings: {
+              reject_call: false,
+              msg_call: "",
+              groups_ignore: true,
+              always_online: false,
+              read_messages: false,
+              read_status: false
+            }
+          };
+
+          const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': evolutionApiKey
+            },
+            body: JSON.stringify(createPayload)
+          });
+          
+          if (!createResponse.ok) {
+            const errorText = await createResponse.text();
+            throw new Error(`Falha ao recriar instância: ${createResponse.status} - ${errorText}`);
+          }
+          
+          const createData = await createResponse.json();
+          console.log(`[EVOLUTION-HANDLER] Nova instância criada:`, createData);
+          
+          // Atualizar instance_name no perfil
+          await supabaseServiceRole
+            .from('profiles')
+            .update({ instance_name: instanceNameToUse })
+            .eq('id', user.id);
+          
+          // Extrair novo pairing code
+          const pairingCode = createData?.qrcode?.pairingCode;
+          const qrCodeBase64 = createData?.qrcode?.base64;
+          
+          auditLog("INSTANCE_RECREATED_SUCCESS", user.id, { instanceName: instanceNameToUse, hasPairingCode: !!pairingCode });
+          
+          return new Response(JSON.stringify({ 
+            success: true,
+            state: 'needs_pairing_code',
+            instanceName: instanceNameToUse,
+            pairingCode: pairingCode,
+            qrCode: qrCodeBase64,
+            message: 'Nova instância criada com sucesso. Use o novo código de pareamento.'
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+          
+        } catch (error) {
+          auditLog("RECREATE_ERROR", user.id, { error: error.message });
+          console.error(`[EVOLUTION-HANDLER] Erro ao recriar instância:`, error);
+          
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: `Erro ao recriar instância: ${error.message}` 
           }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
