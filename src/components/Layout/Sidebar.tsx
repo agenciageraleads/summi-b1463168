@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { 
   BarChart3, 
   Settings, 
+  CreditCard, 
   Users, 
   MessageSquare, 
   TestTube,
@@ -29,6 +30,7 @@ export const Sidebar = () => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
     { name: 'Configurações', href: '/settings', icon: Settings },
+    { name: 'Assinatura', href: '/subscription', icon: CreditCard },
     { name: 'Indicações', href: '/referrals', icon: Users },
     { name: 'Feedback', href: '/feedback', icon: MessageSquare },
   ];
