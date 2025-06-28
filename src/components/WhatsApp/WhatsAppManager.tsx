@@ -48,7 +48,7 @@ export const WhatsAppManager = () => {
           instanceName={connectionData.instanceName}
           phoneNumber={profile?.numero || null}
           message={connectionData.message}
-          onDisconnect={disconnect} // Agora implementado
+          onDisconnect={disconnect}
           onPreferences={handlePreferences}
           isLoading={connectionData.isLoading}
         />
