@@ -61,3 +61,6 @@ verify_jwt = true
 
 [functions.get-connection-status]
 verify_jwt = true
+
+[functions.check-connection-status]
+verify_jwt = true

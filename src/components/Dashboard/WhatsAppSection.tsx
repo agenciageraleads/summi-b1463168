@@ -4,7 +4,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare } from 'lucide-react';
-import { WhatsAppManager } from '@/components/WhatsApp/WhatsAppManager';
+import { WhatsAppManagerV2 } from '@/components/WhatsApp/WhatsAppManagerV2';
 
 export const WhatsAppSection: React.FC = () => {
   return (
@@ -16,7 +16,7 @@ export const WhatsAppSection: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <WhatsAppManager />
+        <WhatsAppManagerV2 />
       </CardContent>
     </Card>
   );

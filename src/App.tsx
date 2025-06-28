@@ -17,8 +17,6 @@ import BetaPage from "./pages/BetaPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
-import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminBetaUsersPage from "./pages/AdminBetaUsersPage";
@@ -46,16 +44,6 @@ function App() {
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
                     <DashboardPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/whatsapp" element={
-                  <ProtectedRoute>
-                    <WhatsAppConnectionPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/whatsapp-v2" element={
-                  <ProtectedRoute>
-                    <WhatsAppConnectionV2Page />
                   </ProtectedRoute>
                 } />
                 <Route path="/settings" element={
