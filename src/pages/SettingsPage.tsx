@@ -4,21 +4,9 @@ import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 import { SubscriptionStatus } from '@/components/SubscriptionStatus';
-import { useState } from 'react';
 
 const SettingsPage = () => {
-  const { profile, isLoading, updateProfile } = useProfile();
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  // Função para salvar as alterações do perfil
-  const handleSaveProfile = async (data: Partial<typeof profile>) => {
-    setIsUpdating(true);
-    try {
-      await updateProfile(data);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
+  const { profile, isLoading } = useProfile();
 
   if (isLoading) {
     return (
@@ -51,11 +39,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Formulário de perfil */}
-        <ProfileForm 
-          profile={profile}
-          onSave={handleSaveProfile}
-          isUpdating={isUpdating}
-        />
+        <ProfileForm />
         
         {/* Status da assinatura */}
         <SubscriptionStatus />
