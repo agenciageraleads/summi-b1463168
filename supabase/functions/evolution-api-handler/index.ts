@@ -93,7 +93,6 @@ serve(async (req) => {
 
     const body = await req.json();
     const action = sanitizeInput(body.action);
-    const instanceName = sanitizeInput(req.headers.get("instance-name") || body.instanceName || '');
 
     console.log(`[EVOLUTION-HANDLER] Action requested: ${action}`);
 
@@ -132,10 +131,10 @@ serve(async (req) => {
 
     // Processar ações baseadas no tipo
     switch (action) {
-      case "initialize-connection": {
-        auditLog("INITIALIZE_CONNECTION", user.id);
+      case "connect": {
+        auditLog("CONNECT_REQUEST", user.id);
         
-        console.log(`[EVOLUTION-HANDLER] Iniciando initialize-connection - User: ${user.id}`);
+        console.log(`[EVOLUTION-HANDLER] Iniciando conexão - User: ${user.id}`);
         
         // Verificar se o número é válido
         if (!profile.numero) {
@@ -163,20 +162,7 @@ serve(async (req) => {
         
         console.log(`[EVOLUTION-HANDLER] Instance name: ${instanceNameToUse}`);
 
-        // TENTE SEMPRE SALVAR O instance_name, se não existir
-        if (!profile.instance_name) {
-          const { error: updateError } = await supabaseServiceRole
-            .from('profiles')
-            .update({ instance_name: instanceNameToUse })
-            .eq('id', user.id);
-          if (updateError) {
-            console.error("[EVOLUTION-HANDLER] Erro ao salvar instance_name inicial:", updateError);
-          } else {
-            console.log(`[EVOLUTION-HANDLER] instance_name inicial salvo no profile: ${instanceNameToUse}`);
-          }
-        }
-
-        // Verificar se a instância já existe
+        // Verificar se a instância já existe e está conectada
         try {
           const checkResponse = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceNameToUse}`, {
             headers: { 'apikey': evolutionApiKey }
@@ -195,8 +181,6 @@ serve(async (req) => {
                   .eq('id', user.id);
                 if (updateError) {
                   console.error("[EVOLUTION-HANDLER] Erro ao atualizar instance_name no profile:", updateError);
-                } else {
-                  console.log(`[EVOLUTION-HANDLER] instance_name atualizado no profile para: ${instanceNameToUse}`);
                 }
               }
               return new Response(JSON.stringify({ 
@@ -207,27 +191,25 @@ serve(async (req) => {
               }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               });
-            } else {
-              // Instância existe mas não está conectada - gerar pairing code
-              return new Response(JSON.stringify({ 
-                success: true,
-                state: 'needs_pairing_code',
-                instanceName: instanceNameToUse,
-                message: 'Instância encontrada, gere o código de pareamento para conectar'
-              }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" }
-              });
             }
           }
         } catch (error) {
           console.log(`[EVOLUTION-HANDLER] Instance não existe, criando nova instância`);
         }
         
+        // Auto-correção: se existe instance_name mas instância não existe na API, limpar estado
+        if (profile.instance_name) {
+          console.log(`[EVOLUTION-HANDLER] Limpando estado inconsistente - instance_name existe mas instância não foi encontrada na API`);
+          await supabaseServiceRole
+            .from('profiles')
+            .update({ instance_name: null })
+            .eq('id', user.id);
+        }
+        
         // Criar nova instância com PAIRING CODE como padrão
         console.log(`[EVOLUTION-HANDLER] Criando nova instância com Pairing Code: ${instanceNameToUse}`);
         
         try {
-          // PAYLOAD MODIFICADO para solicitar Pairing Code por padrão
           const createPayload = {
             instanceName: instanceNameToUse,
             token: evolutionApiKey,
@@ -253,7 +235,7 @@ serve(async (req) => {
             }
           };
 
-          console.log(`[EVOLUTION-HANDLER] Payload de criação com Pairing Code:`, JSON.stringify(createPayload, null, 2));
+          console.log(`[EVOLUTION-HANDLER] Payload de criação:`, JSON.stringify(createPayload, null, 2));
 
           const createResponse = await fetch(`${cleanApiUrl}/instance/create`, {
             method: 'POST',
@@ -283,15 +265,15 @@ serve(async (req) => {
           const pairingCode = createData?.qrcode?.pairingCode;
           const qrCodeBase64 = createData?.qrcode?.base64;
           
-          auditLog("INSTANCE_CREATED_WITH_PAIRING", user.id, { instanceName: instanceNameToUse, hasPairingCode: !!pairingCode });
+          auditLog("INSTANCE_CREATED_SUCCESS", user.id, { instanceName: instanceNameToUse, hasPairingCode: !!pairingCode });
           
           return new Response(JSON.stringify({ 
             success: true,
             state: 'needs_pairing_code',
             instanceName: instanceNameToUse,
             pairingCode: pairingCode,
-            qrCode: qrCodeBase64, // Mantém QR Code como fallback
-            message: 'Instância criada com sucesso. Use o código de pareamento ou QR Code para conectar.'
+            qrCode: qrCodeBase64,
+            message: 'Instância criada com sucesso. Use o código de pareamento para conectar.'
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
