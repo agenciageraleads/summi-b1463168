@@ -1,5 +1,4 @@
 
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -169,11 +168,9 @@ serve(async (req) => {
 
     console.log('[FETCH-WHATSAPP-GROUPS] ⚙️ Configurações Evolution API validadas');
 
-    // CORREÇÃO: Construir URL da Evolution API de forma segura para evitar barra dupla
-    const baseUrl = evolutionApiUrl.endsWith('/') ? evolutionApiUrl.slice(0, -1) : evolutionApiUrl;
-    const evolutionUrl = `${baseUrl}/group/fetchAllGroups/${profile.instance_name}`;
-    
-    console.log('[FETCH-WHATSAPP-GROUPS] 🌐 URL da Evolution API (corrigida):', evolutionUrl);
+    // Construir URL da Evolution API
+    const evolutionUrl = `${evolutionApiUrl}/group/fetchAllGroups/${profile.instance_name}`;
+    console.log('[FETCH-WHATSAPP-GROUPS] 🌐 URL da Evolution API:', evolutionUrl);
 
     // Fazer requisição para Evolution API
     const evolutionResponse = await fetch(evolutionUrl, {
@@ -194,16 +191,14 @@ serve(async (req) => {
       console.error('[FETCH-WHATSAPP-GROUPS] ❌ Erro na Evolution API:', {
         status: evolutionResponse.status,
         statusText: evolutionResponse.statusText,
-        body: errorText,
-        url: evolutionUrl
+        body: errorText
       });
       
       return new Response(
         JSON.stringify({ 
           error: 'Erro ao buscar grupos no WhatsApp',
           details: `Status: ${evolutionResponse.status} - ${evolutionResponse.statusText}`,
-          apiResponse: errorText,
-          url: evolutionUrl
+          apiResponse: errorText
         }),
         {
           status: 500,
@@ -299,4 +294,3 @@ serve(async (req) => {
     )
   }
 })
-
