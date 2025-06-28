@@ -7,7 +7,7 @@ import {
   initializeWhatsAppConnection,
   generateQRCode,
   checkConnectionStatus,
-  disconnectWhatsApp,
+  deleteWhatsAppInstance,
   restartInstance,
   ConnectionResult,
 } from '@/services/whatsappConnection';
@@ -223,11 +223,11 @@ export const useWhatsAppManager = () => {
         ...prev,
         connectionState: 'needs_pairing_code',
         pairingCode: data.pairingCode,
-        qrCode: data.qrCode, // Mantém QR Code como fallback
+        qrCode: data.qrCode,
         instanceName: data.instanceName,
         message: 'Novo código gerado com sucesso!',
         isLoading: false,
-        showQrFallback: false // Reset fallback
+        showQrFallback: false
       }));
 
       // Iniciar polling para nova instância
@@ -410,37 +410,45 @@ export const useWhatsAppManager = () => {
     }
   }, [profile, state.isLoading, toast, stopPolling, refreshProfile, checkConnectionAndUpdate, handleGenerateQR, startPolling]);
 
-  // Desconectar WhatsApp - MODIFICADO para limpar pairing code
+  // MODIFICADO: Desconectar WhatsApp - Agora DELETA a instância completamente
   const handleDisconnect = useCallback(async () => {
-    console.log('[WA Manager] 🔌 Iniciando desconexão...');
+    console.log('[WA Manager] 🗑️ Iniciando DELEÇÃO completa da instância...');
     if (!profile?.instance_name) return;
     
-    setState(prev => ({ ...prev, isLoading: true, message: 'Desconectando...' }));
+    setState(prev => ({ ...prev, isLoading: true, message: 'Deletando instância...' }));
     stopPolling();
     
     try {
-      await disconnectWhatsApp();
+      // MODIFICADO: Usar deleteWhatsAppInstance em vez de disconnectWhatsApp
+      await deleteWhatsAppInstance();
       isDefinitivelyConnectedRef.current = false;
       hasAutoConnectedRef.current = false;
       
-      // CORREÇÃO: Resetar completamente o estado após desconexão
+      // MODIFICADO: Resetar COMPLETAMENTE o estado para início do fluxo
       setState(prev => ({
         ...prev,
-        connectionState: 'needs_pairing_code',
+        connectionState: 'needs_phone_number', // CORRIGIDO: Volta ao estado inicial
         isLoading: false,
         isPolling: false,
-        pairingCode: null, // LIMPAR pairing code
+        pairingCode: null,
         qrCode: null,
-        message: 'WhatsApp desconectado com sucesso.',
+        instanceName: null,
+        message: 'WhatsApp desconectado. Instância deletada com sucesso.',
         showQrFallback: false
       }));
       
-      toast({ title: "Desconectado", description: "Seu WhatsApp foi desconectado." });
+      // NOVO: Forçar refresh do perfil para garantir que instance_name foi limpo
+      await refreshProfile();
+      
+      toast({ 
+        title: "Desconectado", 
+        description: "Instância WhatsApp deletada. Você pode conectar novamente quando quiser." 
+      });
     } catch (error: any) {
       setState(prev => ({ 
         ...prev, 
         isLoading: false, 
-        message: error.message || 'Erro ao desconectar' 
+        message: error.message || 'Erro ao deletar instância' 
       }));
       toast({ 
         title: "Erro", 
@@ -448,7 +456,7 @@ export const useWhatsAppManager = () => {
         variant: "destructive" 
       });
     }
-  }, [profile, stopPolling, toast]);
+  }, [profile, stopPolling, refreshProfile, toast]);
 
   // ... keep existing code (useEffect hooks for profile and auto-connection) the same
 
@@ -519,7 +527,7 @@ export const useWhatsAppManager = () => {
     state,
     handleConnect,
     handleDisconnect,
-    handleRecreateForPairingCode, // NOVO: Função para recriar instância
-    handleToggleQrFallback, // NOVO: Função para alternar para QR Code
+    handleRecreateForPairingCode,
+    handleToggleQrFallback,
   };
 };

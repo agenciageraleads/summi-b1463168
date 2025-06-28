@@ -487,7 +487,7 @@ serve(async (req) => {
       }
       
       case "logout": {
-        // LOGOUT SÓ LIMPA PERFIL SE A EVOLUTION CONFIRMAR QUE DESCONECTOU
+        // LOGOUT SÓ FAZ LOGOUT, NÃO LIMPA PERFIL
         if (!instanceName) {
           return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
             status: 400,
@@ -496,58 +496,27 @@ serve(async (req) => {
         }
 
         try {
-          // Solicita logout na Evolution
           const logoutResponse = await fetch(`${cleanApiUrl}/instance/logout/${instanceName}`, {
-            method: 'GET',
+            method: 'DELETE',
             headers: { 'apikey': evolutionApiKey }
           });
 
           if (!logoutResponse.ok) {
             const errorTxt = await logoutResponse.text();
             auditLog("LOGOUT_ERROR", user.id, { instanceName, status: logoutResponse.status, error: errorTxt });
-            return new Response(JSON.stringify({ success: false, error: `Erro ao deslogar: ${logoutResponse.status} - ${errorTxt}` }), {
+            return new Response(JSON.stringify({ success: false, error: `Erro ao fazer logout: ${logoutResponse.status} - ${errorTxt}` }), {
               status: 500,
               headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
           }
-
-          // VERIFICA SE SAIU MESMO: consulta novamente o status
-          const checkStatusRes = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
-            headers: { 'apikey': evolutionApiKey }
-          });
-          let disconnected = false;
-          if (!checkStatusRes.ok) {
-            // Evolution não retornou status, considera como erro
-            auditLog("LOGOUT_STATUS_CHECK_ERROR", user.id, { instanceName, status: checkStatusRes.status });
-          } else {
-            const statusData = await checkStatusRes.json();
-            // Evolution retorna { state: ... }
-            disconnected = statusData.state === 'disconnected' || statusData.state === 'closed';
-          }
-
-          if (!disconnected) {
-            // Não desconectou de fato, não limpar o perfil
-            auditLog("LOGOUT_INCOMPLETE", user.id, { instanceName });
-            return new Response(JSON.stringify({ success: false, error: "Falha ao desconectar. Tente novamente." }), {
-              status: 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
-          }
-
-          // Logout everificado => limpando o instance_name no perfil
-          await supabaseServiceRole
-            .from('profiles')
-            .update({ instance_name: null })
-            .eq('id', user.id);
 
           auditLog("LOGOUT_SUCCESS", user.id, { instanceName });
-
-          return new Response(JSON.stringify({ success: true, message: "WhatsApp desconectado com sucesso" }), {
+          return new Response(JSON.stringify({ success: true, message: "Logout realizado com sucesso" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } catch (error) {
           auditLog("LOGOUT_EXCEPTION", user.id, { instanceName, error: error.message });
-          return new Response(JSON.stringify({ success: false, error: `Erro ao deslogar: ${error.message}` }), {
+          return new Response(JSON.stringify({ success: false, error: `Erro ao fazer logout: ${error.message}` }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
@@ -555,76 +524,105 @@ serve(async (req) => {
       }
 
       case "delete": {
-        // DELETE: sempre faz logout antes de deletar e só limpa perfil se confirmadamente deletado
-        if (!instanceName) {
-          return new Response(JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }), {
-            status: 400,
+        // MODIFICADO: DELETE sempre tenta deletar e SEMPRE limpa o perfil local
+        const instanceNameToDelete = profile.instance_name;
+        
+        if (!instanceNameToDelete) {
+          auditLog("DELETE_NO_INSTANCE", user.id);
+          return new Response(JSON.stringify({ 
+            success: true,
+            message: 'Nenhuma instância encontrada para deletar'
+          }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
 
         try {
-          // Tenta logout antes de deletar (best practice Evolution)
-          const logoutResponse = await fetch(`${cleanApiUrl}/instance/logout/${instanceName}`, {
-            method: 'GET',
-            headers: { 'apikey': evolutionApiKey }
-          });
-          // (Mesmo que dê erro ignora, pois podemos deletar mesmo assim)
-          if (!logoutResponse.ok) {
-            auditLog("DELETE_LOGOUT_WARNING", user.id, { instanceName, status: logoutResponse.status });
+          console.log(`[EVOLUTION-HANDLER] Deletando instância: ${instanceNameToDelete}`);
+          
+          // Tentar logout primeiro (best practice)
+          try {
+            const logoutResponse = await fetch(`${cleanApiUrl}/instance/logout/${instanceNameToDelete}`, {
+              method: 'DELETE',
+              headers: { 'apikey': evolutionApiKey }
+            });
+            auditLog("DELETE_LOGOUT_ATTEMPT", user.id, { 
+              instanceName: instanceNameToDelete, 
+              success: logoutResponse.ok 
+            });
+          } catch (logoutError) {
+            console.log(`[EVOLUTION-HANDLER] Logout antes do delete falhou (continuando): ${logoutError.message}`);
           }
 
-          // Tenta deletar
-          const deleteResponse = await fetch(`${cleanApiUrl}/instance/delete/${instanceName}`, {
-            method: 'GET',
-            headers: { 'apikey': evolutionApiKey }
-          });
+          // Tentar deletar a instância
+          let deleteSuccess = false;
+          try {
+            const deleteResponse = await fetch(`${cleanApiUrl}/instance/delete/${instanceNameToDelete}`, {
+              method: 'DELETE',
+              headers: { 'apikey': evolutionApiKey }
+            });
 
-          if (!deleteResponse.ok) {
-            const errorTxt = await deleteResponse.text();
-            auditLog("DELETE_ERROR", user.id, { instanceName, status: deleteResponse.status, error: errorTxt });
-            return new Response(JSON.stringify({ success: false, error: `Erro ao deletar: ${deleteResponse.status} - ${errorTxt}` }), {
-              status: 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            if (deleteResponse.ok) {
+              deleteSuccess = true;
+              auditLog("DELETE_API_SUCCESS", user.id, { instanceName: instanceNameToDelete });
+            } else {
+              const errorText = await deleteResponse.text();
+              console.log(`[EVOLUTION-HANDLER] API delete falhou: ${deleteResponse.status} - ${errorText}`);
+              auditLog("DELETE_API_FAILED", user.id, { 
+                instanceName: instanceNameToDelete, 
+                status: deleteResponse.status, 
+                error: errorText 
+              });
+            }
+          } catch (deleteError) {
+            console.log(`[EVOLUTION-HANDLER] Erro na chamada de delete: ${deleteError.message}`);
+            auditLog("DELETE_API_ERROR", user.id, { 
+              instanceName: instanceNameToDelete, 
+              error: deleteError.message 
             });
           }
 
-          // Checa se deletou mesmo
-          const checkStatusRes = await fetch(`${cleanApiUrl}/instance/connectionState/${instanceName}`, {
-            headers: { 'apikey': evolutionApiKey }
-          });
-          let deleted = false;
-          if (!checkStatusRes.ok) {
-            // Status não encontrado já é indicador de sucesso!
-            deleted = true;
-          } else {
-            const statusData = await checkStatusRes.json();
-            // Instância não pode mais estar open/connected, só pode ser disconnected/null
-            deleted = !statusData.state || statusData.state === 'disconnected' || statusData.state === 'closed';
-          }
-
-          if (!deleted) {
-            // Instância ainda existe, não limpar perfil
-            auditLog("DELETE_INCOMPLETE", user.id, { instanceName });
-            return new Response(JSON.stringify({ success: false, error: "Falha ao remover instância. Tente novamente." }), {
-              status: 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
-          }
-
-          // Só chega aqui se realmente deletou!
-          await supabaseServiceRole
+          // SEMPRE limpar o perfil local, independente do resultado da API
+          const { error: updateError } = await supabaseServiceRole
             .from('profiles')
             .update({ instance_name: null })
             .eq('id', user.id);
 
-          auditLog("DELETE_SUCCESS", user.id, { instanceName });
-          return new Response(JSON.stringify({ success: true, message: "Instância deletada com sucesso" }), {
+          if (updateError) {
+            console.error(`[EVOLUTION-HANDLER] Erro ao limpar instance_name do perfil: ${updateError.message}`);
+            auditLog("DELETE_PROFILE_UPDATE_ERROR", user.id, { error: updateError.message });
+            
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: `Erro ao limpar dados do perfil: ${updateError.message}` 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+
+          auditLog("DELETE_COMPLETE_SUCCESS", user.id, { 
+            instanceName: instanceNameToDelete, 
+            apiDeleteSuccess: deleteSuccess 
+          });
+
+          return new Response(JSON.stringify({
+            success: true,
+            message: deleteSuccess 
+              ? 'Instância deletada com sucesso na Evolution API e perfil limpo'
+              : 'Perfil limpo com sucesso (instância pode já ter sido deletada na Evolution API)'
+          }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
+
         } catch (error) {
-          auditLog("DELETE_EXCEPTION", user.id, { instanceName, error: error.message });
-          return new Response(JSON.stringify({ success: false, error: `Erro ao deletar: ${error.message}` }), {
+          auditLog("DELETE_EXCEPTION", user.id, { instanceName: instanceNameToDelete, error: error.message });
+          console.error(`[EVOLUTION-HANDLER] Erro inesperado ao deletar:`, error);
+          
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: `Erro ao deletar instância: ${error.message}` 
+          }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
