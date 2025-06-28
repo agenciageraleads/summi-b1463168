@@ -103,29 +103,19 @@ const RegisterPage = () => {
           <h2 className="text-3xl font-bold text-summi-gray-900">
             Crie sua conta
           </h2>
-          <div className="mt-4 space-y-3">
-            <div className="bg-gradient-to-r from-summi-green/10 to-summi-secondary/10 border border-summi-green/20 rounded-lg p-4">
-              <p className="text-lg font-bold text-summi-green">
-                🎉 Trial de 7 dias GRÁTIS
-              </p>
-              <p className="text-sm text-summi-gray-600">
-                Sem cartão de crédito • Acesso completo
-              </p>
-            </div>
-            <p className="text-sm text-summi-gray-600">
-              Ou{' '}
-              <Link to="/login" className="font-medium text-summi-green hover:text-summi-secondary transition-colors">
-                faça login na sua conta existente
-              </Link>
-            </p>
-          </div>
+          <p className="text-sm text-summi-gray-600 mt-4">
+            Ou{' '}
+            <Link to="/login" className="font-medium text-summi-green hover:text-summi-secondary transition-colors">
+              faça login na sua conta existente
+            </Link>
+          </p>
         </div>
 
         {/* Form */}
         <Card className="card-hover shadow-xl border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="bg-gradient-to-r from-summi-green/5 to-summi-secondary/5 rounded-t-lg">
             <CardTitle className="text-center text-summi-gray-900">
-              Trial Gratuito de 7 Dias
+              Começar Agora
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
@@ -208,7 +198,7 @@ const RegisterPage = () => {
                 className="w-full bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Criando conta e ativando trial...' : 'Começar trial gratuito'}
+                {isSubmitting ? 'Criando conta...' : 'Criar conta'}
               </Button>
               
               <p className="text-xs text-center text-summi-gray-500">

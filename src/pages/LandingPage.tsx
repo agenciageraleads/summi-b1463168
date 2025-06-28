@@ -1,11 +1,12 @@
+
 // ABOUTME: Landing page principal da Summi com seções otimizadas para conversão.
-// ABOUTME: Inclui hero section aprimorada, destaques de valor e estratégia de trial de 30 dias.
+// ABOUTME: Inclui hero section aprimorada, destaques de valor focados no produto core.
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Store, Target, Briefcase, Headphones, User, Clock, Brain, TrendingUp } from "lucide-react";
+import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Store, Target, Briefcase, Headphones, User, Brain, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -36,9 +37,6 @@ const LandingPage = () => {
               </a>
               <a href="#como-funciona" className="text-gray-600 hover:text-green-600 transition-colors">
                 Como Funciona
-              </a>
-              <a href="#precos" className="text-gray-600 hover:text-green-600 transition-colors">
-                Preços
               </a>
               <a href="#faq" className="text-gray-600 hover:text-green-600 transition-colors">
                 FAQ
@@ -464,173 +462,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="precos" className="py-20 bg-green-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Planos Simples e Transparentes
-            </h2>
-            <p className="text-xl text-gray-600 mb-8">
-              Escolha o plano ideal para suas necessidades e comece a usar hoje mesmo.
-            </p>
-            
-            {/* Aviso importante sobre teste gratuito */}
-            <div className="bg-white border-2 border-green-300 rounded-xl p-6 max-w-3xl mx-auto mb-8">
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                🚀 Comece Grátis - Sem Riscos!
-              </h3>
-              <div className="grid md:grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center justify-center space-x-2">
-                  <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-gray-700">30 dias de teste completo</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-gray-700">Ativação imediata</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* Plano Mensal */}
-            <Card className="border-gray-200 hover:shadow-xl transition-all duration-300 relative">
-              <CardHeader className="text-center pb-8">
-                <CardTitle className="text-2xl text-gray-900">Plano Mensal</CardTitle>
-                <div className="mt-6">
-                  <span className="text-5xl font-bold text-gray-900">R$ 29,90</span>
-                  <span className="text-gray-500 ml-2 text-lg">por mês</span>
-                </div>
-                <CardDescription className="mt-4 text-gray-600 text-base text-center">Flexibilidade total com pagamento mensal.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Transcrição de áudio enviado</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Transcrição de áudio recebido</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Resumo de áudios longos</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Análise e resumo de conversas importantes</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Resumo em áudio das conversas importantes</span>
-                  </div>
-                  <div className="flex items-center text-sm text-green-700 font-medium">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>30 dias para testar</span>
-                  </div>
-                </div>
-                
-                <Link to="/register" className="block">
-                  <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 text-lg">
-                    Conectar Agora
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* Plano Anual */}
-            <Card className="border-green-500 shadow-2xl relative bg-gradient-to-br from-white to-green-50 transform scale-105">
-              {/* Badge de melhor oferta */}
-              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
-                <Badge className="bg-green-600 text-white px-6 py-2 text-sm font-semibold shadow-lg">
-                  🏆 MELHOR OFERTA
-                </Badge>
-              </div>
-              
-              {/* Badge de desconto no canto */}
-              <div className="absolute top-4 right-4">
-                <Badge className="bg-red-500 text-white px-3 py-1 text-xs font-bold">
-                  ECONOMIZE 33%
-                </Badge>
-              </div>
-
-              <CardHeader className="text-center pb-8 pt-8">
-                <CardTitle className="text-2xl text-gray-900">Plano Anual</CardTitle>
-                <div className="mt-6">
-                  <div className="flex items-center justify-center space-x-2">
-                    <span className="text-gray-400 line-through text-sm">R$ 29,90</span>
-                    <span className="text-5xl font-bold text-green-600">R$ 19,90</span>
-                  </div>
-                  <span className="text-gray-500 text-lg">por mês</span>
-                  
-                  <div className="mt-4 p-3 bg-green-100 rounded-lg border border-green-200">
-                    <p className="text-green-800 font-semibold text-lg">
-                      💰 Economia de R$ 119,88 por ano!
-                    </p>
-                    <p className="text-green-700 text-sm">
-                      Equivale a mais de 4 meses grátis
-                    </p>
-                  </div>
-                </div>
-                
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Transcrição de áudio enviado</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Transcrição de áudio recebido</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Resumo de áudios longos</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Análise e resumo de conversas importantes</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>Resumo em áudio das conversas importantes</span>
-                  </div>
-                  <div className="flex items-center text-sm text-green-700 font-medium">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>30 dias para testar</span>
-                  </div>
-                  <div className="flex items-center text-sm text-green-700 font-medium">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span><strong>33% de desconto garantido</strong></span>
-                  </div>
-                  <div className="flex items-center text-sm text-green-700 font-medium">
-                    <Check className="w-4 h-4 text-green-600 mr-3" />
-                    <span>🎁 Suporte premium prioritário</span>
-                  </div>
-                </div>
-                
-                <Link to="/register" className="block">
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg shadow-lg transform hover:scale-[1.02] transition-all">
-                    Conectar Agora
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Informações adicionais aprimoradas */}
-          <div className="text-center mt-12 space-y-6">
-            <p className="text-gray-500">
-              💳 Aceitamos todos os cartões de crédito • 🔐 Pagamento 100% seguro via Stripe
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* FAQ Section */}
       <section id="faq" className="py-20 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -686,13 +517,13 @@ const LandingPage = () => {
             <AccordionItem value="item-4" className="border border-gray-200 rounded-lg px-6">
               <AccordionTrigger className="text-left hover:no-underline">
                 <span className="text-lg font-medium text-gray-900">
-                  O que acontece depois que o teste grátis acaba?
+                  Como funciona o monitoramento das conversas?
                 </span>
               </AccordionTrigger>
               <AccordionContent className="text-gray-600 pb-4">
-                Após os 30 dias de teste gratuito, você pode escolher um dos nossos planos ou simplesmente não fazer nada 
-                - não cobramos automaticamente. Se decidir continuar, você escolhe entre o plano mensal (R$ 29,90) ou 
-                anual (R$ 19,90/mês) com 33% de desconto.
+                Nossa IA analisa suas conversas em tempo real, identificando mensagens importantes com base nas 
+                palavras-chave que você configurar. Você recebe relatórios organizados com resumos das conversas 
+                mais relevantes, sem precisar ler tudo manualmente.
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -731,7 +562,7 @@ const LandingPage = () => {
               <h4 className="font-semibold mb-4">Links Rápidos</h4>
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#recursos" className="hover:text-white transition-colors">Funcionalidades</a></li>
-                <li><a href="#precos" className="hover:text-white transition-colors">Planos</a></li>
+                <li><a href="#como-funciona" className="hover:text-white transition-colors">Como Funciona</a></li>
                 <li><a href="#faq" className="hover:text-white transition-colors">FAQ</a></li>
               </ul>
             </div>
