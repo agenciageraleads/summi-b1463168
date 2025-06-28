@@ -2,6 +2,7 @@
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { WhatsAppSection } from '@/components/Dashboard/WhatsAppSection';
 import { ChatsList } from '@/components/Dashboard/ChatsList';
+import { SubscriptionStatus } from '@/components/SubscriptionStatus';
 import { OnboardingTour } from '@/components/Onboarding/OnboardingTour';
 import { OnboardingHighlight } from '@/components/Onboarding/OnboardingHighlight';
 
@@ -30,10 +31,18 @@ const DashboardPage = () => {
             <ChatsList />
           </OnboardingHighlight>
 
-          {/* Seção do WhatsApp integrada - com highlight para onboarding */}
-          <OnboardingHighlight targetId="whatsapp-section">
-            <WhatsAppSection />
-          </OnboardingHighlight>
+          {/* Grid para os outros widgets */}
+          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+            {/* Seção do WhatsApp - com highlight para onboarding */}
+            <OnboardingHighlight targetId="whatsapp-section">
+              <WhatsAppSection />
+            </OnboardingHighlight>
+            
+            {/* Status da Assinatura - com highlight para onboarding */}
+            <OnboardingHighlight targetId="subscription-section">
+              <SubscriptionStatus />
+            </OnboardingHighlight>
+          </div>
         </div>
       </div>
     </DashboardLayout>

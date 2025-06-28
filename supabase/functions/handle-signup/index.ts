@@ -1,7 +1,4 @@
 
-// ABOUTME: Edge function para gerenciar registro de usuários com trial de 30 dias.
-// ABOUTME: Integra Stripe, cria perfil e gerencia sistema de indicações com novos valores.
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -90,7 +87,7 @@ serve(async (req) => {
   );
 
   try {
-    logStep("Iniciando processo de signup com trial de 30 dias");
+    logStep("Iniciando processo de signup com trial");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY não configurada");
@@ -107,7 +104,7 @@ serve(async (req) => {
     // Verificar se há código de indicação válido e obter dados do referrer
     let referrerUserId = null;
     let referrerRole = null;
-    let trialDays = 30; // Trial padrão de 30 dias
+    let trialDays = 7; // Trial padrão
     
     if (referralCode) {
       logStep("Verificando código de indicação", { referralCode });
@@ -121,7 +118,7 @@ serve(async (req) => {
       if (!referrerError && referrer) {
         referrerUserId = referrer.id;
         referrerRole = referrer.role;
-        trialDays = 40; // Trial estendido para convidado (30 + 10 dias bonus)
+        trialDays = 10; // Trial estendido para convidado
         logStep("Código de indicação válido encontrado", { referrerUserId, referrerRole });
       } else {
         logStep("Código de indicação inválido ou não encontrado", { error: referrerError });
@@ -181,7 +178,7 @@ serve(async (req) => {
 
       logStep("Customer criado no Stripe", { customerId: customer.id });
 
-      // Passo 4: Criar subscription de trial no Stripe com novo período
+      // Passo 4: Criar subscription de trial no Stripe
       logStep(`Criando subscription de trial de ${trialDays} dias`);
       const subscription = await stripe.subscriptions.create({
         customer: customer.id,
@@ -221,12 +218,12 @@ serve(async (req) => {
         throw new Error(`Erro ao salvar dados de assinatura: ${subscriberError.message}`);
       }
 
-      // Passo 6: Se houve indicação, recompensar o referrer com bonus ajustado para 30 dias base
+      // Passo 6: Se houve indicação, recompensar o referrer com bonus baseado no role
       if (referrerUserId) {
         logStep("Aplicando recompensa para o referrer", { referrerRole });
         
-        // AJUSTE: Com base de 30 dias, usuários beta ganham 15 dias de bonus, usuários normais ganham 7 dias
-        const bonusDays = referrerRole === 'beta' ? 15 : 7;
+        // CORREÇÃO: Usuários beta ganham o dobro de dias de bonus (6 dias ao invés de 3)
+        const bonusDays = referrerRole === 'beta' ? 6 : 3;
         logStep(`Aplicando ${bonusDays} dias de bonus para referrer ${referrerRole}`);
         
         await extendUserTrial(supabaseAdmin, stripe, referrerUserId, bonusDays);
@@ -237,7 +234,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         message: referrerUserId 
-          ? `Conta criada com trial de ${trialDays} dias! Quem te indicou também ganhou ${referrerRole === 'beta' ? '15' : '7'} dias extras.`
+          ? `Conta criada com trial de ${trialDays} dias! Quem te indicou também ganhou ${referrerRole === 'beta' ? '6' : '3'} dias extras.`
           : `Conta criada com trial de ${trialDays} dias ativado!`,
         user: authData.user,
         session: authData.session

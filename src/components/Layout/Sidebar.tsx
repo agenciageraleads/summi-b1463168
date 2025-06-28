@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { 
   BarChart3, 
   Settings, 
+  CreditCard, 
   Users, 
   MessageSquare, 
   TestTube,
@@ -25,10 +26,11 @@ export const Sidebar = () => {
   const { profile } = useProfile();
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
-  // Navegação principal do usuário (removido item de Assinatura)
+  // Navegação principal do usuário
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
     { name: 'Configurações', href: '/settings', icon: Settings },
+    { name: 'Assinatura', href: '/subscription', icon: CreditCard },
     { name: 'Indicações', href: '/referrals', icon: Users },
     { name: 'Feedback', href: '/feedback', icon: MessageSquare },
   ];

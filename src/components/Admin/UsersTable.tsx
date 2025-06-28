@@ -1,7 +1,4 @@
 
-// ABOUTME: Tabela de gestão de usuários com funcionalidades de edição, desconexão e exclusão.
-// ABOUTME: Inclui diálogo de edição e gerenciamento de estados de carregamento.
-
 import { useState } from 'react';
 import { AdminUser } from '@/hooks/useAdmin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,22 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2, WifiOff, RotateCcw } from 'lucide-react';
-import { UserEditDialog } from './UserEditDialog';
 
 interface UsersTableProps {
   users: AdminUser[];
   onDeleteUser: (userId: string) => Promise<boolean>;
   onDisconnectUser: (userId: string) => Promise<boolean>;
   onRestartInstance?: (userId: string, instanceName: string) => Promise<boolean>;
-  onRefreshUsers: () => void;
 }
 
 export const UsersTable: React.FC<UsersTableProps> = ({ 
   users, 
   onDeleteUser, 
   onDisconnectUser,
-  onRestartInstance,
-  onRefreshUsers
+  onRestartInstance
 }) => {
   const [loadingStates, setLoadingStates] = useState<Record<string, string>>({});
 
@@ -117,9 +111,6 @@ export const UsersTable: React.FC<UsersTableProps> = ({
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex space-x-2">
-                      {/* Editar usuário */}
-                      <UserEditDialog user={user} onUserUpdated={onRefreshUsers} />
-
                       {/* Reiniciar instância */}
                       {user.instance_name && onRestartInstance && (
                         <AlertDialog>
