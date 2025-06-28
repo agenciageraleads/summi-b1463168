@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -139,17 +138,22 @@ const WhatsAppConnectionPage = () => {
     
     try {
       console.log(`[WhatsApp] Conectando à instância: ${targetInstanceName}`);
-      const qrCodeData = await connectInstance(targetInstanceName);
+      const result = await connectInstance(targetInstanceName);
       
-      setQrCode(qrCodeData);
-      setConnectionStatus('connecting');
-      startConnectionTimer();
-      startConnectionMonitoring(targetInstanceName);
-      
-      toast({
-        title: 'QR Code gerado!',
-        description: 'Escaneie o QR Code com seu WhatsApp para conectar'
-      });
+      // CORREÇÃO: Verificar se result é um objeto ConnectionResult e extrair o QR code
+      if (result.success && result.qrCode) {
+        setQrCode(result.qrCode);
+        setConnectionStatus('connecting');
+        startConnectionTimer();
+        startConnectionMonitoring(targetInstanceName);
+        
+        toast({
+          title: 'QR Code gerado!',
+          description: 'Escaneie o QR Code com seu WhatsApp para conectar'
+        });
+      } else {
+        throw new Error(result.error || 'Erro ao gerar QR Code');
+      }
       
     } catch (error) {
       console.error('[WhatsApp] Erro ao conectar instância:', error);
@@ -219,18 +223,24 @@ const WhatsAppConnectionPage = () => {
         // 5. Se não existe, criar a instância primeiro
         console.log('[WhatsApp] Instância não encontrada, criando nova instância...');
         
-        await createInstance(instanceName);
-        await updateProfile({ instance_name: instanceName });
+        // CORREÇÃO: Chamar createInstance() sem argumentos
+        const createResult = await createInstance();
         
-        // 6. Aguardar 2 segundos e então conectar
-        setTimeout(async () => {
-          await handleConnect(instanceName);
-        }, 2000);
-        
-        toast({
-          title: 'Instância criada!',
-          description: 'Gerando QR Code para conexão...'
-        });
+        if (createResult.success && createResult.instanceName) {
+          await updateProfile({ instance_name: createResult.instanceName });
+          
+          // 6. Aguardar 2 segundos e então conectar
+          setTimeout(async () => {
+            await handleConnect(createResult.instanceName);
+          }, 2000);
+          
+          toast({
+            title: 'Instância criada!',
+            description: 'Gerando QR Code para conexão...'
+          });
+        } else {
+          throw new Error(createResult.error || 'Erro ao criar instância');
+        }
       }
       
     } catch (error) {
