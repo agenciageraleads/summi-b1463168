@@ -1,22 +1,120 @@
 
-// ABOUTME: Seção unificada do WhatsApp no dashboard
-// ABOUTME: Componente consolidado que integra status e gerenciamento de conexão
+// ABOUTME: Seção completa do WhatsApp com status da conexão integrado
+// ABOUTME: Combina o status card com o gerenciador de conexão em um só componente
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare } from 'lucide-react';
-import { WhatsAppManager } from '@/components/WhatsApp/WhatsAppManager';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useProfile } from '@/hooks/useProfile';
+import { useNavigate } from 'react-router-dom';
+import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
+import { WhatsAppConnectionManager } from './WhatsAppConnectionManager';
+import { 
+  Link, 
+  Zap, 
+  Settings, 
+  Power,
+  Phone,
+  MessageSquare
+} from 'lucide-react';
 
 export const WhatsAppSection: React.FC = () => {
+  const { profile } = useProfile();
+  const navigate = useNavigate();
+  const { state, handleDisconnect } = useWhatsAppManager();
+
+  // Formatar número de telefone para exibição
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone) return '';
+    // Formato: +55 (62) 8243-5286
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 13) {
+      return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4, 5)}${cleaned.slice(5, 9)}-${cleaned.slice(9)}`;
+    }
+    return phone;
+  };
+
+  // Data da última atualização
+  const getLastUpdate = () => {
+    const now = new Date();
+    return now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const isConnected = state.connectionState === 'already_connected';
+  const phoneNumber = profile?.numero ? formatPhoneNumber(profile.numero) : '';
+
   return (
     <Card className="w-full bg-white border border-gray-200 shadow-sm">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <MessageSquare className="w-5 h-5" />
-          <span>WhatsApp Business</span>
+          <span>WhatsApp</span>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <WhatsAppManager />
+      <CardContent className="space-y-6">
+        {/* Status da Conexão */}
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          {/* Lado esquerdo - Número e Status */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              <Phone className="w-6 h-6 text-gray-600" />
+              <div>
+                <div className="flex items-center space-x-3 mb-2">
+                  <span className="text-lg font-medium text-gray-900">
+                    {phoneNumber || 'Não conectado'}
+                  </span>
+                  <Link className="w-4 h-4 text-gray-400" />
+                  {isConnected && (
+                    <Badge className="bg-green-500 text-white border-0 px-3 py-1">
+                      Ativo
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <span>Última atualização: {getLastUpdate()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Lado direito - Ícone de energia e botões */}
+          <div className="flex items-center space-x-4">
+            {isConnected && (
+              <Zap className="w-6 h-6 text-green-500" />
+            )}
+            
+            <div className="flex space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/settings')}
+                className="border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Preferências</span>
+              </Button>
+              
+              {isConnected && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDisconnect}
+                  className="border-red-300 text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                >
+                  <Power className="w-4 h-4" />
+                  <span>Desconectar</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Gerenciador de Conexão */}
+        <WhatsAppConnectionManager />
       </CardContent>
     </Card>
   );
