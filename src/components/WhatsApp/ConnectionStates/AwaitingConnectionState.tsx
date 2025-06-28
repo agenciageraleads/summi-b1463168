@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Copy, RefreshCw, QrCode } from 'lucide-react';
+import { Copy, RefreshCw, QrCode, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AwaitingConnectionStateProps {
@@ -24,12 +24,16 @@ export const AwaitingConnectionState = ({
 }: AwaitingConnectionStateProps) => {
   const { toast } = useToast();
   const [showQrCode, setShowQrCode] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const copyPairingCode = async () => {
     if (!pairingCode) return;
     
     try {
       await navigator.clipboard.writeText(pairingCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      
       toast({
         title: "Código copiado!",
         description: "Cole no WhatsApp para conectar",
@@ -43,6 +47,13 @@ export const AwaitingConnectionState = ({
       });
     }
   };
+
+  console.log('[AwaitingConnection] Props recebidas:', {
+    pairingCode: pairingCode ? `${pairingCode.substring(0, 4)}****` : 'null',
+    hasQrCode: !!qrCode,
+    isLoading,
+    message
+  });
 
   return (
     <div className="space-y-4">
@@ -59,22 +70,37 @@ export const AwaitingConnectionState = ({
             {message}
           </p>
 
-          {pairingCode && (
+          {pairingCode ? (
             <div className="text-center space-y-4">
-              <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4">
-                <div className="text-2xl font-mono font-bold text-gray-800 tracking-wider">
+              {/* Código em destaque */}
+              <div className="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-dashed border-blue-300 rounded-lg p-6">
+                <div className="text-3xl font-mono font-bold text-blue-800 tracking-widest mb-2">
                   {pairingCode}
+                </div>
+                <div className="text-sm text-blue-600">
+                  Código de 8 caracteres para pareamento
                 </div>
               </div>
 
+              {/* Botões de ação */}
               <div className="flex space-x-2 justify-center">
                 <Button
                   onClick={copyPairingCode}
-                  variant="outline"
+                  variant={copied ? "default" : "outline"}
                   size="sm"
+                  className={copied ? "bg-green-600 hover:bg-green-700" : ""}
                 >
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copiar Código
+                  {copied ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Copiado!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copiar Código
+                    </>
+                  )}
                 </Button>
 
                 <Button
@@ -84,20 +110,26 @@ export const AwaitingConnectionState = ({
                   size="sm"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                  Novo Código
+                  {isLoading ? 'Gerando...' : 'Novo Código'}
                 </Button>
               </div>
             </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Carregando código de pareamento...</p>
+            </div>
           )}
 
-          {/* Instruções */}
-          <div className="text-xs text-muted-foreground bg-blue-50 p-3 rounded-lg">
-            <p className="font-medium mb-1">Como usar:</p>
+          {/* Instruções detalhadas */}
+          <div className="text-xs text-muted-foreground bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <p className="font-medium mb-2 text-blue-800">Como conectar:</p>
             <ol className="list-decimal list-inside space-y-1">
               <li>Abra o WhatsApp no seu celular</li>
-              <li>Vá em Configurações → Aparelhos conectados</li>
-              <li>Toque em "Conectar um aparelho"</li>
-              <li>Digite o código acima quando solicitado</li>
+              <li>Vá em <strong>Configurações → Aparelhos conectados</strong></li>
+              <li>Toque em <strong>"Conectar um aparelho"</strong></li>
+              <li>Escolha <strong>"Conectar com número de telefone"</strong></li>
+              <li>Digite o código <strong>{pairingCode || '********'}</strong> quando solicitado</li>
             </ol>
           </div>
         </CardContent>
@@ -123,7 +155,7 @@ export const AwaitingConnectionState = ({
                 <div className="w-64 h-64 bg-white border-2 border-border rounded-lg flex items-center justify-center mx-auto">
                   <img 
                     src={qrCode} 
-                    alt="QR Code" 
+                    alt="QR Code para WhatsApp" 
                     className="w-56 h-56 object-contain"
                   />
                 </div>

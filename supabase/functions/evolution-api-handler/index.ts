@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -265,6 +266,9 @@ serve(async (req) => {
           const pairingCode = createData?.qrcode?.pairingCode;
           const qrCodeBase64 = createData?.qrcode?.base64;
           
+          console.log(`[EVOLUTION-HANDLER] Pairing Code extraído: ${pairingCode ? 'SIM' : 'NÃO'}`);
+          console.log(`[EVOLUTION-HANDLER] QR Code extraído: ${qrCodeBase64 ? 'SIM' : 'NÃO'}`);
+          
           auditLog("INSTANCE_CREATED_SUCCESS", user.id, { instanceName: instanceNameToUse, hasPairingCode: !!pairingCode });
           
           return new Response(JSON.stringify({ 
@@ -307,27 +311,37 @@ serve(async (req) => {
           });
         }
 
-        try {
-          // Passo 1: Deletar instância atual
-          console.log(`[EVOLUTION-HANDLER] Deletando instância atual: ${profile.instance_name}`);
-          
-          const deleteResponse = await fetch(`${cleanApiUrl}/instance/delete/${profile.instance_name}`, {
-            method: 'GET',
-            headers: { 'apikey': evolutionApiKey }
-          });
+        const instanceNameToRecreate = profile.instance_name;
+        console.log(`[EVOLUTION-HANDLER] Recriando instância: ${instanceNameToRecreate}`);
 
-          if (!deleteResponse.ok) {
-            console.log(`[EVOLUTION-HANDLER] Aviso: Erro ao deletar instância (pode já ter sido deletada): ${deleteResponse.status}`);
+        try {
+          // PASSO 1: Deletar instância atual (mesmo se retornar erro)
+          console.log(`[EVOLUTION-HANDLER] PASSO 1: Deletando instância: ${instanceNameToRecreate}`);
+          
+          try {
+            const deleteResponse = await fetch(`${cleanApiUrl}/instance/delete/${instanceNameToRecreate}`, {
+              method: 'DELETE',
+              headers: { 'apikey': evolutionApiKey }
+            });
+            
+            if (deleteResponse.ok) {
+              console.log(`[EVOLUTION-HANDLER] Instância deletada com sucesso`);
+            } else {
+              console.log(`[EVOLUTION-HANDLER] Delete retornou ${deleteResponse.status} - continuando mesmo assim`);
+            }
+          } catch (deleteError) {
+            console.log(`[EVOLUTION-HANDLER] Erro no delete (continuando): ${deleteError.message}`);
           }
 
-          // Passo 2: Aguardar um momento para garantir que a instância foi removida
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // PASSO 2: Aguardar 10 segundos para garantir que a instância foi removida
+          console.log(`[EVOLUTION-HANDLER] PASSO 2: Aguardando 10 segundos...`);
+          await new Promise(resolve => setTimeout(resolve, 10000));
 
-          // Passo 3: Criar nova instância com novo pairing code
-          const instanceNameToUse = createValidInstanceName(profile.nome, profile.numero);
+          // PASSO 3: Criar nova instância COM O MESMO NOME
+          console.log(`[EVOLUTION-HANDLER] PASSO 3: Criando nova instância: ${instanceNameToRecreate}`);
           
           const createPayload = {
-            instanceName: instanceNameToUse,
+            instanceName: instanceNameToRecreate,
             token: evolutionApiKey,
             qrcode: true,
             number: profile.numero,
@@ -362,28 +376,26 @@ serve(async (req) => {
           
           if (!createResponse.ok) {
             const errorText = await createResponse.text();
+            console.error(`[EVOLUTION-HANDLER] Erro ao recriar instância: ${createResponse.status} - ${errorText}`);
             throw new Error(`Falha ao recriar instância: ${createResponse.status} - ${errorText}`);
           }
           
           const createData = await createResponse.json();
-          console.log(`[EVOLUTION-HANDLER] Nova instância criada:`, createData);
-          
-          // Atualizar instance_name no perfil
-          await supabaseServiceRole
-            .from('profiles')
-            .update({ instance_name: instanceNameToUse })
-            .eq('id', user.id);
+          console.log(`[EVOLUTION-HANDLER] Nova instância criada com sucesso:`, createData);
           
           // Extrair novo pairing code
           const pairingCode = createData?.qrcode?.pairingCode;
           const qrCodeBase64 = createData?.qrcode?.base64;
           
-          auditLog("INSTANCE_RECREATED_SUCCESS", user.id, { instanceName: instanceNameToUse, hasPairingCode: !!pairingCode });
+          console.log(`[EVOLUTION-HANDLER] Novo Pairing Code: ${pairingCode ? 'SIM' : 'NÃO'}`);
+          console.log(`[EVOLUTION-HANDLER] Novo QR Code: ${qrCodeBase64 ? 'SIM' : 'NÃO'}`);
+          
+          auditLog("INSTANCE_RECREATED_SUCCESS", user.id, { instanceName: instanceNameToRecreate, hasPairingCode: !!pairingCode });
           
           return new Response(JSON.stringify({ 
             success: true,
             state: 'needs_pairing_code',
-            instanceName: instanceNameToUse,
+            instanceName: instanceNameToRecreate,
             pairingCode: pairingCode,
             qrCode: qrCodeBase64,
             message: 'Nova instância criada com sucesso. Use o novo código de pareamento.'
