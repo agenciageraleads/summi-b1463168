@@ -1,4 +1,7 @@
 
+// ABOUTME: Função para criar usuário com trial de 30 dias no Stripe
+// ABOUTME: Mantém toda a lógica de backend, apenas ajusta período do trial
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -87,7 +90,7 @@ serve(async (req) => {
   );
 
   try {
-    logStep("Iniciando processo de signup com trial");
+    logStep("Iniciando processo de signup com trial de 30 dias");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY não configurada");
@@ -104,7 +107,7 @@ serve(async (req) => {
     // Verificar se há código de indicação válido e obter dados do referrer
     let referrerUserId = null;
     let referrerRole = null;
-    let trialDays = 7; // Trial padrão
+    let trialDays = 30; // Trial padrão de 30 dias
     
     if (referralCode) {
       logStep("Verificando código de indicação", { referralCode });
@@ -118,7 +121,7 @@ serve(async (req) => {
       if (!referrerError && referrer) {
         referrerUserId = referrer.id;
         referrerRole = referrer.role;
-        trialDays = 10; // Trial estendido para convidado
+        trialDays = 30; // Mantém 30 dias mesmo com indicação
         logStep("Código de indicação válido encontrado", { referrerUserId, referrerRole });
       } else {
         logStep("Código de indicação inválido ou não encontrado", { error: referrerError });
@@ -178,14 +181,14 @@ serve(async (req) => {
 
       logStep("Customer criado no Stripe", { customerId: customer.id });
 
-      // Passo 4: Criar subscription de trial no Stripe
+      // Passo 4: Criar subscription de trial no Stripe com 30 dias
       logStep(`Criando subscription de trial de ${trialDays} dias`);
       const subscription = await stripe.subscriptions.create({
         customer: customer.id,
         items: [{
           price: "price_1RZ8j9KyDqE0F1PtNvJzdK0F"
         }],
-        trial_period_days: trialDays,
+        trial_period_days: trialDays, // CORREÇÃO: Sempre 30 dias
         payment_behavior: 'default_incomplete',
         metadata: {
           supabase_user_id: userId,
@@ -229,13 +232,13 @@ serve(async (req) => {
         await extendUserTrial(supabaseAdmin, stripe, referrerUserId, bonusDays);
       }
 
-      logStep("Trial configurado com sucesso");
+      logStep("Conta criada com sucesso");
 
       return new Response(JSON.stringify({
         success: true,
         message: referrerUserId 
-          ? `Conta criada com trial de ${trialDays} dias! Quem te indicou também ganhou ${referrerRole === 'beta' ? '6' : '3'} dias extras.`
-          : `Conta criada com trial de ${trialDays} dias ativado!`,
+          ? `Conta criada com sucesso! Quem te indicou também ganhou ${referrerRole === 'beta' ? '6' : '3'} dias extras.`
+          : `Conta criada com sucesso!`,
         user: authData.user,
         session: authData.session
       }), {

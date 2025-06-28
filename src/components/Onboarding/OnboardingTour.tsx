@@ -1,4 +1,7 @@
 
+// ABOUTME: Tour de onboarding sem menções a trial ou assinatura
+// ABOUTME: Foca apenas na funcionalidade da aplicação
+
 import React from 'react';
 import {
   Dialog,
