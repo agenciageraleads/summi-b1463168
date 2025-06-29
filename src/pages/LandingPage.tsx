@@ -4,10 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
-
 const LandingPage = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
+  return <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
       <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,9 +26,7 @@ const LandingPage = () => {
               <a href="#como-funciona" className="text-gray-600 hover:text-green-600 transition-colors">
                 Como Funciona
               </a>
-              <a href="#precos" className="text-gray-600 hover:text-green-600 transition-colors">
-                Preços
-              </a>
+              
               <a href="#faq" className="text-gray-600 hover:text-green-600 transition-colors">
                 FAQ
               </a>
@@ -54,7 +50,7 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="py-20 lg:py-[92px]">
+      <section className="py-20 lg:py-[70px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-6 bg-green-100 text-green-700 border-green-200">
@@ -69,9 +65,7 @@ const LandingPage = () => {
               </span>
             </h1>
             
-            <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-              Summi analisa e prioriza suas conversas de WhatsApp para que você não perca nenhuma oportunidade.
-            </p>
+            <p className="text-xl text-gray-600 mb-8 leading-relaxed text-center">A Summi transcreve e resume seus áudios, analisa e prioriza suas conversas para que você não perca nenhuma oportunidade.</p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
               <Link to="/register">
@@ -83,35 +77,19 @@ const LandingPage = () => {
             </div>
 
             <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-500 mb-6">
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Configuração em 5 min
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Sem cartão de crédito
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Cancele quando quiser
-              </div>
+              
+              
+              
             </div>
 
             {/* Aviso destacado sobre teste gratuito */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-2xl mx-auto">
-              <p className="text-green-800 font-medium text-lg">
-                🎉 <strong>7 dias grátis</strong> para testar todas as funcionalidades
-              </p>
-              <p className="text-green-700 text-sm mt-1">
-                Nenhum cartão necessário • Sem compromisso • Ativação imediata
-              </p>
-            </div>
+            
           </div>
         </div>
       </section>
 
       {/* Como Funciona Section */}
-      <section id="como-funciona" className="py-20 bg-gray-50">
+      <section id="como-funciona" className="bg-gray-50 py-[60px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Como Funciona</h2>
@@ -179,7 +157,7 @@ const LandingPage = () => {
       </section>
 
       {/* Recursos Section */}
-      <section id="recursos" className="py-20 bg-white">
+      <section id="recursos" className="bg-white py-[60px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Recursos</h2>
@@ -277,25 +255,7 @@ const LandingPage = () => {
             </p>
             
             {/* Aviso importante sobre teste gratuito */}
-            <div className="bg-white border-2 border-green-300 rounded-xl p-6 max-w-3xl mx-auto mb-8">
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                🚀 Comece Grátis - Sem Riscos!
-              </h3>
-              <div className="grid md:grid-cols-3 gap-4 text-sm">
-                <div className="flex items-center justify-center space-x-2">
-                  <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-gray-700">Sem cartão de crédito</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-gray-700">Cancele quando quiser</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-gray-700">Ativação imediata</span>
-                </div>
-              </div>
-            </div>
+            
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -429,29 +389,7 @@ Cancele quando quiser.</CardDescription>
           </div>
 
           {/* Informações adicionais aprimoradas */}
-          <div className="text-center mt-12 space-y-6">
-            {/* Seção principal de garantias */}
-            
-
-            <p className="text-gray-500">
-              💳 Aceitamos todos os cartões de crédito • 🔐 Pagamento 100% seguro via Stripe
-            </p>
-            
-            <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500">
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Ativação imediata
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Suporte em português
-              </div>
-              <div className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Sem compromisso
-              </div>
-            </div>
-          </div>
+          
         </div>
       </section>
 
@@ -507,18 +445,7 @@ Cancele quando quiser.</CardDescription>
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-4" className="border border-gray-200 rounded-lg px-6">
-              <AccordionTrigger className="text-left hover:no-underline">
-                <span className="text-lg font-medium text-gray-900">
-                  Como funciona o período de teste gratuito?
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="text-gray-600 pb-4">
-                Oferecemos 7 dias de teste gratuito com acesso completo a todas as funcionalidades. 
-                Não é necessário cartão de crédito para começar. Após o período de teste, você pode 
-                escolher entre nossos planos mensais ou anuais.
-              </AccordionContent>
-            </AccordionItem>
+            
 
             <AccordionItem value="item-5" className="border border-gray-200 rounded-lg px-6">
               <AccordionTrigger className="text-left hover:no-underline">
@@ -533,18 +460,7 @@ Cancele quando quiser.</CardDescription>
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-6" className="border border-gray-200 rounded-lg px-6">
-              <AccordionTrigger className="text-left hover:no-underline">
-                <span className="text-lg font-medium text-gray-900">
-                  Como cancelo minha assinatura?
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="text-gray-600 pb-4">
-                Você pode cancelar sua assinatura a qualquer momento através das configurações da sua conta. 
-                O cancelamento é imediato e você continuará tendo acesso aos recursos até o final do período 
-                já pago. Não há taxas de cancelamento ou multas.
-              </AccordionContent>
-            </AccordionItem>
+            
 
             <AccordionItem value="item-7" className="border border-gray-200 rounded-lg px-6">
               <AccordionTrigger className="text-left hover:no-underline">
@@ -636,8 +552,6 @@ Cancele quando quiser.</CardDescription>
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default LandingPage;
