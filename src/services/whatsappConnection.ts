@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface ConnectionResult {
   success: boolean;
-  state: 'needs_phone_number' | 'needs_qr_code' | 'needs_pairing_code' | 'is_connecting' | 'already_connected' | 'error';
+  state: 'needs_phone_number' | 'needs_qr_code' | 'needs_pairing_code' | 'needs_connection' | 'is_connecting' | 'already_connected' | 'error';
   instanceName?: string;
   qrCode?: string;
   pairingCode?: string;
@@ -84,9 +84,9 @@ export const initializeWhatsAppConnection = async (): Promise<ConnectionResult> 
   }
 };
 
-// Gerar QR Code
-export const generateQRCode = async (instanceName: string): Promise<ConnectionResult> => {
-  console.log('[WhatsApp Connection] Gerando QR Code para:', instanceName);
+// Gerar códigos de conexão (QR Code e Pairing Code)
+export const generateConnectionCodes = async (instanceName: string): Promise<ConnectionResult> => {
+  console.log('[WhatsApp Connection] Gerando códigos para:', instanceName);
   
   try {
     const session = await getSession();
@@ -102,39 +102,42 @@ export const generateQRCode = async (instanceName: string): Promise<ConnectionRe
     });
 
     if (response.error) {
-      console.error('[WhatsApp Connection] Erro ao gerar QR:', response.error);
+      console.error('[WhatsApp Connection] Erro ao gerar códigos:', response.error);
       return {
         success: false,
         state: 'error',
-        error: response.error.message || 'Erro ao gerar QR Code'
+        error: response.error.message || 'Erro ao gerar códigos'
       };
     }
 
     const result = response.data;
-    console.log('[WhatsApp Connection] QR Code gerado:', result.success ? 'Sucesso' : result.error);
+    console.log('[WhatsApp Connection] Códigos gerados:', result.success ? 'Sucesso' : result.error);
 
-    if (result.success && result.qrCode) {
-      return {
-        success: true,
-        state: 'needs_qr_code',
-        qrCode: result.qrCode,
-        message: 'QR Code gerado com sucesso'
-      };
-    } else if (result.alreadyConnected) {
-      return {
-        success: true,
-        state: 'already_connected',
-        message: 'WhatsApp já está conectado'
-      };
+    if (result.success) {
+      if (result.state === 'already_connected') {
+        return {
+          success: true,
+          state: 'already_connected',
+          message: 'WhatsApp já está conectado'
+        };
+      } else {
+        return {
+          success: true,
+          state: 'needs_connection',
+          qrCode: result.qrCode,
+          pairingCode: result.pairingCode,
+          message: 'Códigos gerados com sucesso'
+        };
+      }
     } else {
       return {
         success: false,
         state: 'error',
-        error: result.error || 'Erro ao gerar QR Code'
+        error: result.error || 'Erro ao gerar códigos'
       };
     }
   } catch (error) {
-    console.error('[WhatsApp Connection] Erro inesperado ao gerar QR:', error);
+    console.error('[WhatsApp Connection] Erro inesperado ao gerar códigos:', error);
     return {
       success: false,
       state: 'error',
@@ -143,63 +146,13 @@ export const generateQRCode = async (instanceName: string): Promise<ConnectionRe
   }
 };
 
-// Gerar Pairing Code
+// Manter compatibilidade com métodos separados
+export const generateQRCode = async (instanceName: string): Promise<ConnectionResult> => {
+  return generateConnectionCodes(instanceName);
+};
+
 export const generatePairingCode = async (instanceName: string): Promise<ConnectionResult> => {
-  console.log('[WhatsApp Connection] Gerando Pairing Code para:', instanceName);
-  
-  try {
-    const session = await getSession();
-
-    const response = await supabase.functions.invoke('evolution-api-handler', {
-      body: { 
-        action: 'generate-pairing-code',
-        instanceName 
-      },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
-
-    if (response.error) {
-      console.error('[WhatsApp Connection] Erro ao gerar Pairing Code:', response.error);
-      return {
-        success: false,
-        state: 'error',
-        error: response.error.message || 'Erro ao gerar Pairing Code'
-      };
-    }
-
-    const result = response.data;
-    console.log('[WhatsApp Connection] Pairing Code gerado:', result.success ? 'Sucesso' : result.error);
-
-    if (result.success && result.pairingCode) {
-      return {
-        success: true,
-        state: 'needs_pairing_code',
-        pairingCode: result.pairingCode,
-        message: 'Pairing Code gerado com sucesso'
-      };
-    } else if (result.alreadyConnected) {
-      return {
-        success: true,
-        state: 'already_connected',
-        message: 'WhatsApp já está conectado'
-      };
-    } else {
-      return {
-        success: false,
-        state: 'error',
-        error: result.error || 'Erro ao gerar Pairing Code'
-      };
-    }
-  } catch (error) {
-    console.error('[WhatsApp Connection] Erro inesperado ao gerar Pairing Code:', error);
-    return {
-      success: false,
-      state: 'error',
-      error: error instanceof Error ? error.message : 'Erro inesperado'
-    };
-  }
+  return generateConnectionCodes(instanceName);
 };
 
 // Verificar status da conexão
@@ -275,7 +228,7 @@ export const restartInstance = async (instanceName: string): Promise<ConnectionR
     const result = response.data;
     return {
       success: result.success,
-      state: result.success ? 'needs_qr_code' : 'error',
+      state: result.success ? 'needs_connection' : 'error',
       message: result.success ? 'Instância reiniciada com sucesso' : undefined,
       error: result.success ? undefined : result.error
     };
@@ -326,7 +279,7 @@ export const disconnectWhatsApp = async (instanceName: string): Promise<Connecti
 
     return {
       success: true,
-      state: 'needs_qr_code',
+      state: 'needs_connection',
       message: data?.message || 'WhatsApp desconectado com sucesso'
     };
   } catch (error) {

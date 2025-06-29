@@ -1,5 +1,5 @@
 
-// ABOUTME: Hook principal para gerenciar a conexão WhatsApp com suporte a QR Code e Pairing Code
+// ABOUTME: Hook principal para gerenciar a conexão WhatsApp com apresentação dupla de QR Code e Pairing Code
 // ABOUTME: Controla todo o fluxo de conexão, polling e estados da aplicação
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -7,8 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
 import {
   initializeWhatsAppConnection,
-  generateQRCode,
-  generatePairingCode,
+  generateConnectionCodes,
   checkConnectionStatus,
   disconnectWhatsApp,
   restartInstance,
@@ -16,7 +15,7 @@ import {
   ConnectionMethod,
 } from '@/services/whatsappConnection';
 
-export type ConnectionState = 'needs_phone_number' | 'needs_qr_code' | 'needs_pairing_code' | 'is_connecting' | 'already_connected' | 'error';
+export type ConnectionState = 'needs_phone_number' | 'needs_connection' | 'is_connecting' | 'already_connected' | 'error';
 
 export interface WhatsAppManagerState {
   connectionState: ConnectionState;
@@ -155,39 +154,38 @@ export const useWhatsAppManager = () => {
     // Timeout para expiração - 60 segundos
     qrTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current || isDefinitivelyConnectedRef.current) return;
-      console.log('[WA Manager] Código expirado, reiniciando...');
+      console.log('[WA Manager] Códigos expirados, reiniciando...');
       stopPolling();
       setState(prev => ({ 
         ...prev, 
-        message: 'Código expirado, reiniciando...', 
+        message: 'Códigos expirados, reiniciando...', 
         qrCode: null,
         pairingCode: null 
       }));
       await restartInstance(instanceName);
       setTimeout(() => {
-        handleConnect(state.connectionMethod);
+        handleConnect();
       }, 3000);
     }, 60000);
 
-  }, [stopPolling, checkConnectionAndUpdate, state.connectionMethod]);
+  }, [stopPolling, checkConnectionAndUpdate]);
 
-  // Gera código baseado no método selecionado
-  const handleGenerateCode = useCallback(async (instanceName: string, method: ConnectionMethod) => {
-    console.log(`[WA Manager] Gerando ${method} para:`, instanceName);
+  // Gera ambos os códigos (QR Code e Pairing Code)
+  const handleGenerateCodes = useCallback(async (instanceName: string) => {
+    console.log(`[WA Manager] Gerando códigos para:`, instanceName);
     setState(prev => ({ 
       ...prev, 
       isLoading: true, 
-      message: `Gerando ${method === 'qr-code' ? 'QR Code' : 'Pairing Code'}...` 
+      message: `Gerando códigos de conexão...` 
     }));
     
     try {
-      const result: ConnectionResult = method === 'qr-code' 
-        ? await generateQRCode(instanceName)
-        : await generatePairingCode(instanceName);
+      const result: ConnectionResult = await generateConnectionCodes(instanceName);
 
-      console.log('[WA Manager] Resultado do código:', { 
+      console.log('[WA Manager] Resultado dos códigos:', { 
         success: result.success, 
-        hasCode: !!(result.qrCode || result.pairingCode), 
+        hasQR: !!result.qrCode, 
+        hasPairing: !!result.pairingCode, 
         state: result.state
       });
 
@@ -198,21 +196,21 @@ export const useWhatsAppManager = () => {
       }
 
       if (result.success && (result.qrCode || result.pairingCode)) {
-        console.log('[WA Manager] Código recebido, exibindo na tela');
+        console.log('[WA Manager] Códigos recebidos, exibindo na tela');
         setState(prev => ({
           ...prev,
-          connectionState: method === 'qr-code' ? 'needs_qr_code' : 'needs_pairing_code',
+          connectionState: 'needs_connection',
           qrCode: result.qrCode || null,
           pairingCode: result.pairingCode || null,
-          message: `${method === 'qr-code' ? 'Escaneie o QR Code' : 'Digite o Pairing Code'} com seu WhatsApp`,
+          message: 'Escolha um método para conectar seu WhatsApp',
           isLoading: false
         }));
         startPolling(instanceName);
       } else {
-        throw new Error(result.error || 'Falha ao gerar código.');
+        throw new Error(result.error || 'Falha ao gerar códigos.');
       }
     } catch (error: any) {
-      console.error('[WA Manager] Erro ao gerar código:', error);
+      console.error('[WA Manager] Erro ao gerar códigos:', error);
       setState(prev => ({ 
         ...prev, 
         connectionState: 'error', 
@@ -222,20 +220,18 @@ export const useWhatsAppManager = () => {
     }
   }, [setConnectedStateDefinitively, startPolling]);
 
-  // Trocar método de conexão
+  // Manter compatibilidade - não usa mais o método, ambos são gerados juntos
   const switchConnectionMethod = useCallback((method: ConnectionMethod) => {
-    console.log('[WA Manager] Trocando método de conexão para:', method);
+    console.log('[WA Manager] Método de conexão alterado para:', method);
     setState(prev => ({ 
       ...prev, 
-      connectionMethod: method,
-      qrCode: null,
-      pairingCode: null 
+      connectionMethod: method
     }));
   }, []);
 
   // Ação principal de conexão
   const handleConnect = useCallback(async (method: ConnectionMethod = state.connectionMethod) => {
-    console.log('[WA Manager] Conectando com método:', method);
+    console.log('[WA Manager] Conectando...');
 
     if (state.isLoading) {
       return;
@@ -286,8 +282,8 @@ export const useWhatsAppManager = () => {
         return;
       }
       
-      // Passo 3: Gerar código baseado no método
-      await handleGenerateCode(instanceName, method);
+      // Passo 3: Gerar ambos os códigos
+      await handleGenerateCodes(instanceName);
 
     } catch (err: any) {
       console.error('[WA Manager] Erro durante handleConnect:', err);
@@ -303,7 +299,7 @@ export const useWhatsAppManager = () => {
         variant: 'destructive' 
       });
     }
-  }, [profile, state.isLoading, state.connectionMethod, toast, stopPolling, refreshProfile, checkConnectionAndUpdate, handleGenerateCode]);
+  }, [profile, state.isLoading, state.connectionMethod, toast, stopPolling, refreshProfile, checkConnectionAndUpdate, handleGenerateCodes]);
 
   // Desconectar WhatsApp
   const handleDisconnect = useCallback(async () => {
@@ -320,7 +316,7 @@ export const useWhatsAppManager = () => {
       
       setState(prev => ({
         ...prev,
-        connectionState: 'needs_qr_code',
+        connectionState: 'needs_connection',
         isLoading: false,
         isPolling: false,
         qrCode: null,
@@ -360,14 +356,14 @@ export const useWhatsAppManager = () => {
     } else if (profile.instance_name) {
       setState(prev => ({ 
         ...prev, 
-        connectionState: 'needs_qr_code', 
+        connectionState: 'needs_connection', 
         message: 'Pronto para conectar', 
         instanceName: profile.instance_name 
       }));
     } else {
       setState(prev => ({ 
         ...prev, 
-        connectionState: 'needs_qr_code', 
+        connectionState: 'needs_connection', 
         message: 'Pronto para criar sua instância' 
       }));
     }
