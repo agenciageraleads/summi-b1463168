@@ -7,12 +7,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
 import { QrCode, Smartphone, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
 import { 
-  checkInstanceExists, 
-  connectInstance, 
-  getConnectionState, 
-  restartInstance,
-  createInstance 
-} from '@/services/evolutionApi';
+  initializeWhatsAppConnection,
+  generateQRCode,
+  checkConnectionStatus,
+  restartInstance
+} from '@/services/whatsappConnection';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
 
@@ -63,13 +62,13 @@ const WhatsAppConnectionPage = () => {
     setConnectionTimer(0);
   };
 
-  // CORREÇÃO: Função para verificar status da conexão
-  const checkConnectionStatus = async (instanceName: string): Promise<boolean> => {
+  // CORREÇÃO: Função para verificar status da conexão usando o novo serviço
+  const checkConnectionStatusInternal = async (instanceName: string): Promise<boolean> => {
     try {
-      const state = await getConnectionState(instanceName);
-      console.log(`[WhatsApp] Estado da conexão: ${state}`);
+      const result = await checkConnectionStatus(instanceName);
+      console.log(`[WhatsApp] Estado da conexão: ${result.status}`);
       
-      if (state === 'open') {
+      if (result.success && ['open', 'connected'].includes(result.status)) {
         setConnectionStatus('connected');
         setQrCode('');
         stopConnectionTimer();
@@ -88,7 +87,7 @@ const WhatsAppConnectionPage = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     
     intervalRef.current = setInterval(async () => {
-      const isConnected = await checkConnectionStatus(instanceName);
+      const isConnected = await checkConnectionStatusInternal(instanceName);
       
       if (isConnected) {
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -107,7 +106,7 @@ const WhatsAppConnectionPage = () => {
     }, 10000); // A cada 10 segundos
   };
 
-  // CORREÇÃO: Função para reiniciar e reconectar
+  // CORREÇÃO: Função para reiniciar e reconectar usando o novo serviço
   const handleRestartAndReconnect = async (instanceName: string) => {
     try {
       console.log('[WhatsApp] Reiniciando instância...');
@@ -133,37 +132,38 @@ const WhatsAppConnectionPage = () => {
     }
   };
 
-  // CORREÇÃO: Função para conectar e gerar QR Code
+  // CORREÇÃO: Função para conectar e gerar QR Code usando o novo serviço
   const handleConnect = async (instanceName?: string) => {
     const targetInstanceName = instanceName || generateInstanceName();
     
     try {
       console.log(`[WhatsApp] Conectando à instância: ${targetInstanceName}`);
-      const qrCodeData = await connectInstance(targetInstanceName);
+      const result = await generateQRCode(targetInstanceName);
       
-      setQrCode(qrCodeData);
-      setConnectionStatus('connecting');
-      startConnectionTimer();
-      startConnectionMonitoring(targetInstanceName);
-      
-      toast({
-        title: 'QR Code gerado!',
-        description: 'Escaneie o QR Code com seu WhatsApp para conectar'
-      });
-      
-    } catch (error) {
-      console.error('[WhatsApp] Erro ao conectar instância:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      
-      if (errorMessage.includes('já está conectada')) {
+      if (result.success && result.qrCode) {
+        setQrCode(result.qrCode);
+        setConnectionStatus('connecting');
+        startConnectionTimer();
+        startConnectionMonitoring(targetInstanceName);
+        
+        toast({
+          title: 'QR Code gerado!',
+          description: 'Escaneie o QR Code com seu WhatsApp para conectar'
+        });
+      } else if (result.state === 'already_connected') {
         setConnectionStatus('connected');
         setQrCode('');
         toast({
           title: 'WhatsApp já conectado!',
           description: 'Sua instância já está ativa'
         });
-        return;
+      } else {
+        throw new Error(result.error || 'Erro ao gerar QR Code');
       }
+      
+    } catch (error) {
+      console.error('[WhatsApp] Erro ao conectar instância:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       
       toast({
         title: 'Erro',
@@ -193,44 +193,20 @@ const WhatsAppConnectionPage = () => {
     try {
       console.log(`[WhatsApp] Iniciando fluxo de conexão para: ${instanceName}`);
       
-      // 2. Verificar se já não existe uma instância
-      console.log('[WhatsApp] Verificando se a instância já existe...');
-      const instanceCheck = await checkInstanceExists(instanceName);
+      // 2. Inicializar conexão (criar instância se necessário)
+      console.log('[WhatsApp] Inicializando conexão...');
+      const initResult = await initializeWhatsAppConnection();
       
-      if (instanceCheck.exists) {
-        console.log('[WhatsApp] Instância encontrada, verificando status...');
-        
-        // 3. Se existe, verificar o status da instância
-        if (instanceCheck.status === 'open') {
-          console.log('[WhatsApp] Instância já está conectada');
-          setConnectionStatus('connected');
-          setQrCode('');
-          toast({
-            title: 'WhatsApp já conectado!',
-            description: 'Sua instância já está conectada e funcionando'
-          });
-          return;
-        } else {
-          // 4. Se não está conectada, gerar QR Code
-          console.log('[WhatsApp] Instância existe mas não está conectada, gerando QR Code...');
-          await handleConnect(instanceName);
+      if (initResult.success && initResult.instanceName) {
+        // Atualizar perfil com nome da instância se necessário
+        if (!profile.instance_name) {
+          await updateProfile({ instance_name: initResult.instanceName });
         }
+        
+        // 3. Gerar QR Code
+        await handleConnect(initResult.instanceName);
       } else {
-        // 5. Se não existe, criar a instância primeiro
-        console.log('[WhatsApp] Instância não encontrada, criando nova instância...');
-        
-        await createInstance(instanceName);
-        await updateProfile({ instance_name: instanceName });
-        
-        // 6. Aguardar 2 segundos e então conectar
-        setTimeout(async () => {
-          await handleConnect(instanceName);
-        }, 2000);
-        
-        toast({
-          title: 'Instância criada!',
-          description: 'Gerando QR Code para conexão...'
-        });
+        throw new Error(initResult.error || 'Erro ao inicializar conexão');
       }
       
     } catch (error) {

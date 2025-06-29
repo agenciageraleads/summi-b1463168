@@ -11,6 +11,11 @@ const WhatsAppConnectionV2Page = () => {
   const { profile } = useProfile();
   const { state, handleConnect, handleDisconnect } = useWhatsAppManager();
 
+  // CORREÇÃO: Função wrapper que ignora o evento do mouse
+  const handleConnectClick = () => {
+    handleConnect(state.connectionMethod);
+  };
+
   // Função para obter informações de display do status
   const getStatusDisplay = () => {
     switch (state.connectionState) {
@@ -79,7 +84,7 @@ const WhatsAppConnectionV2Page = () => {
                  state.connectionState === 'needs_qr_code' ||
                  state.connectionState === 'error' ? (
                   <Button 
-                    onClick={handleConnect}
+                    onClick={handleConnectClick}
                     disabled={state.isLoading || !profile?.nome || !profile?.numero}
                     className="flex items-center"
                   >
