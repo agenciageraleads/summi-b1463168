@@ -51,7 +51,7 @@ const LandingPage = () => {
 
       {/* Hero Section */}
       <section className="lg:py-0 mx-0 my-0 py-[20px]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-[32px]">
           <div className="text-center max-w-4xl mx-auto my-0">
             <Badge className="mb-6 bg-green-100 text-green-700 border-green-200">
               IA Avançada para WhatsApp
