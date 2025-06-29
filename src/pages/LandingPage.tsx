@@ -60,9 +60,7 @@ const LandingPage = () => {
             <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6">
               Automatize seu{" "}
               <br />
-              <span className="bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent">
-                WhatsApp com IA
-              </span>
+              <span className="bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent">WhatsApp com a Summi</span>
             </h1>
             
             <p className="text-xl text-gray-600 mb-8 leading-relaxed text-center">A Summi transcreve e resume seus áudios, analisa e prioriza suas conversas para que você não perca nenhuma oportunidade.</p>
