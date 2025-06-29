@@ -27,7 +27,7 @@ const WhatsAppConnectionV2Page = () => {
           text: 'Conectado'
         };
       case 'is_connecting':
-      case 'needs_qr_code':
+      case 'needs_connection':
         return {
           color: 'text-yellow-600',
           bg: 'bg-yellow-100',
@@ -81,7 +81,7 @@ const WhatsAppConnectionV2Page = () => {
               
               <div className="flex space-x-2">
                 {state.connectionState === 'needs_phone_number' ||
-                 state.connectionState === 'needs_qr_code' ||
+                 state.connectionState === 'needs_connection' ||
                  state.connectionState === 'error' ? (
                   <Button 
                     onClick={handleConnectClick}
@@ -182,7 +182,7 @@ const WhatsAppConnectionV2Page = () => {
                       <p>Clique em "Conectar WhatsApp" para começar</p>
                     </div>
                   </div>
-                ) : (state.connectionState === 'is_connecting' || state.connectionState === 'needs_qr_code') && state.qrCode ? (
+                ) : (state.connectionState === 'is_connecting' || state.connectionState === 'needs_connection') && state.qrCode ? (
                   <div className="w-64 h-64 bg-white border-2 border-border rounded-lg flex items-center justify-center relative overflow-hidden">
                     <img 
                       src={state.qrCode} 
