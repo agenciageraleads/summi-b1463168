@@ -1,11 +1,15 @@
-// Serviço unificado para conexão WhatsApp - VERSÃO COM MELHOR TRATAMENTO DE ERROS
+
+// ABOUTME: Serviço unificado para conexão WhatsApp com suporte a QR Code e Pairing Code
+// ABOUTME: Implementa todas as operações de conexão, status e gerenciamento de instâncias
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConnectionResult {
   success: boolean;
-  state: 'needs_phone_number' | 'needs_qr_code' | 'is_connecting' | 'already_connected' | 'error';
+  state: 'needs_phone_number' | 'needs_qr_code' | 'needs_pairing_code' | 'is_connecting' | 'already_connected' | 'error';
   instanceName?: string;
   qrCode?: string;
+  pairingCode?: string;
   message?: string;
   error?: string;
 }
@@ -17,6 +21,8 @@ export interface StatusResult {
   error?: string;
 }
 
+export type ConnectionMethod = 'qr-code' | 'pairing-code';
+
 // Função auxiliar para obter sessão válida
 const getSession = async () => {
   const { data: sessionData } = await supabase.auth.getSession();
@@ -24,10 +30,8 @@ const getSession = async () => {
     throw new Error('Usuário não autenticado');
   }
   
-  // Verificar se o token não está expirado
   const now = Math.floor(Date.now() / 1000);
   if (sessionData.session.expires_at && sessionData.session.expires_at < now) {
-    // Tentar renovar o token
     const { data: refreshData, error } = await supabase.auth.refreshSession();
     if (error || !refreshData.session) {
       throw new Error('Sessão expirada. Faça login novamente.');
@@ -87,8 +91,11 @@ export const generateQRCode = async (instanceName: string): Promise<ConnectionRe
   try {
     const session = await getSession();
 
-    const response = await supabase.functions.invoke('evolution-generate-qr', {
-      body: { instanceName },
+    const response = await supabase.functions.invoke('evolution-api-handler', {
+      body: { 
+        action: 'generate-qr-code',
+        instanceName 
+      },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
@@ -136,24 +143,84 @@ export const generateQRCode = async (instanceName: string): Promise<ConnectionRe
   }
 };
 
-// Verificar status da conexão - VERSÃO MELHORADA
-export const checkConnectionStatus = async (instanceName: string): Promise<StatusResult> => {
-  console.log('[WhatsApp Connection] 🔍 Verificando status de:', instanceName);
+// Gerar Pairing Code
+export const generatePairingCode = async (instanceName: string): Promise<ConnectionResult> => {
+  console.log('[WhatsApp Connection] Gerando Pairing Code para:', instanceName);
   
   try {
     const session = await getSession();
 
-    const response = await supabase.functions.invoke('evolution-connection-state', {
-      body: { instanceName },
+    const response = await supabase.functions.invoke('evolution-api-handler', {
+      body: { 
+        action: 'generate-pairing-code',
+        instanceName 
+      },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
     });
 
-    console.log('[WhatsApp Connection] 📡 Resposta da API:', response);
+    if (response.error) {
+      console.error('[WhatsApp Connection] Erro ao gerar Pairing Code:', response.error);
+      return {
+        success: false,
+        state: 'error',
+        error: response.error.message || 'Erro ao gerar Pairing Code'
+      };
+    }
+
+    const result = response.data;
+    console.log('[WhatsApp Connection] Pairing Code gerado:', result.success ? 'Sucesso' : result.error);
+
+    if (result.success && result.pairingCode) {
+      return {
+        success: true,
+        state: 'needs_pairing_code',
+        pairingCode: result.pairingCode,
+        message: 'Pairing Code gerado com sucesso'
+      };
+    } else if (result.alreadyConnected) {
+      return {
+        success: true,
+        state: 'already_connected',
+        message: 'WhatsApp já está conectado'
+      };
+    } else {
+      return {
+        success: false,
+        state: 'error',
+        error: result.error || 'Erro ao gerar Pairing Code'
+      };
+    }
+  } catch (error) {
+    console.error('[WhatsApp Connection] Erro inesperado ao gerar Pairing Code:', error);
+    return {
+      success: false,
+      state: 'error',
+      error: error instanceof Error ? error.message : 'Erro inesperado'
+    };
+  }
+};
+
+// Verificar status da conexão
+export const checkConnectionStatus = async (instanceName: string): Promise<StatusResult> => {
+  console.log('[WhatsApp Connection] Verificando status de:', instanceName);
+  
+  try {
+    const session = await getSession();
+
+    const response = await supabase.functions.invoke('evolution-api-handler', {
+      body: { 
+        action: 'get-status',
+        instanceName 
+      },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
 
     if (response.error) {
-      console.error('[WhatsApp Connection] ❌ Erro ao verificar status:', response.error);
+      console.error('[WhatsApp Connection] Erro ao verificar status:', response.error);
       return {
         success: false,
         status: 'disconnected',
@@ -162,14 +229,7 @@ export const checkConnectionStatus = async (instanceName: string): Promise<Statu
     }
 
     const result = response.data;
-    console.log('[WhatsApp Connection] 📊 Status detalhado:', {
-      rawResult: result,
-      status: result.state || 'disconnected',
-      success: result.success
-    });
-
-    // CORREÇÃO: Melhor tratamento do estado retornado
-    const status = result.state || result.status || 'disconnected';
+    const status = result.status || 'disconnected';
     
     return {
       success: true,
@@ -177,7 +237,7 @@ export const checkConnectionStatus = async (instanceName: string): Promise<Statu
       state: status
     };
   } catch (error) {
-    console.error('[WhatsApp Connection] 💥 Erro inesperado ao verificar status:', error);
+    console.error('[WhatsApp Connection] Erro inesperado ao verificar status:', error);
     return {
       success: false,
       status: 'disconnected',
@@ -193,8 +253,11 @@ export const restartInstance = async (instanceName: string): Promise<ConnectionR
   try {
     const session = await getSession();
 
-    const response = await supabase.functions.invoke('evolution-restart-instance', {
-      body: { instanceName },
+    const response = await supabase.functions.invoke('evolution-api-handler', {
+      body: { 
+        action: 'restart',
+        instanceName 
+      },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
@@ -210,8 +273,6 @@ export const restartInstance = async (instanceName: string): Promise<ConnectionR
     }
 
     const result = response.data;
-    console.log('[WhatsApp Connection] Instância reiniciada:', result.success ? 'Sucesso' : result.error);
-
     return {
       success: result.success,
       state: result.success ? 'needs_qr_code' : 'error',
@@ -228,14 +289,18 @@ export const restartInstance = async (instanceName: string): Promise<ConnectionR
   }
 };
 
-// Desconectar WhatsApp (apenas logout, mantém instance_name no perfil)
-export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
+// Desconectar WhatsApp
+export const disconnectWhatsApp = async (instanceName: string): Promise<ConnectionResult> => {
   console.log('[WhatsApp Service] Desconectando WhatsApp...');
   
   try {
     const session = await getSession();
 
-    const { data, error } = await supabase.functions.invoke('evolution-logout-instance', {
+    const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
+      body: { 
+        action: 'logout',
+        instanceName 
+      },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
@@ -259,10 +324,9 @@ export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
       };
     }
 
-    console.log('[WhatsApp Service] Desconectado com sucesso (instance_name mantido no perfil)');
     return {
       success: true,
-      state: 'needs_qr_code', // Após logout, pode reconectar usando o mesmo instance_name
+      state: 'needs_qr_code',
       message: data?.message || 'WhatsApp desconectado com sucesso'
     };
   } catch (error) {
@@ -275,14 +339,18 @@ export const disconnectWhatsApp = async (): Promise<ConnectionResult> => {
   }
 };
 
-// Deletar instância (para quando deletar conta)
-export const deleteWhatsAppInstance = async (): Promise<ConnectionResult> => {
+// Deletar instância
+export const deleteWhatsAppInstance = async (instanceName: string): Promise<ConnectionResult> => {
   console.log('[WhatsApp Service] Deletando instância WhatsApp...');
   
   try {
     const session = await getSession();
 
-    const { data, error } = await supabase.functions.invoke('evolution-delete-instance', {
+    const { data, error } = await supabase.functions.invoke('evolution-api-handler', {
+      body: { 
+        action: 'delete',
+        instanceName 
+      },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
@@ -297,7 +365,6 @@ export const deleteWhatsAppInstance = async (): Promise<ConnectionResult> => {
       };
     }
 
-    console.log('[WhatsApp Service] Instância deletada com sucesso');
     return {
       success: true,
       state: 'needs_phone_number',

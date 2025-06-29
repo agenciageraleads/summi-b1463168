@@ -1,23 +1,29 @@
 
-// Hook principal para gerenciar a conexão WhatsApp Business - VERSÃO CORRIGIDA
+// ABOUTME: Hook principal para gerenciar a conexão WhatsApp com suporte a QR Code e Pairing Code
+// ABOUTME: Controla todo o fluxo de conexão, polling e estados da aplicação
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
 import {
   initializeWhatsAppConnection,
   generateQRCode,
+  generatePairingCode,
   checkConnectionStatus,
   disconnectWhatsApp,
   restartInstance,
   ConnectionResult,
+  ConnectionMethod,
 } from '@/services/whatsappConnection';
 
-// Tipos
-export type ConnectionState = 'needs_phone_number' | 'needs_qr_code' | 'is_connecting' | 'already_connected' | 'error';
+export type ConnectionState = 'needs_phone_number' | 'needs_qr_code' | 'needs_pairing_code' | 'is_connecting' | 'already_connected' | 'error';
+
 export interface WhatsAppManagerState {
   connectionState: ConnectionState;
+  connectionMethod: ConnectionMethod;
   isLoading: boolean;
   qrCode: string | null;
+  pairingCode: string | null;
   instanceName: string | null;
   message: string;
   isPolling: boolean;
@@ -27,11 +33,12 @@ export const useWhatsAppManager = () => {
   const { toast } = useToast();
   const { profile, refreshProfile } = useProfile();
 
-  // Estado principal do hook
   const [state, setState] = useState<WhatsAppManagerState>({
     connectionState: 'needs_phone_number',
+    connectionMethod: 'qr-code',
     isLoading: false,
     qrCode: null,
+    pairingCode: null,
     instanceName: null,
     message: 'Verificando estado da conexão...',
     isPolling: false
@@ -46,19 +53,9 @@ export const useWhatsAppManager = () => {
   const hasAutoConnectedRef = useRef(false);
   const isDefinitivelyConnectedRef = useRef(false);
 
-  console.log('[WA Manager] 🎯 Estado atual:', {
-    connectionState: state.connectionState,
-    hasAutoConnected: hasAutoConnectedRef.current,
-    isLoading: state.isLoading,
-    qrCode: state.qrCode ? 'Presente' : 'Ausente',
-    profileNumero: profile?.numero,
-    instanceName: profile?.instance_name,
-    isDefinitivelyConnected: isDefinitivelyConnectedRef.current
-  });
-
   // Limpar todos os timers
   const stopPolling = useCallback(() => {
-    console.log('[WA Manager] 🛑 Parando polling');
+    console.log('[WA Manager] Parando polling');
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     if (qrTimeoutRef.current) clearTimeout(qrTimeoutRef.current);
     pollingIntervalRef.current = null;
@@ -69,9 +66,9 @@ export const useWhatsAppManager = () => {
     }
   }, []);
   
-  // CORREÇÃO CRÍTICA: Define o estado como conectado de forma definitiva e protegida
+  // Define o estado como conectado definitivamente
   const setConnectedStateDefinitively = useCallback(() => {
-    console.log('[WA Manager] ✅ Definindo como conectado definitivamente');
+    console.log('[WA Manager] Definindo como conectado definitivamente');
     isDefinitivelyConnectedRef.current = true;
     stopPolling();
     if (isMountedRef.current) {
@@ -79,6 +76,7 @@ export const useWhatsAppManager = () => {
         ...prev,
         connectionState: 'already_connected',
         qrCode: null,
+        pairingCode: null,
         message: 'WhatsApp conectado e funcionando!',
         isLoading: false,
         isPolling: false,
@@ -86,28 +84,26 @@ export const useWhatsAppManager = () => {
     }
   }, [stopPolling]);
 
-  // CORREÇÃO: Checa o status da conexão e mapeia corretamente os estados
+  // Checa o status da conexão
   const checkConnectionAndUpdate = useCallback(async (instanceName: string) => {
     if (!isMountedRef.current || isCheckingConnectionRef.current) return false;
     isCheckingConnectionRef.current = true;
 
     try {
-      console.log('[WA Manager] 🔍 Verificando conexão para:', instanceName);
+      console.log('[WA Manager] Verificando conexão para:', instanceName);
       const statusResult = await checkConnectionStatus(instanceName);
       
-      // CORREÇÃO: Mapear corretamente os estados da API Evolution
       const apiState = statusResult.state;
       const isConnected = statusResult.success && ['open', 'connected'].includes(apiState || '');
       
-      console.log('[WA Manager] 📊 Estado detectado:', { 
+      console.log('[WA Manager] Estado detectado:', { 
         apiState,
         isConnected,
-        success: statusResult.success,
-        mappingTo: isConnected ? 'already_connected' : 'disconnected'
+        success: statusResult.success
       });
 
       if (isConnected) {
-        console.log('[WA Manager] ✅ Conexão confirmada - atualizando estado para already_connected');
+        console.log('[WA Manager] Conexão confirmada');
         if (!isDefinitivelyConnectedRef.current) {
           toast({ 
             title: "✅ Conectado!", 
@@ -121,22 +117,18 @@ export const useWhatsAppManager = () => {
       }
       return false;
     } catch (error) {
-      console.error('[WA Manager] ❌ Erro ao checar status:', error);
+      console.error('[WA Manager] Erro ao checar status:', error);
       return false;
     } finally {
       isCheckingConnectionRef.current = false;
     }
   }, [refreshProfile, toast, setConnectedStateDefinitively]);
 
-  // Usa ref para startPolling para evitar dependência circular
-  const startPollingRef = useRef<((instanceName: string) => void) | null>(null);
-
   // Inicia o polling para verificar a conexão
   const startPolling = useCallback((instanceName: string) => {
-    console.log('[WA Manager] 🔄 Iniciando polling para:', instanceName);
+    console.log('[WA Manager] Iniciando polling para:', instanceName);
     
     if (!isMountedRef.current || isPollingActiveRef.current || isDefinitivelyConnectedRef.current) {
-      console.log('[WA Manager] ❌ Polling cancelado - condições não atendidas');
       return;
     }
     
@@ -151,7 +143,6 @@ export const useWhatsAppManager = () => {
       }
       const isConnected = await checkConnectionAndUpdate(instanceName);
       if (isConnected) {
-        console.log('[WA Manager] ✅ Conexão detectada no polling - parando');
         stopPolling();
       }
     };
@@ -161,61 +152,67 @@ export const useWhatsAppManager = () => {
     // Polling regular a cada 7 segundos
     pollingIntervalRef.current = setInterval(checkAndUpdate, 7000);
 
-    // Timeout para expiração do QR Code - 60 segundos
+    // Timeout para expiração - 60 segundos
     qrTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current || isDefinitivelyConnectedRef.current) return;
-      console.log('[WA Manager] ⏰ QR Code expirado, reiniciando...');
+      console.log('[WA Manager] Código expirado, reiniciando...');
       stopPolling();
-      setState(prev => ({ ...prev, message: 'QR Code expirado, reiniciando...', qrCode: null }));
+      setState(prev => ({ 
+        ...prev, 
+        message: 'Código expirado, reiniciando...', 
+        qrCode: null,
+        pairingCode: null 
+      }));
       await restartInstance(instanceName);
       setTimeout(() => {
-        if (startPollingRef.current) {
-          handleGenerateQR(instanceName);
-        }
+        handleConnect(state.connectionMethod);
       }, 3000);
     }, 60000);
 
-  }, [stopPolling, checkConnectionAndUpdate]);
+  }, [stopPolling, checkConnectionAndUpdate, state.connectionMethod]);
 
-  // Atualiza a ref
-  startPollingRef.current = startPolling;
-  
-  // Gera QR Code e inicia o polling
-  const handleGenerateQR = useCallback(async (instanceName: string) => {
-    console.log('[WA Manager] 📱 Gerando QR Code para:', instanceName);
-    setState(prev => ({ ...prev, isLoading: true, message: 'Gerando QR Code...' }));
+  // Gera código baseado no método selecionado
+  const handleGenerateCode = useCallback(async (instanceName: string, method: ConnectionMethod) => {
+    console.log(`[WA Manager] Gerando ${method} para:`, instanceName);
+    setState(prev => ({ 
+      ...prev, 
+      isLoading: true, 
+      message: `Gerando ${method === 'qr-code' ? 'QR Code' : 'Pairing Code'}...` 
+    }));
     
     try {
-      const result: ConnectionResult = await generateQRCode(instanceName);
-      console.log('[WA Manager] 📨 Resultado do QR:', { 
+      const result: ConnectionResult = method === 'qr-code' 
+        ? await generateQRCode(instanceName)
+        : await generatePairingCode(instanceName);
+
+      console.log('[WA Manager] Resultado do código:', { 
         success: result.success, 
-        hasQR: !!result.qrCode, 
-        state: result.state,
-        connectionState: result.state
+        hasCode: !!(result.qrCode || result.pairingCode), 
+        state: result.state
       });
 
-      // CORREÇÃO: Verificar se já está conectado usando result.state = 'already_connected'
       if (result.state === 'already_connected') {
-        console.log('[WA Manager] ✅ Já conectado detectado no QR');
+        console.log('[WA Manager] Já conectado detectado');
         setConnectedStateDefinitively();
         return;
       }
 
-      if (result.success && result.qrCode) {
-        console.log('[WA Manager] ✅ QR Code recebido, exibindo na tela');
+      if (result.success && (result.qrCode || result.pairingCode)) {
+        console.log('[WA Manager] Código recebido, exibindo na tela');
         setState(prev => ({
           ...prev,
-          connectionState: 'needs_qr_code',
-          qrCode: result.qrCode!,
-          message: 'Escaneie o QR Code com seu WhatsApp',
+          connectionState: method === 'qr-code' ? 'needs_qr_code' : 'needs_pairing_code',
+          qrCode: result.qrCode || null,
+          pairingCode: result.pairingCode || null,
+          message: `${method === 'qr-code' ? 'Escaneie o QR Code' : 'Digite o Pairing Code'} com seu WhatsApp`,
           isLoading: false
         }));
         startPolling(instanceName);
       } else {
-        throw new Error(result.error || 'Falha ao gerar QR Code.');
+        throw new Error(result.error || 'Falha ao gerar código.');
       }
     } catch (error: any) {
-      console.error('[WA Manager] ❌ Erro ao gerar QR:', error);
+      console.error('[WA Manager] Erro ao gerar código:', error);
       setState(prev => ({ 
         ...prev, 
         connectionState: 'error', 
@@ -225,12 +222,22 @@ export const useWhatsAppManager = () => {
     }
   }, [setConnectedStateDefinitively, startPolling]);
 
+  // Trocar método de conexão
+  const switchConnectionMethod = useCallback((method: ConnectionMethod) => {
+    console.log('[WA Manager] Trocando método de conexão para:', method);
+    setState(prev => ({ 
+      ...prev, 
+      connectionMethod: method,
+      qrCode: null,
+      pairingCode: null 
+    }));
+  }, []);
+
   // Ação principal de conexão
-  const handleConnect = useCallback(async () => {
-    console.log('[WA Manager] 🚀 Conectando - verificações iniciais...');
+  const handleConnect = useCallback(async (method: ConnectionMethod = state.connectionMethod) => {
+    console.log('[WA Manager] Conectando com método:', method);
 
     if (state.isLoading) {
-      console.log('[WA Manager] ⏳ Já carregando, ignorando...');
       return;
     }
     
@@ -249,8 +256,10 @@ export const useWhatsAppManager = () => {
       ...prev, 
       isLoading: true, 
       connectionState: 'is_connecting', 
+      connectionMethod: method,
       message: 'Iniciando conexão...', 
-      qrCode: null 
+      qrCode: null,
+      pairingCode: null 
     }));
 
     try {
@@ -258,7 +267,7 @@ export const useWhatsAppManager = () => {
 
       // Passo 1: Criar instância se necessário
       if (!instanceName) {
-        console.log('[WA Manager] 🔧 Criando nova instância...');
+        console.log('[WA Manager] Criando nova instância...');
         setState(prev => ({ ...prev, message: 'Criando nova instância...' }));
         const initResult = await initializeWhatsAppConnection();
         if (initResult.success && initResult.instanceName) {
@@ -270,20 +279,18 @@ export const useWhatsAppManager = () => {
       }
       
       // Passo 2: Verificar status atual
-      console.log('[WA Manager] 🔍 Verificando status da instância:', instanceName);
+      console.log('[WA Manager] Verificando status da instância:', instanceName);
       setState(prev => ({ ...prev, message: 'Verificando status da conexão...' }));
       const isConnected = await checkConnectionAndUpdate(instanceName);
       if (isConnected) {
-        console.log('[WA Manager] ✅ Já conectado - finalizando');
         return;
       }
       
-      // Passo 3: Gerar QR Code
-      setState(prev => ({ ...prev, message: 'Gerando QR Code...' }));
-      await handleGenerateQR(instanceName);
+      // Passo 3: Gerar código baseado no método
+      await handleGenerateCode(instanceName, method);
 
     } catch (err: any) {
-      console.error('[WA Manager] ❌ Erro durante handleConnect:', err);
+      console.error('[WA Manager] Erro durante handleConnect:', err);
       setState(prev => ({ 
         ...prev, 
         connectionState: 'error', 
@@ -296,28 +303,28 @@ export const useWhatsAppManager = () => {
         variant: 'destructive' 
       });
     }
-  }, [profile, state.isLoading, toast, stopPolling, refreshProfile, checkConnectionAndUpdate, handleGenerateQR]);
+  }, [profile, state.isLoading, state.connectionMethod, toast, stopPolling, refreshProfile, checkConnectionAndUpdate, handleGenerateCode]);
 
   // Desconectar WhatsApp
   const handleDisconnect = useCallback(async () => {
-    console.log('[WA Manager] 🔌 Iniciando desconexão...');
+    console.log('[WA Manager] Iniciando desconexão...');
     if (!profile?.instance_name) return;
     
     setState(prev => ({ ...prev, isLoading: true, message: 'Desconectando...' }));
     stopPolling();
     
     try {
-      await disconnectWhatsApp();
+      await disconnectWhatsApp(profile.instance_name);
       isDefinitivelyConnectedRef.current = false;
       hasAutoConnectedRef.current = false;
       
-      // CORREÇÃO: Resetar completamente o estado após desconexão
       setState(prev => ({
         ...prev,
         connectionState: 'needs_qr_code',
         isLoading: false,
         isPolling: false,
         qrCode: null,
+        pairingCode: null,
         message: 'WhatsApp desconectado com sucesso.',
       }));
       
@@ -336,22 +343,14 @@ export const useWhatsAppManager = () => {
     }
   }, [profile, stopPolling, toast]);
 
-  // CORREÇÃO CRÍTICA: Estado inicial baseado no perfil - com proteção contra sobrescrita
+  // Estado inicial baseado no perfil
   useEffect(() => {
     if (!profile) return;
     
-    // IMPORTANTE: Não atualizar o estado se já estamos definitivamente conectados
     if (isDefinitivelyConnectedRef.current) {
-      console.log('[WA Manager] 🛡️ Perfil carregado mas já conectado - mantendo estado atual');
       return;
     }
     
-    console.log('[WA Manager] 👤 Perfil carregado:', {
-      numero: profile.numero,
-      instanceName: profile.instance_name,
-      hasAutoConnected: hasAutoConnectedRef.current
-    });
-
     if (!profile.numero) {
       setState(prev => ({ 
         ...prev, 
@@ -374,13 +373,12 @@ export const useWhatsAppManager = () => {
     }
   }, [profile]);
 
-  // Auto-conexão APENAS uma vez quando o perfil carrega com número
+  // Auto-conexão inicial
   useEffect(() => {
     if (profile?.numero && profile?.instance_name && !hasAutoConnectedRef.current && !isDefinitivelyConnectedRef.current) {
-      console.log('[WA Manager] 🤖 Executando auto-conexão inicial...');
+      console.log('[WA Manager] Executando auto-conexão inicial...');
       hasAutoConnectedRef.current = true;
       
-      // Pequeno delay para evitar corrida entre efeitos
       setTimeout(() => {
         if (isMountedRef.current) {
           handleConnect();
@@ -393,7 +391,7 @@ export const useWhatsAppManager = () => {
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
-      console.log('[WA Manager] 🧹 Limpando recursos...');
+      console.log('[WA Manager] Limpando recursos...');
       isMountedRef.current = false;
       stopPolling();
     };
@@ -403,5 +401,6 @@ export const useWhatsAppManager = () => {
     state,
     handleConnect,
     handleDisconnect,
+    switchConnectionMethod,
   };
 };
