@@ -83,7 +83,7 @@ export const useWhatsAppManager = () => {
     }
   }, [stopPolling]);
 
-  // Checa o status da conexão
+  // Checa o status da conexão - CORRIGIDO para detectar melhor as conexões ativas
   const checkConnectionAndUpdate = useCallback(async (instanceName: string) => {
     if (!isMountedRef.current || isCheckingConnectionRef.current) return false;
     isCheckingConnectionRef.current = true;
@@ -92,17 +92,30 @@ export const useWhatsAppManager = () => {
       console.log('[WA Manager] Verificando conexão para:', instanceName);
       const statusResult = await checkConnectionStatus(instanceName);
       
-      const apiState = statusResult.state;
-      const isConnected = statusResult.success && ['open', 'connected'].includes(apiState || '');
-      
-      console.log('[WA Manager] Estado detectado:', { 
+      const apiState = statusResult.state || statusResult.status;
+      console.log('[WA Manager] Estado bruto da API:', { 
         apiState,
-        isConnected,
+        status: statusResult.status,
+        state: statusResult.state,
         success: statusResult.success
       });
 
+      // CORREÇÃO: Verificar múltiplos possíveis estados de conexão
+      const connectedStates = ['open', 'connected', 'qr', 'connecting', 'pairing'];
+      const isConnected = statusResult.success && 
+        (connectedStates.includes(apiState?.toLowerCase() || '') ||
+         apiState === 'open' ||
+         apiState === 'connected');
+      
+      console.log('[WA Manager] Estado processado:', { 
+        apiState,
+        isConnected,
+        connectedStates,
+        matchedState: connectedStates.includes(apiState?.toLowerCase() || '')
+      });
+
       if (isConnected) {
-        console.log('[WA Manager] Conexão confirmada');
+        console.log('[WA Manager] Conexão confirmada - estado:', apiState);
         if (!isDefinitivelyConnectedRef.current) {
           toast({ 
             title: "✅ Conectado!", 
@@ -114,6 +127,9 @@ export const useWhatsAppManager = () => {
         setConnectedStateDefinitively();
         return true;
       }
+      
+      // Se não está conectado, log para debug
+      console.log('[WA Manager] Não conectado - estado:', apiState);
       return false;
     } catch (error) {
       console.error('[WA Manager] Erro ao checar status:', error);
@@ -369,19 +385,27 @@ export const useWhatsAppManager = () => {
     }
   }, [profile]);
 
-  // Auto-conexão inicial
+  // CORREÇÃO: Auto-verificação inicial melhorada - verifica status ao carregar a página
   useEffect(() => {
     if (profile?.numero && profile?.instance_name && !hasAutoConnectedRef.current && !isDefinitivelyConnectedRef.current) {
-      console.log('[WA Manager] Executando auto-conexão inicial...');
+      console.log('[WA Manager] Executando verificação inicial de status...');
       hasAutoConnectedRef.current = true;
       
-      setTimeout(() => {
-        if (isMountedRef.current) {
-          handleConnect();
+      // Primeiro tenta verificar se já está conectado
+      setTimeout(async () => {
+        if (isMountedRef.current && profile.instance_name) {
+          console.log('[WA Manager] Verificando status inicial para:', profile.instance_name);
+          const isConnected = await checkConnectionAndUpdate(profile.instance_name);
+          
+          // Se não estiver conectado, inicia o processo de conexão
+          if (!isConnected && isMountedRef.current) {
+            console.log('[WA Manager] Não conectado, iniciando processo de conexão...');
+            handleConnect();
+          }
         }
       }, 1000);
     }
-  }, [profile?.numero, profile?.instance_name, handleConnect]);
+  }, [profile?.numero, profile?.instance_name, handleConnect, checkConnectionAndUpdate]);
 
   // Cleanup ao desmontar
   useEffect(() => {

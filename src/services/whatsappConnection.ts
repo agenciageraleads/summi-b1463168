@@ -155,7 +155,7 @@ export const generatePairingCode = async (instanceName: string): Promise<Connect
   return generateConnectionCodes(instanceName);
 };
 
-// Verificar status da conexão
+// CORREÇÃO: Verificar status da conexão com melhor tratamento de estados
 export const checkConnectionStatus = async (instanceName: string): Promise<StatusResult> => {
   console.log('[WhatsApp Connection] Verificando status de:', instanceName);
   
@@ -183,6 +183,12 @@ export const checkConnectionStatus = async (instanceName: string): Promise<Statu
 
     const result = response.data;
     const status = result.status || 'disconnected';
+    
+    console.log('[WhatsApp Connection] Status retornado:', { 
+      status, 
+      rawResult: result,
+      success: result.success !== false 
+    });
     
     return {
       success: true,
@@ -287,7 +293,7 @@ export const disconnectWhatsApp = async (instanceName: string): Promise<Connecti
     return {
       success: false,
       state: 'error',
-      error: error instanceof Error ? error.message : 'Erro ao desconectar'
+      error: error instanceof Error ? error.message : 'Erro inesperado'
     };
   }
 };
