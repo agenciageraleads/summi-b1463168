@@ -52,7 +52,7 @@ const LandingPage = () => {
       {/* Hero Section */}
       <section className="lg:py-0 mx-0 my-0 py-[20px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-4xl mx-auto">
+          <div className="text-center max-w-4xl mx-auto my-0">
             <Badge className="mb-6 bg-green-100 text-green-700 border-green-200">
               IA Avançada para WhatsApp
             </Badge>
@@ -65,7 +65,7 @@ const LandingPage = () => {
             
             <p className="text-xl text-gray-600 mb-8 leading-relaxed text-center">A Summi transcreve e resume seus áudios, analisa e prioriza suas conversas para que você não perca nenhuma oportunidade.</p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 my-0">
               <Link to="/register">
                 <Button size="lg" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl px-8 py-4 text-lg">
                   Começar Grátis
@@ -87,7 +87,7 @@ const LandingPage = () => {
       </section>
 
       {/* Como Funciona Section */}
-      <section id="como-funciona" className="bg-gray-50 py-[60px]">
+      <section id="como-funciona" className="bg-gray-50 py-[21px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Como Funciona</h2>
@@ -155,7 +155,7 @@ const LandingPage = () => {
       </section>
 
       {/* Recursos Section */}
-      <section id="recursos" className="bg-white py-[60px]">
+      <section id="recursos" className="bg-white py-[32px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Recursos</h2>
