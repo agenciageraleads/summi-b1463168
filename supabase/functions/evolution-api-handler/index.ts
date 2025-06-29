@@ -19,6 +19,99 @@ const sanitizeInput = (input: string): string => {
   return input.replace(/[<>\"']/g, '').trim();
 };
 
+// NOVA: Função para interpretar estados da Evolution API de forma padronizada
+const interpretConnectionState = (rawState: string | null | undefined): string => {
+  if (!rawState) return 'disconnected';
+  
+  const state = rawState.toLowerCase();
+  console.log(`[STATUS-INTERPRETER] Interpretando estado bruto: "${rawState}" -> normalizado: "${state}"`);
+  
+  // Estados que indicam conexão ativa
+  const connectedStates = ['open', 'connected'];
+  // Estados que indicam processo de conexão
+  const connectingStates = ['connecting', 'qr', 'pairing'];
+  // Estados que indicam desconexão
+  const disconnectedStates = ['disconnected', 'close', 'closed'];
+  
+  if (connectedStates.includes(state)) {
+    console.log(`[STATUS-INTERPRETER] Estado "${state}" interpretado como: CONNECTED`);
+    return 'connected';
+  }
+  
+  if (connectingStates.includes(state)) {
+    console.log(`[STATUS-INTERPRETER] Estado "${state}" interpretado como: CONNECTING`);
+    return 'connecting';
+  }
+  
+  if (disconnectedStates.includes(state)) {
+    console.log(`[STATUS-INTERPRETER] Estado "${state}" interpretado como: DISCONNECTED`);
+    return 'disconnected';
+  }
+  
+  // Estado desconhecido - log para análise
+  console.log(`[STATUS-INTERPRETER] Estado desconhecido "${state}" - assumindo DISCONNECTED`);
+  return 'disconnected';
+};
+
+// NOVA: Função auxiliar unificada para verificar status de instância
+const getInstanceStatus = async (instanceName: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+  console.log(`[GET-INSTANCE-STATUS] Verificando status para instância: ${instanceName}`);
+  
+  try {
+    const statusResponse = await retryWithBackoff(() => 
+      fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
+        headers: { 'apikey': evolutionApiKey }
+      })
+    );
+    
+    console.log(`[GET-INSTANCE-STATUS] Response status: ${statusResponse.status}, ok: ${statusResponse.ok}`);
+    
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      
+      // INSTRUMENTAÇÃO: Log completo dos dados brutos recebidos
+      console.log('[GET-INSTANCE-STATUS] Raw status data received:', JSON.stringify(statusData, null, 2));
+      
+      const rawState = statusData.state || statusData.instance?.state || null;
+      console.log(`[GET-INSTANCE-STATUS] Estado extraído: "${rawState}"`);
+      
+      const interpretedState = interpretConnectionState(rawState);
+      console.log(`[GET-INSTANCE-STATUS] Estado final interpretado: "${interpretedState}"`);
+      
+      return {
+        exists: true,
+        state: interpretedState,
+        rawState: rawState,
+        fullResponse: statusData
+      };
+    } else if (statusResponse.status === 404) {
+      console.log(`[GET-INSTANCE-STATUS] Instância não encontrada (404)`);
+      return {
+        exists: false,
+        state: 'not_found',
+        rawState: null,
+        fullResponse: null
+      };
+    } else {
+      console.log(`[GET-INSTANCE-STATUS] Erro HTTP: ${statusResponse.status}`);
+      return {
+        exists: false,
+        state: 'disconnected',
+        rawState: null,
+        fullResponse: null
+      };
+    }
+  } catch (error) {
+    console.error(`[GET-INSTANCE-STATUS] Erro na requisição:`, error);
+    return {
+      exists: false,
+      state: 'disconnected',
+      rawState: null,
+      fullResponse: null
+    };
+  }
+};
+
 // Função para criar nome de instância válido
 const createValidInstanceName = (nome: string, numero: string): string => {
   const cleanName = nome
@@ -202,43 +295,24 @@ serve(async (req) => {
 
         auditLog(action.toUpperCase(), user.id, { instanceName: targetInstanceName });
 
-        // Verificar se a instância existe e seu status
-        let instanceExists = false;
-        let currentStatus = 'disconnected';
+        // Usar função unificada para verificar status
+        const statusInfo = await getInstanceStatus(targetInstanceName, cleanApiUrl, evolutionApiKey);
         
-        try {
-          const statusResponse = await retryWithBackoff(() => 
-            fetch(`${cleanApiUrl}/instance/connectionState/${targetInstanceName}`, {
-              headers: { 'apikey': evolutionApiKey }
-            })
-          );
-          
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            instanceExists = true;
-            currentStatus = statusData.state || 'disconnected';
-            console.log(`[EVOLUTION-HANDLER] Instance exists with state: ${currentStatus}`);
-            
-            if (currentStatus === 'open') {
-              return new Response(JSON.stringify({ 
-                success: true,
-                state: 'already_connected',
-                message: 'WhatsApp já está conectado'
-              }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" }
-              });
-            }
-          } else if (statusResponse.status === 404) {
-            console.log(`[EVOLUTION-HANDLER] Instance não existe, será criada`);
-            instanceExists = false;
-          }
-        } catch (error) {
-          console.log(`[EVOLUTION-HANDLER] Erro ao verificar instância, assumindo que não existe:`, error);
-          instanceExists = false;
+        console.log(`[EVOLUTION-HANDLER] Status verificado:`, statusInfo);
+        
+        if (statusInfo.exists && statusInfo.state === 'connected') {
+          console.log('[EVOLUTION-HANDLER] Instância já conectada');
+          return new Response(JSON.stringify({ 
+            success: true,
+            state: 'already_connected',
+            message: 'WhatsApp já está conectado'
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
         }
 
         // Se não existe, criar instância com suporte a Pairing Code
-        if (!instanceExists) {
+        if (!statusInfo.exists) {
           console.log(`[EVOLUTION-HANDLER] Criando instância com suporte a Pairing Code: ${targetInstanceName}`);
           
           const createPayload = {
@@ -367,6 +441,7 @@ serve(async (req) => {
       case "get-status": {
         const targetInstanceName = instanceName || profile.instance_name;
         if (!targetInstanceName) {
+          console.log('[GET-STATUS] Nenhuma instância encontrada - retornando disconnected');
           return new Response(JSON.stringify({ 
             success: true, 
             status: 'disconnected' 
@@ -375,32 +450,27 @@ serve(async (req) => {
           });
         }
 
-        try {
-          const statusResponse = await retryWithBackoff(() =>
-            fetch(`${cleanApiUrl}/instance/connectionState/${targetInstanceName}`, {
-              headers: { 'apikey': evolutionApiKey }
-            })
-          );
+        console.log(`[GET-STATUS] Verificando status para instância: ${targetInstanceName}`);
+        auditLog("GET_STATUS", user.id, { instanceName: targetInstanceName });
 
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            const status = statusData.state || 'disconnected';
-            console.log(`[EVOLUTION-HANDLER] Status da instância ${targetInstanceName}: ${status}`);
-            
-            return new Response(JSON.stringify({ 
-              success: true, 
-              status: status 
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
-          }
-        } catch (error) {
-          console.error(`[EVOLUTION-HANDLER] Erro ao verificar status:`, error);
-        }
-
+        // CORREÇÃO: Usar função unificada com instrumentação completa
+        const statusInfo = await getInstanceStatus(targetInstanceName, cleanApiUrl, evolutionApiKey);
+        
+        // INSTRUMENTAÇÃO: Log detalhado do resultado
+        console.log('[GET-STATUS] Resultado da verificação:', {
+          exists: statusInfo.exists,
+          state: statusInfo.state,
+          rawState: statusInfo.rawState,
+          hasFullResponse: !!statusInfo.fullResponse
+        });
+        
+        // Retornar status padronizado
+        const finalStatus = statusInfo.exists ? statusInfo.state : 'disconnected';
+        console.log(`[GET-STATUS] Status final retornado: ${finalStatus}`);
+        
         return new Response(JSON.stringify({ 
           success: true, 
-          status: 'disconnected' 
+          status: finalStatus
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
