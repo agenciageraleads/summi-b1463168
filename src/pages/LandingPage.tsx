@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,7 @@ const LandingPage = () => {
               </Link>
               <Link to="/register">
                 <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg">
-                  Começar Grátis
+                  Conectar Agora
                 </Button>
               </Link>
             </div>
@@ -68,7 +69,7 @@ const LandingPage = () => {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 my-0">
               <Link to="/register">
                 <Button size="lg" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl px-8 py-4 text-lg">
-                  Começar Grátis
+                  Conectar Agora
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
@@ -293,7 +294,7 @@ Cancele quando quiser.</CardDescription>
                 
                 <Link to="/register" className="block">
                   <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 text-lg">
-                    Começar Agora
+                    Conectar Agora
                   </Button>
                 </Link>
               </CardContent>
@@ -373,7 +374,7 @@ Cancele quando quiser.</CardDescription>
                 
                 <Link to="/register" className="block">
                   <Button className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg shadow-lg transform hover:scale-[1.02] transition-all">
-                    Garantir Desconto Anual
+                    Conectar com Desconto
                     <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                 </Link>
@@ -488,7 +489,7 @@ Cancele quando quiser.</CardDescription>
             </p>
             <Link to="/register">
               <Button size="lg" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white">
-                Começar Teste Gratuito
+                Conectar Agora
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
@@ -526,7 +527,7 @@ Cancele quando quiser.</CardDescription>
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#como-funciona" className="hover:text-white transition-colors">Como Funciona</a></li>
                 <li><a href="#recursos" className="hover:text-white transition-colors">Recursos</a></li>
-                <li><Link to="/register" className="hover:text-white transition-colors">Começar Agora</Link></li>
+                <li><Link to="/register" className="hover:text-white transition-colors">Conectar Agora</Link></li>
               </ul>
             </div>
 

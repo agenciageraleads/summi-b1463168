@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -30,7 +31,7 @@ export const Sidebar = () => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
     { name: 'Configurações', href: '/settings', icon: Settings },
-    { name: 'Assinatura', href: '/subscription', icon: CreditCard },
+    // { name: 'Assinatura', href: '/subscription', icon: CreditCard }, // OCULTO TEMPORARIAMENTE
     { name: 'Indicações', href: '/referrals', icon: Users },
     { name: 'Feedback', href: '/feedback', icon: MessageSquare },
   ];
@@ -162,3 +163,4 @@ export const Sidebar = () => {
     </>
   );
 };
+

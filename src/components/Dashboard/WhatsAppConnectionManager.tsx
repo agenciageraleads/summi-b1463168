@@ -1,6 +1,7 @@
 
+
 // ABOUTME: Componente principal para gerenciar conexão WhatsApp com apresentação dupla de QR Code e Pairing Code
-// ABOUTME: Interface unificada que exibe ambos os métodos simultaneamente
+// ABOUTME: Interface unificada que exibe ambos os métodos simultaneamente com Pairing Code em destaque
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -261,17 +262,53 @@ export const WhatsAppConnectionManager: React.FC = () => {
           {renderActionButtons()}
         </div>
 
-        {/* Códigos de Conexão - Apresentação Dupla */}
+        {/* Códigos de Conexão - PAIRING CODE EM DESTAQUE ACIMA */}
         {(state.qrCode || state.pairingCode) && state.connectionState === 'needs_connection' && (
-          <div className="grid md:grid-cols-2 gap-4">
-            {/* QR Code */}
+          <div className="space-y-6">
+            {/* Pairing Code - PRIORIDADE SUPERIOR */}
+            {state.pairingCode && (
+              <Card className="border-green-200 bg-green-50">
+                <CardContent className="p-6">
+                  <div className="text-center space-y-4">
+                    <div className="flex items-center justify-center space-x-2">
+                      <Smartphone className="w-6 h-6 text-green-600" />
+                      <h3 className="font-semibold text-lg text-green-800">Método Recomendado: Pairing Code</h3>
+                    </div>
+                    <div className="p-4 bg-white border border-green-300 rounded-lg">
+                      <p className="text-sm text-gray-700 mb-3 font-medium">
+                        📱 No seu WhatsApp: Configurações → Dispositivos conectados → Conectar com número do telefone
+                      </p>
+                      <div className="flex justify-center items-center space-x-3">
+                        <div className="text-3xl font-mono font-bold bg-gray-100 px-6 py-3 rounded-lg border-2 border-green-400 text-green-800">
+                          {state.pairingCode}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={copyPairingCode}
+                          className="bg-green-100 border-green-300 hover:bg-green-200"
+                          title="Copiar código"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-2">
+                        💡 Cole este código no WhatsApp para conectar
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* QR Code - MÉTODO ALTERNATIVO */}
             {state.qrCode && (
-              <Card>
+              <Card className="border-gray-200">
                 <CardContent className="p-4">
                   <div className="text-center space-y-3">
                     <div className="flex items-center justify-center space-x-2">
                       <QrCode className="w-5 h-5 text-blue-600" />
-                      <h3 className="font-medium">QR Code</h3>
+                      <h3 className="font-medium text-gray-700">Método Alternativo: QR Code</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       WhatsApp → Menu → Dispositivos conectados → Conectar dispositivo
@@ -287,46 +324,17 @@ export const WhatsAppConnectionManager: React.FC = () => {
                 </CardContent>
               </Card>
             )}
-
-            {/* Pairing Code */}
-            {state.pairingCode && (
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-center space-y-3">
-                    <div className="flex items-center justify-center space-x-2">
-                      <Smartphone className="w-5 h-5 text-green-600" />
-                      <h3 className="font-medium">Pairing Code</h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      WhatsApp → Configurações → Dispositivos conectados → Conectar com número
-                    </p>
-                    <div className="flex justify-center items-center space-x-2">
-                      <div className="text-2xl font-mono font-bold bg-gray-100 px-4 py-2 rounded-lg border">
-                        {state.pairingCode}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={copyPairingCode}
-                        title="Copiar código"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         )}
 
         {/* Informação sobre expiração */}
         {(state.qrCode || state.pairingCode) && state.connectionState === 'needs_connection' && (
           <p className="text-xs text-muted-foreground text-center">
-            Os códigos expiram em aproximadamente 45 segundos
+            ⏰ Os códigos expiram em aproximadamente 45 segundos
           </p>
         )}
       </CardContent>
     </Card>
   );
 };
+
