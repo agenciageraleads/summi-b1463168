@@ -1,7 +1,6 @@
 
-
 // ABOUTME: Componente principal para gerenciar conexão WhatsApp com apresentação dupla de QR Code e Pairing Code
-// ABOUTME: Interface unificada que exibe ambos os métodos simultaneamente com Pairing Code em destaque
+// ABOUTME: Interface unificada que exibe ambos os métodos simultaneamente com contador regressivo
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,13 +21,15 @@ import {
   Settings, 
   RefreshCw,
   Smartphone,
-  Copy
+  Copy,
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 
 export const WhatsAppConnectionManager: React.FC = () => {
   const { profile, refreshProfile } = useProfile();
   const navigate = useNavigate();
-  const { state, handleConnect, handleDisconnect } = useWhatsAppManager();
+  const { state, handleConnect, handleDisconnect, forceRenewCodes } = useWhatsAppManager();
   const { toast } = useToast();
   const [isRecreating, setIsRecreating] = React.useState(false);
 
@@ -143,6 +144,67 @@ export const WhatsAppConnectionManager: React.FC = () => {
     }
   };
 
+  // FASE 3: Renderizar contador regressivo
+  const renderCountdown = () => {
+    if (state.connectionState !== 'is_connecting' || (!state.qrCode && !state.pairingCode)) {
+      return null;
+    }
+
+    const minutes = Math.floor(state.countdownSeconds / 60);
+    const seconds = state.countdownSeconds % 60;
+    const isWarning = state.countdownSeconds <= 10;
+
+    return (
+      <div className={`flex items-center justify-center space-x-2 p-3 rounded-lg transition-colors ${
+        isWarning ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'
+      }`}>
+        <Clock className={`w-4 h-4 ${isWarning ? 'text-red-600' : 'text-blue-600'}`} />
+        <span className={`text-sm font-medium ${isWarning ? 'text-red-800' : 'text-blue-800'}`}>
+          Códigos renovam em: {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+        </span>
+        {isWarning && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={forceRenewCodes}
+            className="text-xs px-2 py-1 h-6"
+          >
+            Renovar agora
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  // Renderizar alerta de erro
+  const renderErrorAlert = () => {
+    if (!state.hasConnectionError || state.errorCount === 0) return null;
+
+    return (
+      <div className="flex items-center space-x-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+        <AlertTriangle className="w-4 h-4 text-orange-600" />
+        <div className="flex-1">
+          <p className="text-sm text-orange-800 font-medium">
+            {state.errorCount >= 5 
+              ? `Muitos erros detectados (${state.errorCount}). Considere recriar a instância.`
+              : `Erro detectado (tentativa ${state.errorCount}/5). Tentando novamente...`
+            }
+          </p>
+        </div>
+        {state.errorCount >= 3 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRecreateInstance}
+            className="text-xs"
+          >
+            Recriar
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   // Renderizar botões de ação
   const renderActionButtons = () => {
     if (state.isLoading || isRecreating) {
@@ -240,6 +302,12 @@ export const WhatsAppConnectionManager: React.FC = () => {
           )}
         </div>
 
+        {/* FASE 5: Alerta de Erro */}
+        {renderErrorAlert()}
+
+        {/* FASE 3: Contador Regressivo */}
+        {renderCountdown()}
+
         {/* Mensagem de Status */}
         <p className="text-sm text-muted-foreground text-center">{state.message}</p>
 
@@ -262,24 +330,24 @@ export const WhatsAppConnectionManager: React.FC = () => {
           {renderActionButtons()}
         </div>
 
-        {/* Códigos de Conexão - PAIRING CODE EM DESTAQUE ACIMA */}
-        {(state.qrCode || state.pairingCode) && state.connectionState === 'needs_connection' && (
-          <div className="space-y-6">
-            {/* Pairing Code - PRIORIDADE SUPERIOR */}
+        {/* FASE 4: CÓDIGOS SIMULTÂNEOS - Layout em grid */}
+        {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && (
+          <div className="grid gap-4">
+            {/* Pairing Code - Continua em destaque */}
             {state.pairingCode && (
               <Card className="border-green-200 bg-green-50">
-                <CardContent className="p-6">
-                  <div className="text-center space-y-4">
+                <CardContent className="p-4">
+                  <div className="text-center space-y-3">
                     <div className="flex items-center justify-center space-x-2">
-                      <Smartphone className="w-6 h-6 text-green-600" />
-                      <h3 className="font-semibold text-lg text-green-800">Método Recomendado: Pairing Code</h3>
+                      <Smartphone className="w-5 h-5 text-green-600" />
+                      <h3 className="font-semibold text-green-800">Pairing Code (Recomendado)</h3>
                     </div>
-                    <div className="p-4 bg-white border border-green-300 rounded-lg">
-                      <p className="text-sm text-gray-700 mb-3 font-medium">
-                        📱 No seu WhatsApp: Configurações → Dispositivos conectados → Conectar com número do telefone
+                    <div className="p-3 bg-white border border-green-300 rounded-lg">
+                      <p className="text-xs text-gray-700 mb-2 font-medium">
+                        📱 WhatsApp → Configurações → Dispositivos conectados → Conectar com número
                       </p>
                       <div className="flex justify-center items-center space-x-3">
-                        <div className="text-3xl font-mono font-bold bg-gray-100 px-6 py-3 rounded-lg border-2 border-green-400 text-green-800">
+                        <div className="text-2xl font-mono font-bold bg-gray-100 px-4 py-2 rounded-lg border-2 border-green-400 text-green-800">
                           {state.pairingCode}
                         </div>
                         <Button
@@ -292,32 +360,29 @@ export const WhatsAppConnectionManager: React.FC = () => {
                           <Copy className="w-4 h-4" />
                         </Button>
                       </div>
-                      <p className="text-xs text-gray-600 mt-2">
-                        💡 Cole este código no WhatsApp para conectar
-                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* QR Code - MÉTODO ALTERNATIVO */}
+            {/* QR Code - Exibido simultaneamente */}
             {state.qrCode && (
-              <Card className="border-gray-200">
+              <Card className="border-blue-200 bg-blue-50">
                 <CardContent className="p-4">
                   <div className="text-center space-y-3">
                     <div className="flex items-center justify-center space-x-2">
                       <QrCode className="w-5 h-5 text-blue-600" />
-                      <h3 className="font-medium text-gray-700">Método Alternativo: QR Code</h3>
+                      <h3 className="font-medium text-blue-800">QR Code (Alternativo)</h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-blue-700">
                       WhatsApp → Menu → Dispositivos conectados → Conectar dispositivo
                     </p>
                     <div className="flex justify-center">
                       <img 
                         src={state.qrCode} 
                         alt="QR Code para conectar WhatsApp" 
-                        className="max-w-[180px] max-h-[180px] border rounded-lg" 
+                        className="max-w-[160px] max-h-[160px] border rounded-lg bg-white p-2" 
                       />
                     </div>
                   </div>
@@ -327,14 +392,18 @@ export const WhatsAppConnectionManager: React.FC = () => {
           </div>
         )}
 
-        {/* Informação sobre expiração */}
-        {(state.qrCode || state.pairingCode) && state.connectionState === 'needs_connection' && (
-          <p className="text-xs text-muted-foreground text-center">
-            ⏰ Os códigos expiram em aproximadamente 45 segundos
-          </p>
+        {/* Informação sobre expiração e renovação */}
+        {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && (
+          <div className="text-center space-y-1">
+            <p className="text-xs text-muted-foreground">
+              ⏰ Os códigos são renovados automaticamente a cada 60 segundos
+            </p>
+            <p className="text-xs text-muted-foreground">
+              💡 Use qualquer um dos métodos - ambos funcionam perfeitamente
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 };
-
