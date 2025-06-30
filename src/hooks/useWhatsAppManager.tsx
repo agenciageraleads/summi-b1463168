@@ -1,6 +1,6 @@
 
-// ABOUTME: Hook principal para gerenciar a conexão WhatsApp com apresentação dupla de QR Code e Pairing Code
-// ABOUTME: Controla todo o fluxo de conexão, polling e estados da aplicação
+// ABOUTME: Hook refatorado para gerenciar conexão WhatsApp com máquina de estados explícita
+// ABOUTME: Elimina race conditions e implementa fluxo de estado previsível e robusto
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,9 @@ export interface WhatsAppManagerState {
   isPolling: boolean;
 }
 
+// Tipos para a máquina de estados
+type ConnectionCheckResult = 'connected' | 'connecting' | 'disconnected';
+
 export const useWhatsAppManager = () => {
   const { toast } = useToast();
   const { profile, refreshProfile } = useProfile();
@@ -43,14 +46,10 @@ export const useWhatsAppManager = () => {
     isPolling: false
   });
 
-  // Refs para controle de lifecycle
+  // Refs para controle de lifecycle simplificadas
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
-  const isCheckingConnectionRef = useRef(false);
-  const isPollingActiveRef = useRef(false);
-  const hasAutoConnectedRef = useRef(false);
-  const isDefinitivelyConnectedRef = useRef(false);
 
   // Limpar todos os timers
   const stopPolling = useCallback(() => {
@@ -59,16 +58,45 @@ export const useWhatsAppManager = () => {
     if (qrTimeoutRef.current) clearTimeout(qrTimeoutRef.current);
     pollingIntervalRef.current = null;
     qrTimeoutRef.current = null;
-    isPollingActiveRef.current = false;
     if (isMountedRef.current) {
       setState(prev => ({ ...prev, isPolling: false }));
     }
   }, []);
-  
-  // Define o estado como conectado definitivamente
+
+  // Máquina de estados corrigida - retorna estados macro claros
+  const checkConnectionAndUpdate = useCallback(async (instanceName: string): Promise<ConnectionCheckResult> => {
+    try {
+      console.log('[WA Manager] Verificando conexão para:', instanceName);
+      const statusResult = await checkConnectionStatus(instanceName);
+      
+      const rawState = statusResult.state || statusResult.status;
+      console.log('[WA Manager] Estado bruto da API:', { rawState, success: statusResult.success });
+
+      // Lógica da máquina de estados corrigida
+      const finalConnectedStates = ['open', 'connected'];
+      const transitionalConnectingStates = ['qr', 'connecting', 'pairing'];
+
+      if (statusResult.success && finalConnectedStates.includes(rawState?.toLowerCase() || '')) {
+        console.log('[WA Manager] Estado: CONECTADO');
+        return 'connected';
+      }
+      
+      if (statusResult.success && transitionalConnectingStates.includes(rawState?.toLowerCase() || '')) {
+        console.log('[WA Manager] Estado: CONECTANDO');
+        return 'connecting';
+      }
+      
+      console.log('[WA Manager] Estado: DESCONECTADO');
+      return 'disconnected';
+    } catch (error) {
+      console.error('[WA Manager] Erro ao checar status:', error);
+      return 'disconnected';
+    }
+  }, []);
+
+  // Define como conectado definitivamente
   const setConnectedStateDefinitively = useCallback(() => {
     console.log('[WA Manager] Definindo como conectado definitivamente');
-    isDefinitivelyConnectedRef.current = true;
     stopPolling();
     if (isMountedRef.current) {
       setState(prev => ({
@@ -83,82 +111,42 @@ export const useWhatsAppManager = () => {
     }
   }, [stopPolling]);
 
-  // Checa o status da conexão - CORRIGIDO para detectar melhor as conexões ativas
-  const checkConnectionAndUpdate = useCallback(async (instanceName: string) => {
-    if (!isMountedRef.current || isCheckingConnectionRef.current) return false;
-    isCheckingConnectionRef.current = true;
+  // Inicia o polling com lógica de máquina de estados explícita
+  const startPolling = useCallback((instanceName: string) => {
+    console.log('[WA Manager] Iniciando polling para:', instanceName);
+    
+    if (!isMountedRef.current) return;
+    
+    stopPolling();
+    setState(prev => ({ ...prev, isPolling: true }));
 
-    try {
-      console.log('[WA Manager] Verificando conexão para:', instanceName);
-      const statusResult = await checkConnectionStatus(instanceName);
+    const checkAndUpdate = async () => {
+      if (!isMountedRef.current) {
+        stopPolling();
+        return;
+      }
+
+      const connectionResult = await checkConnectionAndUpdate(instanceName);
       
-      const apiState = statusResult.state || statusResult.status;
-      console.log('[WA Manager] Estado bruto da API:', { 
-        apiState,
-        status: statusResult.status,
-        state: statusResult.state,
-        success: statusResult.success
-      });
-
-      // CORREÇÃO: Verificar múltiplos possíveis estados de conexão
-      const connectedStates = ['open', 'connected', 'qr', 'connecting', 'pairing'];
-      const isConnected = statusResult.success && 
-        (connectedStates.includes(apiState?.toLowerCase() || '') ||
-         apiState === 'open' ||
-         apiState === 'connected');
-      
-      console.log('[WA Manager] Estado processado:', { 
-        apiState,
-        isConnected,
-        connectedStates,
-        matchedState: connectedStates.includes(apiState?.toLowerCase() || '')
-      });
-
-      if (isConnected) {
-        console.log('[WA Manager] Conexão confirmada - estado:', apiState);
-        if (!isDefinitivelyConnectedRef.current) {
+      // Switch explícito para tratar cada estado da máquina
+      switch (connectionResult) {
+        case 'connected':
           toast({ 
             title: "✅ Conectado!", 
             description: "Seu WhatsApp foi conectado com sucesso.", 
             duration: 3000 
           });
           await refreshProfile();
-        }
-        setConnectedStateDefinitively();
-        return true;
-      }
-      
-      // Se não está conectado, log para debug
-      console.log('[WA Manager] Não conectado - estado:', apiState);
-      return false;
-    } catch (error) {
-      console.error('[WA Manager] Erro ao checar status:', error);
-      return false;
-    } finally {
-      isCheckingConnectionRef.current = false;
-    }
-  }, [refreshProfile, toast, setConnectedStateDefinitively]);
-
-  // Inicia o polling para verificar a conexão
-  const startPolling = useCallback((instanceName: string) => {
-    console.log('[WA Manager] Iniciando polling para:', instanceName);
-    
-    if (!isMountedRef.current || isPollingActiveRef.current || isDefinitivelyConnectedRef.current) {
-      return;
-    }
-    
-    stopPolling();
-    isPollingActiveRef.current = true;
-    setState(prev => ({ ...prev, isPolling: true }));
-
-    const checkAndUpdate = async () => {
-      if (!isMountedRef.current || !isPollingActiveRef.current || isDefinitivelyConnectedRef.current) {
-        stopPolling();
-        return;
-      }
-      const isConnected = await checkConnectionAndUpdate(instanceName);
-      if (isConnected) {
-        stopPolling();
+          setConnectedStateDefinitively();
+          break;
+        
+        case 'connecting':
+          console.log('[WA Manager] Ainda conectando, continuando polling...');
+          break;
+        
+        case 'disconnected':
+          console.log('[WA Manager] Desconectado, continuando polling...');
+          break;
       }
     };
 
@@ -169,7 +157,7 @@ export const useWhatsAppManager = () => {
 
     // Timeout para expiração - 60 segundos
     qrTimeoutRef.current = setTimeout(async () => {
-      if (!isMountedRef.current || isDefinitivelyConnectedRef.current) return;
+      if (!isMountedRef.current) return;
       console.log('[WA Manager] Códigos expirados, reiniciando...');
       stopPolling();
       setState(prev => ({ 
@@ -184,7 +172,7 @@ export const useWhatsAppManager = () => {
       }, 3000);
     }, 60000);
 
-  }, [stopPolling, checkConnectionAndUpdate]);
+  }, [stopPolling, checkConnectionAndUpdate, refreshProfile, toast, setConnectedStateDefinitively]);
 
   // Gera ambos os códigos (QR Code e Pairing Code)
   const handleGenerateCodes = useCallback(async (instanceName: string) => {
@@ -245,13 +233,11 @@ export const useWhatsAppManager = () => {
     }));
   }, []);
 
-  // Ação principal de conexão
+  // Função de conexão simplificada com responsabilidade única
   const handleConnect = useCallback(async (method: ConnectionMethod = state.connectionMethod) => {
-    console.log('[WA Manager] Conectando...');
+    console.log('[WA Manager] Iniciando processo de conexão');
 
-    if (state.isLoading) {
-      return;
-    }
+    if (state.isLoading) return;
     
     if (!profile?.numero) {
       toast({ 
@@ -262,8 +248,8 @@ export const useWhatsAppManager = () => {
       return;
     }
 
+    // Limpar estado anterior
     stopPolling();
-    isDefinitivelyConnectedRef.current = false;
     setState(prev => ({ 
       ...prev, 
       isLoading: true, 
@@ -290,15 +276,7 @@ export const useWhatsAppManager = () => {
         }
       }
       
-      // Passo 2: Verificar status atual
-      console.log('[WA Manager] Verificando status da instância:', instanceName);
-      setState(prev => ({ ...prev, message: 'Verificando status da conexão...' }));
-      const isConnected = await checkConnectionAndUpdate(instanceName);
-      if (isConnected) {
-        return;
-      }
-      
-      // Passo 3: Gerar ambos os códigos
+      // Passo 2: Gerar códigos e iniciar polling
       await handleGenerateCodes(instanceName);
 
     } catch (err: any) {
@@ -315,9 +293,9 @@ export const useWhatsAppManager = () => {
         variant: 'destructive' 
       });
     }
-  }, [profile, state.isLoading, state.connectionMethod, toast, stopPolling, refreshProfile, checkConnectionAndUpdate, handleGenerateCodes]);
+  }, [profile, state.isLoading, state.connectionMethod, toast, stopPolling, refreshProfile, handleGenerateCodes]);
 
-  // Desconectar WhatsApp
+  // Função de desconexão simplificada com refresh garantido
   const handleDisconnect = useCallback(async () => {
     console.log('[WA Manager] Iniciando desconexão...');
     if (!profile?.instance_name) return;
@@ -327,12 +305,14 @@ export const useWhatsAppManager = () => {
     
     try {
       await disconnectWhatsApp(profile.instance_name);
-      isDefinitivelyConnectedRef.current = false;
-      hasAutoConnectedRef.current = false;
       
+      // Refresh garantido antes de resetar estado local
+      await refreshProfile();
+      
+      // Resetar estado local somente após refresh
       setState(prev => ({
         ...prev,
-        connectionState: 'needs_connection',
+        connectionState: profile?.numero ? 'needs_connection' : 'needs_phone_number',
         isLoading: false,
         isPolling: false,
         qrCode: null,
@@ -353,59 +333,66 @@ export const useWhatsAppManager = () => {
         variant: "destructive" 
       });
     }
-  }, [profile, stopPolling, toast]);
+  }, [profile, stopPolling, toast, refreshProfile]);
 
-  // Estado inicial baseado no perfil
+  // useEffect de inicialização unificado para evitar race conditions
   useEffect(() => {
-    if (!profile) return;
-    
-    if (isDefinitivelyConnectedRef.current) {
-      return;
-    }
-    
-    if (!profile.numero) {
-      setState(prev => ({ 
-        ...prev, 
-        connectionState: 'needs_phone_number', 
-        message: 'Configure seu número de telefone' 
-      }));
-    } else if (profile.instance_name) {
-      setState(prev => ({ 
-        ...prev, 
-        connectionState: 'needs_connection', 
-        message: 'Pronto para conectar', 
-        instanceName: profile.instance_name 
-      }));
-    } else {
-      setState(prev => ({ 
-        ...prev, 
-        connectionState: 'needs_connection', 
-        message: 'Pronto para criar sua instância' 
-      }));
-    }
-  }, [profile]);
-
-  // CORREÇÃO: Auto-verificação inicial melhorada - verifica status ao carregar a página
-  useEffect(() => {
-    if (profile?.numero && profile?.instance_name && !hasAutoConnectedRef.current && !isDefinitivelyConnectedRef.current) {
-      console.log('[WA Manager] Executando verificação inicial de status...');
-      hasAutoConnectedRef.current = true;
+    const initializeState = async () => {
+      if (!profile) return;
       
-      // Primeiro tenta verificar se já está conectado
-      setTimeout(async () => {
-        if (isMountedRef.current && profile.instance_name) {
-          console.log('[WA Manager] Verificando status inicial para:', profile.instance_name);
-          const isConnected = await checkConnectionAndUpdate(profile.instance_name);
-          
-          // Se não estiver conectado, inicia o processo de conexão
-          if (!isConnected && isMountedRef.current) {
-            console.log('[WA Manager] Não conectado, iniciando processo de conexão...');
-            handleConnect();
-          }
+      // Se já está conectado, não fazer nada
+      if (state.connectionState === 'already_connected') return;
+      
+      console.log('[WA Manager] Inicializando estado baseado no perfil');
+      
+      // Verificar se tem número de telefone
+      if (!profile.numero) {
+        setState(prev => ({ 
+          ...prev, 
+          connectionState: 'needs_phone_number', 
+          message: 'Configure seu número de telefone' 
+        }));
+        return;
+      }
+      
+      // Se tem instância, verificar conexão
+      if (profile.instance_name) {
+        console.log('[WA Manager] Verificando status da instância existente:', profile.instance_name);
+        const connectionResult = await checkConnectionAndUpdate(profile.instance_name);
+        
+        switch (connectionResult) {
+          case 'connected':
+            setConnectedStateDefinitively();
+            break;
+          case 'connecting':
+            setState(prev => ({ 
+              ...prev, 
+              connectionState: 'is_connecting',
+              message: 'Reconectando...' 
+            }));
+            // Iniciar conexão para obter códigos
+            setTimeout(() => handleConnect(), 1000);
+            break;
+          case 'disconnected':
+            setState(prev => ({ 
+              ...prev, 
+              connectionState: 'needs_connection', 
+              message: 'Pronto para conectar',
+              instanceName: profile.instance_name 
+            }));
+            break;
         }
-      }, 1000);
-    }
-  }, [profile?.numero, profile?.instance_name, handleConnect, checkConnectionAndUpdate]);
+      } else {
+        setState(prev => ({ 
+          ...prev, 
+          connectionState: 'needs_connection', 
+          message: 'Pronto para criar sua instância' 
+        }));
+      }
+    };
+
+    initializeState();
+  }, [profile, checkConnectionAndUpdate, setConnectedStateDefinitively, handleConnect]);
 
   // Cleanup ao desmontar
   useEffect(() => {
