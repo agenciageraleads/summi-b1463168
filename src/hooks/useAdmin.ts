@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSecurityAudit } from './useSecurityAudit';
 
 // Interface para dados administrativos
 export interface AdminStats {
@@ -30,12 +31,13 @@ export interface AdminUser {
 export const useAdmin = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { logSecurityEvent, validateAccess } = useSecurityAudit();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
 
-  // Verificar se o usuário é admin
+  // Verificar se o usuário é admin com log de auditoria
   const checkAdminStatus = async () => {
     if (!user) {
       setIsAdmin(false);
@@ -44,17 +46,23 @@ export const useAdmin = () => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('is_admin', { user_id: user.id });
+      const isValidAdmin = await validateAccess('admin', 'admin_status_check');
+      setIsAdmin(isValidAdmin);
       
-      if (error) {
-        console.error('Erro ao verificar status de admin:', error);
-        setIsAdmin(false);
-      } else {
-        setIsAdmin(data || false);
+      if (isValidAdmin) {
+        await logSecurityEvent('admin_action', {
+          action: 'admin_access_granted',
+          operation: 'dashboard_access'
+        }, 'medium');
       }
+      
     } catch (error) {
       console.error('Erro inesperado ao verificar admin:', error);
       setIsAdmin(false);
+      await logSecurityEvent('admin_action', {
+        action: 'admin_check_error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'high');
     } finally {
       setIsLoading(false);
     }
@@ -65,20 +73,20 @@ export const useAdmin = () => {
     try {
       console.log(`[Admin] Verificando status real da instância: ${instanceName}`);
       
-      // Usar a função evolution-connection-state que já existe e está funcionando
       const { data, error } = await supabase.functions.invoke('evolution-connection-state', {
-        body: { 
-          instanceName 
-        },
+        body: { instanceName },
       });
 
       if (error) {
         console.error(`[Admin] Erro ao verificar status de ${instanceName}:`, error);
+        await logSecurityEvent('admin_action', {
+          action: 'connection_check_error',
+          instance_name: instanceName,
+          error: error.message
+        }, 'medium');
         return 'disconnected';
       }
 
-      // Verificar o campo 'state' que é retornado pela API Evolution
-      // Os possíveis valores são: 'open' (conectado), 'close' (desconectado), etc.
       const isConnected = data?.state === 'open';
       console.log(`[Admin] Status de ${instanceName}: state=${data?.state} - ${isConnected ? 'conectado' : 'desconectado'}`);
       
@@ -89,11 +97,25 @@ export const useAdmin = () => {
     }
   };
 
-  // Buscar estatísticas administrativas
+  // Buscar estatísticas administrativas com validação
   const fetchStats = async () => {
     if (!isAdmin) return;
 
+    const hasAccess = await validateAccess('admin', 'fetch_admin_stats');
+    if (!hasAccess) {
+      toast({
+        title: "Acesso Negado",
+        description: "Você não tem permissão para visualizar estatísticas administrativas",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      await logSecurityEvent('admin_action', {
+        action: 'stats_fetch_started'
+      }, 'low');
+
       // Buscar total de usuários
       const { count: totalUsers } = await supabase
         .from('profiles')
@@ -153,8 +175,22 @@ export const useAdmin = () => {
       };
 
       setStats(statsData);
+      
+      await logSecurityEvent('admin_action', {
+        action: 'stats_fetched_successfully',
+        stats_summary: {
+          total_users: statsData.totalUsers,
+          connected_users: statsData.connectedUsers
+        }
+      }, 'low');
+
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
+      await logSecurityEvent('admin_action', {
+        action: 'stats_fetch_error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'high');
+      
       toast({
         title: "Erro",
         description: "Erro ao carregar estatísticas administrativas",
@@ -163,13 +199,27 @@ export const useAdmin = () => {
     }
   };
 
-  // Buscar todos os usuários para gestão
+  // Buscar todos os usuários para gestão com validação
   const fetchUsers = async () => {
     if (!isAdmin) return;
+
+    const hasAccess = await validateAccess('admin', 'fetch_all_users');
+    if (!hasAccess) {
+      toast({
+        title: "Acesso Negado",
+        description: "Você não tem permissão para visualizar dados de usuários",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       console.log('[Admin] Buscando usuários...');
       
+      await logSecurityEvent('admin_action', {
+        action: 'users_fetch_started'
+      }, 'medium');
+
       // Buscar perfis com informações de assinatura
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
@@ -215,8 +265,19 @@ export const useAdmin = () => {
 
       console.log('[Admin] Usuários carregados com status real:', usersWithRealStatus.length);
       setUsers(usersWithRealStatus);
+      
+      await logSecurityEvent('admin_action', {
+        action: 'users_fetched_successfully',
+        users_count: usersWithRealStatus.length
+      }, 'low');
+
     } catch (error) {
       console.error('Erro ao buscar usuários:', error);
+      await logSecurityEvent('admin_action', {
+        action: 'users_fetch_error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'high');
+      
       toast({
         title: "Erro",
         description: "Erro ao carregar lista de usuários",
