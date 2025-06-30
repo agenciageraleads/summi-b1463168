@@ -50,8 +50,23 @@ export const useProfileSecurity = () => {
       const sanitizedUpdates: any = {};
       const validationErrors: string[] = [];
 
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value === undefined || value === null) return;
+      // Função auxiliar async para validar roles
+      const validateRoleChange = async (value: any): Promise<boolean> => {
+        const { isValid: isAdmin } = await validateUserPermission('admin', 'role_change');
+        if (!isAdmin) {
+          await logSecurityEvent('unauthorized_access', {
+            action: 'role_escalation_attempt',
+            userId: user.id,
+            attemptedRole: value
+          });
+          return false;
+        }
+        return true;
+      };
+
+      // Processar cada campo de atualização
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === undefined || value === null) continue;
 
         switch (key) {
           case 'nome':
@@ -90,13 +105,8 @@ export const useProfileSecurity = () => {
 
           case 'role':
             // Role só pode ser alterado por administradores
-            const { isValid: isAdmin } = await validateUserPermission('admin', 'role_change');
-            if (!isAdmin) {
-              await logSecurityEvent('unauthorized_access', {
-                action: 'role_escalation_attempt',
-                userId: user.id,
-                attemptedRole: value
-              });
+            const canChangeRole = await validateRoleChange(value);
+            if (!canChangeRole) {
               validationErrors.push('Apenas administradores podem alterar roles');
             } else {
               sanitizedUpdates[key] = value;
@@ -134,7 +144,7 @@ export const useProfileSecurity = () => {
             }
             break;
         }
-      });
+      }
 
       // Se há erros de validação, interromper
       if (validationErrors.length > 0) {
