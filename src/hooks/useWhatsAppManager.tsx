@@ -1,4 +1,3 @@
-
 // ABOUTME: Hook principal para gerenciar a conexão WhatsApp com máquina de estados corrigida
 // ABOUTME: Implementa lógica unificada de inicialização e fluxo de estados previsível com correção do pairing code
 
@@ -131,6 +130,45 @@ export const useWhatsAppManager = () => {
     }, 1000);
   }, []);
 
+  // CORREÇÃO: Validação flexível do pairing code
+  const validateAndCleanPairingCode = useCallback((rawPairingCode: string | null | undefined): string | null => {
+    if (!rawPairingCode) {
+      console.log('[WA Manager] 🚨 Pairing code vazio ou nulo');
+      return null;
+    }
+
+    console.log('[WA Manager] 🚨 Pairing code bruto recebido:', rawPairingCode);
+    
+    // CORREÇÃO: Validação mais flexível - aceitar códigos com 6-12 caracteres alfanuméricos
+    const cleanCode = rawPairingCode.toString().trim();
+    
+    // Se o código parece ser base64 ou tem caracteres especiais, tentar extrair apenas alfanuméricos
+    if (cleanCode.includes('@') || cleanCode.includes('=') || cleanCode.includes('/') || cleanCode.includes('+')) {
+      console.log('[WA Manager] 🚨 Pairing code parece ser codificado, tentando extrair parte válida');
+      
+      // Tentar extrair apenas a primeira parte antes de @ ou =
+      const parts = cleanCode.split(/[@=,\/\+]/);
+      for (const part of parts) {
+        const alphanumericPart = part.replace(/[^A-Z0-9]/gi, '');
+        if (alphanumericPart.length >= 6 && alphanumericPart.length <= 12) {
+          console.log('[WA Manager] ✅ Parte válida extraída:', alphanumericPart);
+          return alphanumericPart.toUpperCase();
+        }
+      }
+    }
+    
+    // Validação direta para códigos já limpos
+    const alphanumericCode = cleanCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    
+    if (alphanumericCode.length >= 6 && alphanumericCode.length <= 12) {
+      console.log('[WA Manager] ✅ Pairing code válido:', alphanumericCode);
+      return alphanumericCode;
+    }
+    
+    console.log('[WA Manager] ❌ Pairing code inválido - comprimento:', alphanumericCode.length, 'conteúdo:', alphanumericCode);
+    return null;
+  }, []);
+
   // CORREÇÃO: Renovar códigos com melhor validação do pairing code
   const renewCodes = useCallback(async (instanceName: string) => {
     if (!isMountedRef.current) return;
@@ -142,20 +180,10 @@ export const useWhatsAppManager = () => {
 
       if (result.success && (result.qrCode || result.pairingCode)) {
         console.log('[WA Manager] Códigos renovados com sucesso');
+        console.log('[WA Manager] 🚨 DEBUG - Raw pairing code:', result.pairingCode);
         
-        // CORREÇÃO: Validar se o pairing code tem formato correto (8 caracteres alfanuméricos)
-        let validPairingCode = result.pairingCode;
-        if (validPairingCode && (validPairingCode.length !== 8 || !/^[A-Z0-9]{8}$/.test(validPairingCode))) {
-          console.warn('[WA Manager] Pairing code com formato inválido:', validPairingCode);
-          // Tentar extrair apenas os 8 caracteres finais se for maior
-          if (validPairingCode.length > 8) {
-            validPairingCode = validPairingCode.slice(-8);
-          }
-          // Se ainda não for válido, definir como null
-          if (!/^[A-Z0-9]{8}$/.test(validPairingCode)) {
-            validPairingCode = null;
-          }
-        }
+        // CORREÇÃO: Usar validação flexível
+        const validPairingCode = validateAndCleanPairingCode(result.pairingCode);
         
         setState(prev => ({
           ...prev,
@@ -187,7 +215,7 @@ export const useWhatsAppManager = () => {
         message: `Erro de conexão: ${error.message}`
       }));
     }
-  }, [startCountdown]);
+  }, [startCountdown, validateAndCleanPairingCode]);
 
   // CORREÇÃO: Polling simplificado sem reinicialização
   const startPolling = useCallback((instanceName: string) => {
@@ -261,7 +289,8 @@ export const useWhatsAppManager = () => {
         hasQR: !!result.qrCode, 
         hasPairing: !!result.pairingCode, 
         state: result.state,
-        pairingCodeLength: result.pairingCode?.length
+        pairingCodeLength: result.pairingCode?.length,
+        rawPairingCode: result.pairingCode
       });
 
       if (result.state === 'already_connected') {
@@ -281,21 +310,10 @@ export const useWhatsAppManager = () => {
 
       if (result.success && (result.qrCode || result.pairingCode)) {
         console.log('[WA Manager] Códigos recebidos, validando pairing code...');
+        console.log('[WA Manager] 🚨 DEBUG - Raw pairing code:', result.pairingCode);
         
-        // CORREÇÃO: Validar formato do pairing code
-        let validPairingCode = result.pairingCode;
-        if (validPairingCode) {
-          // Remover espaços e caracteres especiais
-          validPairingCode = validPairingCode.replace(/[^A-Z0-9]/g, '');
-          
-          // Verificar se tem exatamente 8 caracteres alfanuméricos
-          if (validPairingCode.length !== 8 || !/^[A-Z0-9]{8}$/.test(validPairingCode)) {
-            console.warn('[WA Manager] Pairing code inválido recebido:', result.pairingCode, 'Processado:', validPairingCode);
-            validPairingCode = null;
-          } else {
-            console.log('[WA Manager] Pairing code válido:', validPairingCode);
-          }
-        }
+        // CORREÇÃO: Usar validação flexível
+        const validPairingCode = validateAndCleanPairingCode(result.pairingCode);
         
         setState(prev => ({
           ...prev,
@@ -330,7 +348,7 @@ export const useWhatsAppManager = () => {
         errorCount: prev.errorCount + 1
       }));
     }
-  }, [startPolling, startCountdown]);
+  }, [startPolling, startCountdown, validateAndCleanPairingCode]);
 
   // Função handleConnect simplificada
   const handleConnect = useCallback(async (method: ConnectionMethod = state.connectionMethod) => {

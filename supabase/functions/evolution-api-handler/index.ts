@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -148,6 +147,63 @@ const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDela
       console.log(`[EVOLUTION-HANDLER] Tentativa ${attempt} falhou, tentando novamente em ${delay}ms`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
+  }
+};
+
+// CORREÇÃO: Função específica para gerar pairing code
+const generatePairingCodeWithPhone = async (instanceName: string, phoneNumber: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+  console.log(`[PAIRING-CODE-GENERATOR] 🚨 Gerando pairing code para instância: ${instanceName} com número: ${phoneNumber}`);
+  
+  try {
+    // CORREÇÃO: Usar endpoint correto com parâmetro number para pairing code
+    const pairingUrl = `${evolutionApiUrl}/instance/connect/${instanceName}?number=${phoneNumber}`;
+    console.log(`[PAIRING-CODE-GENERATOR] 🚨 URL do pairing code: ${pairingUrl}`);
+    
+    const pairingResponse = await retryWithBackoff(() =>
+      fetch(pairingUrl, {
+        method: 'GET',
+        headers: { 'apikey': evolutionApiKey }
+      })
+    );
+
+    console.log(`[PAIRING-CODE-GENERATOR] Response status: ${pairingResponse.status}, ok: ${pairingResponse.ok}`);
+    
+    if (pairingResponse.ok) {
+      const pairingData = await pairingResponse.json();
+      console.log('[PAIRING-CODE-GENERATOR] 🚨 RAW PAIRING RESPONSE:', JSON.stringify(pairingData, null, 2));
+      
+      // CORREÇÃO: Buscar pairing code em diferentes propriedades possíveis
+      let pairingCode = pairingData.pairingCode || pairingData.code || pairingData.pairing_code || pairingData.pair_code;
+      
+      if (pairingCode) {
+        console.log(`[PAIRING-CODE-GENERATOR] ✅ Pairing code encontrado: ${pairingCode}`);
+        return {
+          success: true,
+          pairingCode: pairingCode,
+          rawResponse: pairingData
+        };
+      } else {
+        console.log('[PAIRING-CODE-GENERATOR] ❌ Pairing code não encontrado na resposta');
+        return {
+          success: false,
+          error: 'Pairing code não encontrado na resposta da API',
+          rawResponse: pairingData
+        };
+      }
+    } else {
+      const errorText = await pairingResponse.text();
+      console.error(`[PAIRING-CODE-GENERATOR] ❌ Erro HTTP: ${pairingResponse.status} - ${errorText}`);
+      return {
+        success: false,
+        error: `Erro HTTP ${pairingResponse.status}: ${errorText}`
+      };
+    }
+  } catch (error) {
+    console.error(`[PAIRING-CODE-GENERATOR] ❌ Erro na requisição:`, error);
+    return {
+      success: false,
+      error: `Erro na requisição: ${error.message}`
+    };
   }
 };
 
@@ -374,9 +430,10 @@ serve(async (req) => {
           }
         }
 
-        // Gerar QR Code
+        // CORREÇÃO: Gerar QR Code (endpoint normal sem parâmetro)
         let qrCode = null;
         try {
+          console.log(`[EVOLUTION-HANDLER] 🚨 Gerando QR Code - endpoint: ${cleanApiUrl}/instance/connect/${targetInstanceName}`);
           const qrResponse = await retryWithBackoff(() =>
             fetch(`${cleanApiUrl}/instance/connect/${targetInstanceName}`, {
               method: 'GET',
@@ -386,41 +443,39 @@ serve(async (req) => {
 
           if (qrResponse.ok) {
             const qrData = await qrResponse.json();
+            console.log('[EVOLUTION-HANDLER] 🚨 RAW QR RESPONSE:', JSON.stringify(qrData, null, 2));
+            
             if (qrData.qrcode?.base64 || qrData.base64) {
               qrCode = qrData.qrcode?.base64 || qrData.base64;
               if (!qrCode.startsWith('data:image/')) {
                 qrCode = `data:image/png;base64,${qrCode}`;
               }
+              console.log('[EVOLUTION-HANDLER] ✅ QR Code extraído com sucesso');
             }
           }
         } catch (error) {
-          console.error(`[EVOLUTION-HANDLER] Erro ao gerar QR Code:`, error);
+          console.error(`[EVOLUTION-HANDLER] ❌ Erro ao gerar QR Code:`, error);
         }
 
-        // Gerar Pairing Code
+        // CORREÇÃO: Gerar Pairing Code usando função específica
         let pairingCode = null;
-        try {
-          const pairingResponse = await retryWithBackoff(() =>
-            fetch(`${cleanApiUrl}/instance/connect/${targetInstanceName}?number=${profile.numero}`, {
-              method: 'GET',
-              headers: { 'apikey': evolutionApiKey }
-            })
-          );
-
-          if (pairingResponse.ok) {
-            const pairingData = await pairingResponse.json();
-            if (pairingData.pairingCode || pairingData.code) {
-              pairingCode = pairingData.pairingCode || pairingData.code;
-            }
-          }
-        } catch (error) {
-          console.error(`[EVOLUTION-HANDLER] Erro ao gerar Pairing Code:`, error);
+        const pairingResult = await generatePairingCodeWithPhone(targetInstanceName, profile.numero, cleanApiUrl, evolutionApiKey);
+        
+        if (pairingResult.success) {
+          pairingCode = pairingResult.pairingCode;
+          console.log(`[EVOLUTION-HANDLER] ✅ Pairing code gerado: ${pairingCode}`);
+        } else {
+          console.error(`[EVOLUTION-HANDLER] ❌ Erro ao gerar pairing code:`, pairingResult.error);
         }
 
         if (!qrCode && !pairingCode) {
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "Não foi possível gerar códigos de conexão" 
+            error: "Não foi possível gerar códigos de conexão",
+            debug: {
+              qrCodeGenerated: !!qrCode,
+              pairingCodeResult: pairingResult
+            }
           }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -432,7 +487,12 @@ serve(async (req) => {
           state: 'needs_connection',
           qrCode: qrCode,
           pairingCode: pairingCode,
-          message: 'Códigos gerados com sucesso'
+          message: 'Códigos gerados com sucesso',
+          debug: {
+            qrCodeGenerated: !!qrCode,
+            pairingCodeGenerated: !!pairingCode,
+            pairingCodeLength: pairingCode?.length || 0
+          }
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
