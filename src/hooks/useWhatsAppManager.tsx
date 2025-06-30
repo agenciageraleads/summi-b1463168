@@ -1,3 +1,4 @@
+
 // ABOUTME: Hook principal para gerenciar a conexão WhatsApp com máquina de estados corrigida
 // ABOUTME: Implementa lógica unificada de inicialização e fluxo de estados previsível com correção do pairing code
 
@@ -53,6 +54,7 @@ export const useWhatsAppManager = () => {
   const codeRenewalIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const isInitializedRef = useRef(false);
 
   // CORREÇÃO: Interpretação correta dos estados da Evolution API
   const interpretEvolutionState = useCallback((rawState: string): 'connected' | 'connecting' | 'disconnected' => {
@@ -88,13 +90,6 @@ export const useWhatsAppManager = () => {
       return interpretEvolutionState(rawState);
     } catch (error) {
       console.error('[WA Manager] Erro ao verificar status:', error);
-      
-      setState(prev => ({
-        ...prev,
-        hasConnectionError: true,
-        errorCount: prev.errorCount + 1
-      }));
-      
       return 'disconnected';
     }
   }, [interpretEvolutionState]);
@@ -108,13 +103,6 @@ export const useWhatsAppManager = () => {
     pollingIntervalRef.current = null;
     codeRenewalIntervalRef.current = null;
     countdownIntervalRef.current = null;
-    if (isMountedRef.current) {
-      setState(prev => ({ 
-        ...prev, 
-        isPolling: false,
-        countdownSeconds: 60
-      }));
-    }
   }, []);
 
   // Iniciar contador regressivo
@@ -201,13 +189,16 @@ export const useWhatsAppManager = () => {
     }
   }, [startCountdown]);
 
-  // Polling com renovação automática dos códigos
+  // CORREÇÃO: Polling simplificado sem reinicialização
   const startPolling = useCallback((instanceName: string) => {
     console.log('[WA Manager] Iniciando polling para:', instanceName);
     
     if (!isMountedRef.current) return;
     
-    cleanupResources();
+    // Limpar apenas os timers sem resetar o estado
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    if (codeRenewalIntervalRef.current) clearInterval(codeRenewalIntervalRef.current);
+    
     setState(prev => ({ ...prev, isPolling: true }));
 
     const checkStatus = async () => {
@@ -215,50 +206,27 @@ export const useWhatsAppManager = () => {
       
       const connectionStatus = await checkConnectionAndUpdate(instanceName);
       
-      switch (connectionStatus) {
-        case 'connected':
-          console.log('[WA Manager] Conexão confirmada - parando polling');
-          cleanupResources();
-          setState(prev => ({
-            ...prev,
-            connectionState: 'already_connected',
-            qrCode: null,
-            pairingCode: null,
-            message: 'WhatsApp conectado e funcionando!',
-            isLoading: false,
-            isPolling: false,
-            hasConnectionError: false,
-            errorCount: 0,
-            countdownSeconds: 60
-          }));
-          toast({ 
-            title: "✅ Conectado!", 
-            description: "Seu WhatsApp foi conectado com sucesso.", 
-            duration: 3000 
-          });
-          await refreshProfile();
-          break;
-          
-        case 'connecting':
-          console.log('[WA Manager] Ainda conectando - continuando polling');
-          // Continua o polling sem mudanças de estado
-          break;
-          
-        case 'disconnected':
-          console.log('[WA Manager] Desconectado durante polling');
-          setState(prev => {
-            if (prev.errorCount >= 5) {
-              return {
-                ...prev,
-                connectionState: 'error',
-                message: 'Muitas tentativas falharam. Tente recriar a instância.',
-                isLoading: false,
-                isPolling: false
-              };
-            }
-            return prev;
-          });
-          break;
+      if (connectionStatus === 'connected') {
+        console.log('[WA Manager] Conexão confirmada - parando polling');
+        cleanupResources();
+        setState(prev => ({
+          ...prev,
+          connectionState: 'already_connected',
+          qrCode: null,
+          pairingCode: null,
+          message: 'WhatsApp conectado e funcionando!',
+          isLoading: false,
+          isPolling: false,
+          hasConnectionError: false,
+          errorCount: 0,
+          countdownSeconds: 60
+        }));
+        toast({ 
+          title: "✅ Conectado!", 
+          description: "Seu WhatsApp foi conectado com sucesso.", 
+          duration: 3000 
+        });
+        await refreshProfile();
       }
     };
 
@@ -490,20 +458,15 @@ export const useWhatsAppManager = () => {
     }
   }, [profile?.instance_name, state.connectionState, renewCodes]);
 
-  // useEffect de inicialização unificado para evitar race conditions
+  // CORREÇÃO: useEffect de inicialização controlado para evitar loops
   useEffect(() => {
-    const initializeConnectionState = async () => {
-      if (!profile) {
-        console.log('[WA Manager] Profile ainda não carregado');
-        return;
-      }
-      
-      if (state.connectionState === 'already_connected') {
-        console.log('[WA Manager] Já conectado, não fazendo verificação');
-        return;
-      }
+    // Evitar múltiplas inicializações
+    if (isInitializedRef.current || !profile) {
+      return;
+    }
 
-      console.log('[WA Manager] Inicializando estado baseado no perfil');
+    const initializeConnectionState = async () => {
+      console.log('[WA Manager] Inicializando estado baseado no perfil - ÚNICA VEZ');
       
       if (!profile.numero) {
         console.log('[WA Manager] Número não configurado');
@@ -512,6 +475,7 @@ export const useWhatsAppManager = () => {
           connectionState: 'needs_phone_number', 
           message: 'Configure seu número de telefone' 
         }));
+        isInitializedRef.current = true;
         return;
       }
 
@@ -522,6 +486,7 @@ export const useWhatsAppManager = () => {
           connectionState: 'needs_connection', 
           message: 'Pronto para criar sua instância' 
         }));
+        isInitializedRef.current = true;
         return;
       }
 
@@ -562,10 +527,12 @@ export const useWhatsAppManager = () => {
           }));
           break;
       }
+      
+      isInitializedRef.current = true;
     };
 
     initializeConnectionState();
-  }, [profile, checkConnectionAndUpdate, startPolling]);
+  }, [profile?.id, profile?.numero, profile?.instance_name]); // Dependências específicas para evitar loops
 
   // Cleanup ao desmontar
   useEffect(() => {
@@ -573,6 +540,7 @@ export const useWhatsAppManager = () => {
     return () => {
       console.log('[WA Manager] Desmontando, limpando recursos...');
       isMountedRef.current = false;
+      isInitializedRef.current = false;
       cleanupResources();
     };
   }, [cleanupResources]);
