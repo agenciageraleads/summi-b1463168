@@ -49,11 +49,12 @@ export const useWhatsAppManager = () => {
   const isMountedRef = useRef(true);
 
   // CORREÇÃO: Máquina de estados explícita para conexão
-  const checkConnectionStatus = useCallback(async (instanceName: string): Promise<'connected' | 'connecting' | 'disconnected'> => {
+  const checkConnectionAndUpdate = useCallback(async (instanceName: string): Promise<'connected' | 'connecting' | 'disconnected'> => {
     try {
       console.log('[WA Manager] Verificando status para:', instanceName);
       const statusResult = await checkConnectionStatus(instanceName);
       
+      // CORREÇÃO: statusResult é um objeto StatusResult, não uma string
       const rawState = (statusResult.state || statusResult.status || '').toLowerCase();
       console.log('[WA Manager] Estado bruto da API:', rawState);
 
@@ -104,7 +105,7 @@ export const useWhatsAppManager = () => {
     const checkStatus = async () => {
       if (!isMountedRef.current) return;
       
-      const connectionStatus = await checkConnectionStatus(instanceName);
+      const connectionStatus = await checkConnectionAndUpdate(instanceName);
       
       switch (connectionStatus) {
         case 'connected':
@@ -162,7 +163,7 @@ export const useWhatsAppManager = () => {
       }, 3000);
     }, 60000);
 
-  }, [checkConnectionStatus, cleanupResources, refreshProfile, toast]);
+  }, [checkConnectionAndUpdate, cleanupResources, refreshProfile, toast]);
 
   // Gerar códigos de conexão
   const handleGenerateCodes = useCallback(async (instanceName: string) => {
@@ -371,7 +372,7 @@ export const useWhatsAppManager = () => {
 
       // Verificar status da instância existente
       console.log('[WA Manager] Verificando status da instância existente:', profile.instance_name);
-      const connectionStatus = await checkConnectionStatus(profile.instance_name);
+      const connectionStatus = await checkConnectionAndUpdate(profile.instance_name);
       
       switch (connectionStatus) {
         case 'connected':
@@ -408,7 +409,7 @@ export const useWhatsAppManager = () => {
     };
 
     initializeConnectionState();
-  }, [profile, checkConnectionStatus, startPolling]);
+  }, [profile, checkConnectionAndUpdate, startPolling]);
 
   // Cleanup ao desmontar
   useEffect(() => {
