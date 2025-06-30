@@ -1,4 +1,3 @@
-
 // ABOUTME: Hook principal para gerenciar a conexão WhatsApp com máquina de estados corrigida
 // ABOUTME: Implementa lógica unificada de inicialização e fluxo de estados previsível
 
@@ -60,14 +59,14 @@ export const useWhatsAppManager = () => {
     const normalizedState = rawState.toLowerCase();
     console.log('[WA Manager] Interpretando estado Evolution:', normalizedState);
 
-    // APENAS "open" significa conectado
-    if (normalizedState === 'open') {
+    // CORREÇÃO: Aceitar tanto "open" quanto "connected" como conectado
+    if (normalizedState === 'open' || normalizedState === 'connected') {
       console.log('[WA Manager] Estado interpretado: CONECTADO');
       return 'connected';
     }
     
-    // "close" significa desconectado
-    if (normalizedState === 'close') {
+    // "close" ou "disconnected" significa desconectado
+    if (normalizedState === 'close' || normalizedState === 'disconnected') {
       console.log('[WA Manager] Estado interpretado: DESCONECTADO');
       return 'disconnected';
     }
