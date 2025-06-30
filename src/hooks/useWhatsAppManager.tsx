@@ -1,4 +1,3 @@
-
 // ABOUTME: Hook principal para gerenciar a conexão WhatsApp com máquina de estados corrigida
 // ABOUTME: Implementa lógica unificada de inicialização e fluxo de estados previsível
 
@@ -45,55 +44,85 @@ export const useWhatsAppManager = () => {
 
   // Refs para controle de lifecycle
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const qrTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const codeRenewalIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
-  // CORREÇÃO: Máquina de estados explícita para conexão
+  // CORREÇÃO: Interpretação correta dos estados da Evolution API
+  const interpretEvolutionState = useCallback((rawState: string): 'connected' | 'connecting' | 'disconnected' => {
+    const normalizedState = rawState.toLowerCase();
+    console.log('[WA Manager] Interpretando estado Evolution:', normalizedState);
+
+    // APENAS "open" significa conectado
+    if (normalizedState === 'open') {
+      console.log('[WA Manager] Estado interpretado: CONECTADO');
+      return 'connected';
+    }
+    
+    // "close" significa desconectado
+    if (normalizedState === 'close') {
+      console.log('[WA Manager] Estado interpretado: DESCONECTADO');
+      return 'disconnected';
+    }
+    
+    // TODO O RESTO (connecting, qr, pairing, etc.) significa conectando
+    console.log('[WA Manager] Estado interpretado: CONECTANDO');
+    return 'connecting';
+  }, []);
+
+  // Verificar status da conexão com interpretação corrigida
   const checkConnectionAndUpdate = useCallback(async (instanceName: string): Promise<'connected' | 'connecting' | 'disconnected'> => {
     try {
       console.log('[WA Manager] Verificando status para:', instanceName);
       const statusResult = await checkConnectionStatus(instanceName);
       
-      // CORREÇÃO: statusResult é um objeto StatusResult, não uma string
       const rawState = (statusResult.state || statusResult.status || '').toLowerCase();
-      console.log('[WA Manager] Estado bruto da API:', rawState);
+      console.log('[WA Manager] Estado bruto da API Evolution:', rawState);
 
-      // Estados finais de conexão estabelecida
-      const finalConnectedStates = ['open', 'connected'];
-      // Estados transicionais de conexão em progresso
-      const transitionalConnectingStates = ['qr', 'connecting', 'pairing'];
-
-      if (finalConnectedStates.includes(rawState)) {
-        console.log('[WA Manager] Status: CONECTADO');
-        return 'connected';
-      }
-      
-      if (transitionalConnectingStates.includes(rawState)) {
-        console.log('[WA Manager] Status: CONECTANDO');
-        return 'connecting';
-      }
-      
-      console.log('[WA Manager] Status: DESCONECTADO');
-      return 'disconnected';
+      return interpretEvolutionState(rawState);
     } catch (error) {
       console.error('[WA Manager] Erro ao verificar status:', error);
       return 'disconnected';
     }
-  }, []);
+  }, [interpretEvolutionState]);
 
   // Limpar todos os recursos
   const cleanupResources = useCallback(() => {
     console.log('[WA Manager] Limpando recursos');
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-    if (qrTimeoutRef.current) clearTimeout(qrTimeoutRef.current);
+    if (codeRenewalIntervalRef.current) clearInterval(codeRenewalIntervalRef.current);
     pollingIntervalRef.current = null;
-    qrTimeoutRef.current = null;
+    codeRenewalIntervalRef.current = null;
     if (isMountedRef.current) {
       setState(prev => ({ ...prev, isPolling: false }));
     }
   }, []);
 
-  // CORREÇÃO: Polling com lógica de estados explícita
+  // NOVA: Renovar códigos automaticamente a cada 60 segundos
+  const renewCodes = useCallback(async (instanceName: string) => {
+    if (!isMountedRef.current) return;
+    
+    console.log('[WA Manager] Renovando códigos para:', instanceName);
+    
+    try {
+      const result: ConnectionResult = await generateConnectionCodes(instanceName);
+
+      if (result.success && (result.qrCode || result.pairingCode)) {
+        console.log('[WA Manager] Códigos renovados com sucesso');
+        setState(prev => ({
+          ...prev,
+          qrCode: result.qrCode || null,
+          pairingCode: result.pairingCode || null,
+          message: 'Códigos renovados - escolha um método para conectar'
+        }));
+      } else {
+        console.log('[WA Manager] Falha ao renovar códigos:', result.error);
+      }
+    } catch (error) {
+      console.error('[WA Manager] Erro ao renovar códigos:', error);
+    }
+  }, []);
+
+  // CORREÇÃO: Polling com renovação automática dos códigos
   const startPolling = useCallback((instanceName: string) => {
     console.log('[WA Manager] Iniciando polling para:', instanceName);
     
@@ -146,24 +175,12 @@ export const useWhatsAppManager = () => {
     // Polling regular a cada 7 segundos
     pollingIntervalRef.current = setInterval(checkStatus, 7000);
 
-    // Timeout para expiração dos códigos - 60 segundos
-    qrTimeoutRef.current = setTimeout(async () => {
-      if (!isMountedRef.current) return;
-      console.log('[WA Manager] Códigos expirados, reiniciando...');
-      cleanupResources();
-      setState(prev => ({ 
-        ...prev, 
-        message: 'Códigos expirados, reiniciando...', 
-        qrCode: null,
-        pairingCode: null 
-      }));
-      await restartInstance(instanceName);
-      setTimeout(() => {
-        handleConnect();
-      }, 3000);
+    // NOVA: Renovação automática dos códigos a cada 60 segundos
+    codeRenewalIntervalRef.current = setInterval(() => {
+      renewCodes(instanceName);
     }, 60000);
 
-  }, [checkConnectionAndUpdate, cleanupResources, refreshProfile, toast]);
+  }, [checkConnectionAndUpdate, cleanupResources, refreshProfile, toast, renewCodes]);
 
   // Gerar códigos de conexão
   const handleGenerateCodes = useCallback(async (instanceName: string) => {
