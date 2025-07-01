@@ -1,6 +1,6 @@
 
-// ABOUTME: Componente principal para gerenciar conexão WhatsApp com design refinado e elegante
-// ABOUTME: Interface limpa inspirada no Ziptalk com melhor UX e correção do pairing code
+// ABOUTME: Componente principal para gerenciar conexão WhatsApp com interface aprimorada e robustez
+// ABOUTME: Design refinado com indicadores visuais claros e ações específicas para cada situação
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +25,8 @@ import {
   Clock,
   AlertTriangle,
   Check,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 export const WhatsAppConnectionManager: React.FC = () => {
@@ -138,12 +139,20 @@ export const WhatsAppConnectionManager: React.FC = () => {
         return (
           <div className="flex items-center space-x-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+              {state.isRenewing ? (
+                <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />
+              ) : (
+                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+              )}
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-blue-900">Conectando...</h3>
-              <p className="text-sm text-blue-700">Use um dos métodos abaixo</p>
-              {state.isPolling && (
+              <h3 className="font-medium text-blue-900">
+                {state.isRenewing ? 'Renovando códigos...' : 'Conectando...'}
+              </h3>
+              <p className="text-sm text-blue-700">
+                {state.isRenewing ? 'Gerando novos códigos de conexão' : 'Use um dos métodos abaixo'}
+              </p>
+              {state.isPolling && !state.isRenewing && (
                 <p className="text-xs text-blue-600 mt-1">🔄 Aguardando confirmação</p>
               )}
             </div>
@@ -158,14 +167,23 @@ export const WhatsAppConnectionManager: React.FC = () => {
             <div className="flex-1">
               <h3 className="font-medium text-red-900">Erro na Conexão</h3>
               <p className="text-sm text-red-700">{state.message}</p>
+              {state.generationAttempts > 0 && (
+                <p className="text-xs text-red-600 mt-1">
+                  Tentativas: {state.generationAttempts}/3
+                </p>
+              )}
             </div>
             <div className="flex space-x-2">
               <Button onClick={() => handleConnect()} variant="outline" size="sm" className="border-red-300 text-red-700 hover:bg-red-100">
                 Tentar Novamente
               </Button>
               {profile?.instance_name && state.errorCount >= 3 && (
-                <Button onClick={handleRecreateInstance} variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-100">
-                  <RefreshCw className="w-4 h-4 mr-1" />
+                <Button onClick={handleRecreateInstance} variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-100" disabled={isRecreating}>
+                  {isRecreating ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-1" />
+                  )}
                   Recriar
                 </Button>
               )}
@@ -188,8 +206,12 @@ export const WhatsAppConnectionManager: React.FC = () => {
                 Configurar
               </Button>
             ) : (
-              <Button onClick={() => handleConnect()} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                <Smartphone className="w-4 h-4 mr-1" />
+              <Button onClick={() => handleConnect()} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={state.isLoading}>
+                {state.isLoading ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Smartphone className="w-4 h-4 mr-1" />
+                )}
                 Conectar
               </Button>
             )}
@@ -198,35 +220,59 @@ export const WhatsAppConnectionManager: React.FC = () => {
     }
   };
 
-  // Renderizar contador elegante
+  // NOVA: Renderizar contador elegante com renovação automática
   const renderCountdown = () => {
-    if (state.connectionState !== 'is_connecting' || (!state.qrCode && !state.pairingCode)) {
+    if (state.connectionState !== 'is_connecting' || (!state.qrCode && !state.pairingCode) || state.isRenewing) {
       return null;
     }
 
     const minutes = Math.floor(state.countdownSeconds / 60);
     const seconds = state.countdownSeconds % 60;
     const isWarning = state.countdownSeconds <= 15;
+    const isExpiring = state.countdownSeconds <= 5;
 
     return (
-      <div className={`flex items-center justify-center space-x-3 p-3 rounded-lg transition-all ${
-        isWarning ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200'
+      <div className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+        isExpiring ? 'bg-red-50 border border-red-200' : 
+        isWarning ? 'bg-amber-50 border border-amber-200' : 
+        'bg-blue-50 border border-blue-200'
       }`}>
-        <Clock className={`w-4 h-4 ${isWarning ? 'text-amber-600' : 'text-blue-600'}`} />
-        <span className={`text-sm font-medium ${isWarning ? 'text-amber-800' : 'text-blue-800'}`}>
-          Renovação em {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
-        </span>
-        {isWarning && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={forceRenewCodes}
-            className="text-xs px-2 py-1 h-6 border-amber-300 text-amber-700 hover:bg-amber-100"
-          >
-            <RefreshCw className="w-3 h-3 mr-1" />
-            Renovar
-          </Button>
-        )}
+        <div className="flex items-center space-x-3">
+          <Clock className={`w-4 h-4 ${
+            isExpiring ? 'text-red-600' : 
+            isWarning ? 'text-amber-600' : 
+            'text-blue-600'
+          }`} />
+          <span className={`text-sm font-medium ${
+            isExpiring ? 'text-red-800' : 
+            isWarning ? 'text-amber-800' : 
+            'text-blue-800'
+          }`}>
+            {isExpiring ? 'Renovando automaticamente...' : 
+             `Renovação automática em ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`}
+          </span>
+        </div>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={forceRenewCodes}
+          className={`text-xs px-3 py-1 h-7 ${
+            isExpiring ? 'border-red-300 text-red-700 hover:bg-red-100' :
+            isWarning ? 'border-amber-300 text-amber-700 hover:bg-amber-100' :
+            'border-blue-300 text-blue-700 hover:bg-blue-100'
+          }`}
+          disabled={state.isRenewing}
+        >
+          {state.isRenewing ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <>
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Renovar Agora
+            </>
+          )}
+        </Button>
       </div>
     );
   };
@@ -258,7 +304,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
               <Loader2 className="w-3 h-3 animate-spin" />
             ) : (
               <>
-                <RefreshCw className="w-3 h-3 mr-1" />
+                <Trash2 className="w-3 h-3 mr-1" />
                 Recriar
               </>
             )}
@@ -280,7 +326,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
       {renderCountdown()}
 
       {/* Métodos de Conexão */}
-      {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && (
+      {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && !state.isRenewing && (
         <div className="grid gap-6 md:grid-cols-2">
           {/* Método do Código (Preferido) */}
           {state.pairingCode && (
@@ -306,8 +352,12 @@ export const WhatsAppConnectionManager: React.FC = () => {
                   </p>
                 </div>
                 <div className="bg-white border-2 border-emerald-300 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-mono font-bold text-emerald-800 tracking-wider mb-2">
+                  <div className="text-3xl font-mono font-bold text-emerald-800 tracking-wider mb-2 select-all">
                     {state.pairingCode}
+                  </div>
+                  <div className="flex items-center justify-center space-x-2 text-xs text-emerald-600 mb-3">
+                    <Check className="w-3 h-3" />
+                    <span>8 dígitos válidos</span>
                   </div>
                   <Button
                     variant="outline"
@@ -355,14 +405,19 @@ export const WhatsAppConnectionManager: React.FC = () => {
       )}
 
       {/* Dica de Uso */}
-      {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && (
+      {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && !state.isRenewing && (
         <div className="text-center space-y-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <p className="text-sm text-gray-600 font-medium">
             💡 Use qualquer um dos métodos - ambos funcionam perfeitamente
           </p>
           <p className="text-xs text-gray-500">
-            Os códigos são renovados automaticamente para sua segurança
+            Os códigos são renovados automaticamente a cada 60 segundos para sua segurança
           </p>
+          {state.generationAttempts > 0 && (
+            <p className="text-xs text-blue-600">
+              ⚡ Sistema com 3 tentativas automáticas para máxima confiabilidade
+            </p>
+          )}
         </div>
       )}
     </div>

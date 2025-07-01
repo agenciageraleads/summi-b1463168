@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -47,7 +48,6 @@ const interpretConnectionState = (rawState: string | null | undefined): string =
     return 'disconnected';
   }
   
-  // Estado desconhecido - log para análise
   console.log(`[STATUS-INTERPRETER] Estado desconhecido "${state}" - assumindo DISCONNECTED`);
   return 'disconnected';
 };
@@ -68,7 +68,6 @@ const getInstanceStatus = async (instanceName: string, evolutionApiUrl: string, 
     if (statusResponse.ok) {
       const statusData = await statusResponse.json();
       
-      // INSTRUMENTAÇÃO: Log completo dos dados brutos recebidos
       console.log('[GET-INSTANCE-STATUS] Raw status data received:', JSON.stringify(statusData, null, 2));
       
       const rawState = statusData.state || statusData.instance?.state || null;
@@ -150,14 +149,88 @@ const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDela
   }
 };
 
-// CORREÇÃO: Função específica para gerar pairing code
-const generatePairingCodeWithPhone = async (instanceName: string, phoneNumber: string, evolutionApiUrl: string, evolutionApiKey: string) => {
-  console.log(`[PAIRING-CODE-GENERATOR] 🚨 Gerando pairing code para instância: ${instanceName} com número: ${phoneNumber}`);
+// NOVA: Função para validar pairing code de 8 dígitos
+const validatePairingCode = (code: string | null | undefined): string | null => {
+  if (!code) return null;
+  
+  const cleanCode = code.toString().trim().toUpperCase();
+  
+  // Validar formato: exatos 8 caracteres alfanuméricos
+  if (/^[A-Z0-9]{8}$/.test(cleanCode)) {
+    console.log(`[PAIRING-VALIDATOR] ✅ Pairing code válido: ${cleanCode}`);
+    return cleanCode;
+  }
+  
+  console.log(`[PAIRING-VALIDATOR] ❌ Pairing code inválido: "${code}" -> limpo: "${cleanCode}"`);
+  return null;
+};
+
+// CORREÇÃO: Função específica para gerar QR Code (sem parâmetros)
+const generateQRCodeOnly = async (instanceName: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+  console.log(`[QR-GENERATOR] 🎯 Gerando QR Code para instância: ${instanceName}`);
   
   try {
-    // CORREÇÃO: Usar endpoint correto com parâmetro number para pairing code
+    const qrUrl = `${evolutionApiUrl}/instance/connect/${instanceName}`;
+    console.log(`[QR-GENERATOR] 🎯 URL do QR Code: ${qrUrl}`);
+    
+    const qrResponse = await retryWithBackoff(() =>
+      fetch(qrUrl, {
+        method: 'GET',
+        headers: { 'apikey': evolutionApiKey }
+      })
+    );
+
+    console.log(`[QR-GENERATOR] Response status: ${qrResponse.status}, ok: ${qrResponse.ok}`);
+    
+    if (qrResponse.ok) {
+      const qrData = await qrResponse.json();
+      console.log('[QR-GENERATOR] 🎯 RAW QR RESPONSE:', JSON.stringify(qrData, null, 2));
+      
+      let qrCodeData = qrData.qrcode?.base64 || qrData.base64 || qrData.qrcode?.code || qrData.code;
+      
+      if (qrCodeData && !qrCodeData.startsWith('data:image/')) {
+        qrCodeData = `data:image/png;base64,${qrCodeData}`;
+      }
+      
+      if (qrCodeData) {
+        console.log(`[QR-GENERATOR] ✅ QR Code gerado com sucesso`);
+        return {
+          success: true,
+          qrCode: qrCodeData,
+          rawResponse: qrData
+        };
+      } else {
+        console.log('[QR-GENERATOR] ❌ QR Code não encontrado na resposta');
+        return {
+          success: false,
+          error: 'QR Code não encontrado na resposta da API',
+          rawResponse: qrData
+        };
+      }
+    } else {
+      const errorText = await qrResponse.text();
+      console.error(`[QR-GENERATOR] ❌ Erro HTTP: ${qrResponse.status} - ${errorText}`);
+      return {
+        success: false,
+        error: `Erro HTTP ${qrResponse.status}: ${errorText}`
+      };
+    }
+  } catch (error) {
+    console.error(`[QR-GENERATOR] ❌ Erro na requisição:`, error);
+    return {
+      success: false,
+      error: `Erro na requisição: ${error.message}`
+    };
+  }
+};
+
+// CORREÇÃO: Função específica para gerar Pairing Code (com parâmetro number)
+const generatePairingCodeOnly = async (instanceName: string, phoneNumber: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+  console.log(`[PAIRING-GENERATOR] 🎯 Gerando pairing code para instância: ${instanceName} com número: ${phoneNumber}`);
+  
+  try {
     const pairingUrl = `${evolutionApiUrl}/instance/connect/${instanceName}?number=${phoneNumber}`;
-    console.log(`[PAIRING-CODE-GENERATOR] 🚨 URL do pairing code: ${pairingUrl}`);
+    console.log(`[PAIRING-GENERATOR] 🎯 URL do pairing code: ${pairingUrl}`);
     
     const pairingResponse = await retryWithBackoff(() =>
       fetch(pairingUrl, {
@@ -166,45 +239,238 @@ const generatePairingCodeWithPhone = async (instanceName: string, phoneNumber: s
       })
     );
 
-    console.log(`[PAIRING-CODE-GENERATOR] Response status: ${pairingResponse.status}, ok: ${pairingResponse.ok}`);
+    console.log(`[PAIRING-GENERATOR] Response status: ${pairingResponse.status}, ok: ${pairingResponse.ok}`);
     
     if (pairingResponse.ok) {
       const pairingData = await pairingResponse.json();
-      console.log('[PAIRING-CODE-GENERATOR] 🚨 RAW PAIRING RESPONSE:', JSON.stringify(pairingData, null, 2));
+      console.log('[PAIRING-GENERATOR] 🎯 RAW PAIRING RESPONSE:', JSON.stringify(pairingData, null, 2));
       
-      // CORREÇÃO: Buscar pairing code em diferentes propriedades possíveis
-      let pairingCode = pairingData.pairingCode || pairingData.code || pairingData.pairing_code || pairingData.pair_code;
+      // Buscar pairing code em diferentes propriedades possíveis
+      let rawPairingCode = pairingData.qrcode?.pairingCode || pairingData.pairingCode || pairingData.code;
       
-      if (pairingCode) {
-        console.log(`[PAIRING-CODE-GENERATOR] ✅ Pairing code encontrado: ${pairingCode}`);
+      // Validar se é realmente um pairing code de 8 dígitos
+      const validPairingCode = validatePairingCode(rawPairingCode);
+      
+      if (validPairingCode) {
+        console.log(`[PAIRING-GENERATOR] ✅ Pairing code válido gerado: ${validPairingCode}`);
         return {
           success: true,
-          pairingCode: pairingCode,
+          pairingCode: validPairingCode,
           rawResponse: pairingData
         };
       } else {
-        console.log('[PAIRING-CODE-GENERATOR] ❌ Pairing code não encontrado na resposta');
+        console.log('[PAIRING-GENERATOR] ❌ Pairing code inválido ou não encontrado na resposta');
         return {
           success: false,
-          error: 'Pairing code não encontrado na resposta da API',
-          rawResponse: pairingData
+          error: 'Pairing code de 8 dígitos não encontrado na resposta da API',
+          rawResponse: pairingData,
+          needsRecreation: true // Sinaliza que precisa recriar a instância
         };
       }
     } else {
       const errorText = await pairingResponse.text();
-      console.error(`[PAIRING-CODE-GENERATOR] ❌ Erro HTTP: ${pairingResponse.status} - ${errorText}`);
+      console.error(`[PAIRING-GENERATOR] ❌ Erro HTTP: ${pairingResponse.status} - ${errorText}`);
       return {
         success: false,
         error: `Erro HTTP ${pairingResponse.status}: ${errorText}`
       };
     }
   } catch (error) {
-    console.error(`[PAIRING-CODE-GENERATOR] ❌ Erro na requisição:`, error);
+    console.error(`[PAIRING-GENERATOR] ❌ Erro na requisição:`, error);
     return {
       success: false,
       error: `Erro na requisição: ${error.message}`
     };
   }
+};
+
+// NOVA: Função para deletar instância
+const deleteInstance = async (instanceName: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+  console.log(`[DELETE-INSTANCE] 🗑️ Deletando instância: ${instanceName}`);
+  
+  try {
+    const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+      method: 'DELETE',
+      headers: { 'apikey': evolutionApiKey }
+    });
+    
+    console.log(`[DELETE-INSTANCE] Response status: ${deleteResponse.status}, ok: ${deleteResponse.ok}`);
+    
+    // 404 significa que já não existe, consideramos sucesso
+    const success = deleteResponse.ok || deleteResponse.status === 404;
+    
+    if (success) {
+      console.log(`[DELETE-INSTANCE] ✅ Instância deletada com sucesso`);
+      return { success: true };
+    } else {
+      const errorText = await deleteResponse.text();
+      console.log(`[DELETE-INSTANCE] ❌ Erro ao deletar: ${errorText}`);
+      return { success: false, error: errorText };
+    }
+  } catch (error) {
+    console.error(`[DELETE-INSTANCE] ❌ Erro na requisição:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+// NOVA: Função para criar instância com suporte correto ao pairing code
+const createInstanceWithPairingSupport = async (instanceName: string, phoneNumber: string, webhookUrl: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+  console.log(`[CREATE-INSTANCE] 🏗️ Criando instância com suporte a pairing code: ${instanceName}`);
+  
+  try {
+    // CORREÇÃO: Usar endpoint correto com parâmetro number para garantir pairing code
+    const createUrl = `${evolutionApiUrl}/instance/create?number=${phoneNumber}`;
+    console.log(`[CREATE-INSTANCE] 🏗️ URL de criação: ${createUrl}`);
+    
+    const createPayload = {
+      instanceName,
+      qrcode: true,
+      integration: "WHATSAPP-BAILEYS",
+      webhook: {
+        url: webhookUrl,
+        byEvents: false,
+        base64: true,
+        headers: {
+          "Content-Type": "application/json"
+        },
+        events: ["MESSAGES_UPSERT"]
+      },
+      settings: {
+        reject_call: false,
+        msg_call: "",
+        groups_ignore: true,
+        always_online: false,
+        read_messages: false,
+        read_status: false
+      }
+    };
+
+    console.log('[CREATE-INSTANCE] 🏗️ Payload de criação:', JSON.stringify(createPayload, null, 2));
+
+    const createResponse = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': evolutionApiKey
+      },
+      body: JSON.stringify(createPayload)
+    });
+    
+    console.log(`[CREATE-INSTANCE] Response status: ${createResponse.status}, ok: ${createResponse.ok}`);
+    
+    if (createResponse.ok) {
+      const creationData = await createResponse.json();
+      console.log('[CREATE-INSTANCE] 🏗️ RAW CREATION RESPONSE:', JSON.stringify(creationData, null, 2));
+      
+      // Verificar se o pairing code já veio na resposta da criação
+      const rawPairingCode = creationData.qrcode?.pairingCode || creationData.pairingCode;
+      const validPairingCode = validatePairingCode(rawPairingCode);
+      
+      // Extrair QR Code se disponível
+      let qrCodeData = creationData.qrcode?.base64 || creationData.base64;
+      if (qrCodeData && !qrCodeData.startsWith('data:image/')) {
+        qrCodeData = `data:image/png;base64,${qrCodeData}`;
+      }
+      
+      console.log(`[CREATE-INSTANCE] ✅ Instância criada - Pairing code válido: ${!!validPairingCode}, QR Code: ${!!qrCodeData}`);
+      
+      return {
+        success: true,
+        pairingCode: validPairingCode,
+        qrCode: qrCodeData,
+        rawResponse: creationData
+      };
+    } else {
+      const errorText = await createResponse.text();
+      
+      // Se erro for que já existe, não é fatal
+      if (errorText && errorText.toLowerCase().includes("instance already exists")) {
+        console.log('[CREATE-INSTANCE] ⚠️ Instância já existe, continuando...');
+        return { success: true, alreadyExists: true };
+      } else {
+        console.error(`[CREATE-INSTANCE] ❌ Erro ao criar: ${createResponse.status} - ${errorText}`);
+        return { success: false, error: `Erro HTTP ${createResponse.status}: ${errorText}` };
+      }
+    }
+  } catch (error) {
+    console.error(`[CREATE-INSTANCE] ❌ Erro na requisição:`, error);
+    return { success: false, error: `Erro na requisição: ${error.message}` };
+  }
+};
+
+// NOVA: Função para recriar instância quando pairing code não for gerado corretamente
+const recreateInstanceForPairingCode = async (instanceName: string, phoneNumber: string, webhookUrl: string, evolutionApiUrl: string, evolutionApiKey: string, maxAttempts = 2) => {
+  console.log(`[RECREATE-INSTANCE] 🔄 Iniciando recriação de instância para pairing code: ${instanceName}`);
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(`[RECREATE-INSTANCE] 🔄 Tentativa ${attempt}/${maxAttempts}`);
+    
+    try {
+      // 1. Deletar instância existente
+      console.log(`[RECREATE-INSTANCE] 🗑️ Deletando instância existente...`);
+      const deleteResult = await deleteInstance(instanceName, evolutionApiUrl, evolutionApiKey);
+      
+      if (!deleteResult.success) {
+        console.log(`[RECREATE-INSTANCE] ⚠️ Erro ao deletar, continuando... ${deleteResult.error}`);
+      }
+      
+      // 2. Aguardar processamento da Evolution API
+      console.log(`[RECREATE-INSTANCE] ⏳ Aguardando 5 segundos para processamento...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // 3. Criar nova instância
+      console.log(`[RECREATE-INSTANCE] 🏗️ Criando nova instância...`);
+      const createResult = await createInstanceWithPairingSupport(instanceName, phoneNumber, webhookUrl, evolutionApiUrl, evolutionApiKey);
+      
+      if (createResult.success && createResult.pairingCode) {
+        console.log(`[RECREATE-INSTANCE] ✅ Instância recriada com sucesso - Pairing code: ${createResult.pairingCode}`);
+        return {
+          success: true,
+          pairingCode: createResult.pairingCode,
+          qrCode: createResult.qrCode,
+          attempt: attempt
+        };
+      } else if (createResult.success && createResult.alreadyExists) {
+        console.log(`[RECREATE-INSTANCE] ⚠️ Instância já existe na tentativa ${attempt}, tentando gerar pairing code...`);
+        
+        // Tentar gerar pairing code para instância existente
+        const pairingResult = await generatePairingCodeOnly(instanceName, phoneNumber, evolutionApiUrl, evolutionApiKey);
+        
+        if (pairingResult.success && pairingResult.pairingCode) {
+          console.log(`[RECREATE-INSTANCE] ✅ Pairing code gerado para instância existente: ${pairingResult.pairingCode}`);
+          return {
+            success: true,
+            pairingCode: pairingResult.pairingCode,
+            attempt: attempt
+          };
+        }
+      }
+      
+      console.log(`[RECREATE-INSTANCE] ❌ Tentativa ${attempt} falhou:`, createResult.error);
+      
+      if (attempt < maxAttempts) {
+        console.log(`[RECREATE-INSTANCE] ⏳ Aguardando antes da próxima tentativa...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+      
+    } catch (error) {
+      console.error(`[RECREATE-INSTANCE] ❌ Erro na tentativa ${attempt}:`, error);
+      
+      if (attempt === maxAttempts) {
+        return {
+          success: false,
+          error: `Falha após ${maxAttempts} tentativas: ${error.message}`,
+          attempt: attempt
+        };
+      }
+    }
+  }
+  
+  return {
+    success: false,
+    error: `Falha após ${maxAttempts} tentativas de recriação`,
+    attempt: maxAttempts
+  };
 };
 
 serve(async (req) => {
@@ -367,114 +633,60 @@ serve(async (req) => {
           });
         }
 
-        // Se não existe, criar instância com suporte a Pairing Code
-        if (!statusInfo.exists) {
-          console.log(`[EVOLUTION-HANDLER] Criando instância com suporte a Pairing Code: ${targetInstanceName}`);
-          
-          const createPayload = {
-            instanceName: targetInstanceName,
-            token: evolutionApiKey,
-            qrcode: true,
-            number: profile.numero,
-            integration: "WHATSAPP-BAILEYS",
-            webhook: {
-              url: webhookUrl,
-              byEvents: false,
-              base64: true,
-              headers: {
-                "Content-Type": "application/json"
-              },
-              events: ["MESSAGES_UPSERT"]
-            },
-            settings: {
-              reject_call: false,
-              msg_call: "",
-              groups_ignore: true,
-              always_online: false,
-              read_messages: false,
-              read_status: false
-            }
-          };
-
-          try {
-            const createResponse = await retryWithBackoff(() =>
-              fetch(`${cleanApiUrl}/instance/create?number=${profile.numero}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': evolutionApiKey
-                },
-                body: JSON.stringify(createPayload)
-              })
-            );
-            
-            if (!createResponse.ok) {
-              const errorText = await createResponse.text();
-              if (!errorText.toLowerCase().includes("instance already exists")) {
-                throw new Error(`Falha ao criar instância: ${createResponse.status} - ${errorText}`);
-              }
-            }
-            
-            console.log(`[EVOLUTION-HANDLER] Instância criada/verificada com sucesso`);
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Aguarda estabilização
-            
-          } catch (error) {
-            console.error(`[EVOLUTION-HANDLER] Erro ao criar instância:`, error);
-            return new Response(JSON.stringify({ 
-              success: false, 
-              error: `Erro ao criar instância: ${error.message}` 
-            }), {
-              status: 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
-          }
-        }
-
-        // CORREÇÃO: Gerar QR Code (endpoint normal sem parâmetro)
         let qrCode = null;
-        try {
-          console.log(`[EVOLUTION-HANDLER] 🚨 Gerando QR Code - endpoint: ${cleanApiUrl}/instance/connect/${targetInstanceName}`);
-          const qrResponse = await retryWithBackoff(() =>
-            fetch(`${cleanApiUrl}/instance/connect/${targetInstanceName}`, {
-              method: 'GET',
-              headers: { 'apikey': evolutionApiKey }
-            })
-          );
+        let pairingCode = null;
 
-          if (qrResponse.ok) {
-            const qrData = await qrResponse.json();
-            console.log('[EVOLUTION-HANDLER] 🚨 RAW QR RESPONSE:', JSON.stringify(qrData, null, 2));
-            
-            if (qrData.qrcode?.base64 || qrData.base64) {
-              qrCode = qrData.qrcode?.base64 || qrData.base64;
-              if (!qrCode.startsWith('data:image/')) {
-                qrCode = `data:image/png;base64,${qrCode}`;
-              }
-              console.log('[EVOLUTION-HANDLER] ✅ QR Code extraído com sucesso');
-            }
-          }
-        } catch (error) {
-          console.error(`[EVOLUTION-HANDLER] ❌ Erro ao gerar QR Code:`, error);
+        // CORREÇÃO: Gerar QR Code separadamente (sem parâmetros)
+        console.log(`[EVOLUTION-HANDLER] 🎯 Gerando QR Code...`);
+        const qrResult = await generateQRCodeOnly(targetInstanceName, cleanApiUrl, evolutionApiKey);
+        
+        if (qrResult.success) {
+          qrCode = qrResult.qrCode;
+          console.log('[EVOLUTION-HANDLER] ✅ QR Code gerado com sucesso');
+        } else {
+          console.error(`[EVOLUTION-HANDLER] ❌ Erro ao gerar QR Code:`, qrResult.error);
         }
 
-        // CORREÇÃO: Gerar Pairing Code usando função específica
-        let pairingCode = null;
-        const pairingResult = await generatePairingCodeWithPhone(targetInstanceName, profile.numero, cleanApiUrl, evolutionApiKey);
+        // CORREÇÃO: Gerar Pairing Code separadamente (com parâmetro number)
+        console.log(`[EVOLUTION-HANDLER] 🎯 Gerando Pairing Code...`);
+        const pairingResult = await generatePairingCodeOnly(targetInstanceName, profile.numero, cleanApiUrl, evolutionApiKey);
         
         if (pairingResult.success) {
           pairingCode = pairingResult.pairingCode;
           console.log(`[EVOLUTION-HANDLER] ✅ Pairing code gerado: ${pairingCode}`);
         } else {
           console.error(`[EVOLUTION-HANDLER] ❌ Erro ao gerar pairing code:`, pairingResult.error);
+          
+          // NOVA: Se pairing code falhou e sinaliza necessidade de recriação
+          if (pairingResult.needsRecreation) {
+            console.log(`[EVOLUTION-HANDLER] 🔄 Tentando recriar instância para gerar pairing code...`);
+            
+            const recreateResult = await recreateInstanceForPairingCode(
+              targetInstanceName, 
+              profile.numero, 
+              webhookUrl, 
+              cleanApiUrl, 
+              evolutionApiKey
+            );
+            
+            if (recreateResult.success) {
+              pairingCode = recreateResult.pairingCode;
+              if (recreateResult.qrCode) qrCode = recreateResult.qrCode;
+              console.log(`[EVOLUTION-HANDLER] ✅ Instância recriada com pairing code: ${pairingCode}`);
+            } else {
+              console.error(`[EVOLUTION-HANDLER] ❌ Falha na recriação:`, recreateResult.error);
+            }
+          }
         }
 
+        // Se não conseguiu gerar pelo menos um código, erro
         if (!qrCode && !pairingCode) {
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "Não foi possível gerar códigos de conexão",
+            error: "Não foi possível gerar códigos de conexão. Tente recriar a instância.",
             debug: {
-              qrCodeGenerated: !!qrCode,
-              pairingCodeResult: pairingResult
+              qrResult: qrResult.error,
+              pairingResult: pairingResult.error
             }
           }), {
             status: 500,
@@ -513,10 +725,8 @@ serve(async (req) => {
         console.log(`[GET-STATUS] Verificando status para instância: ${targetInstanceName}`);
         auditLog("GET_STATUS", user.id, { instanceName: targetInstanceName });
 
-        // CORREÇÃO: Usar função unificada com instrumentação completa
         const statusInfo = await getInstanceStatus(targetInstanceName, cleanApiUrl, evolutionApiKey);
         
-        // INSTRUMENTAÇÃO: Log detalhado do resultado
         console.log('[GET-STATUS] Resultado da verificação:', {
           exists: statusInfo.exists,
           state: statusInfo.state,
@@ -524,7 +734,6 @@ serve(async (req) => {
           hasFullResponse: !!statusInfo.fullResponse
         });
         
-        // Retornar status padronizado
         const finalStatus = statusInfo.exists ? statusInfo.state : 'disconnected';
         console.log(`[GET-STATUS] Status final retornado: ${finalStatus}`);
         
@@ -551,7 +760,6 @@ serve(async (req) => {
         auditLog("LOGOUT", user.id, { instanceName: targetInstanceName });
 
         try {
-          // CORREÇÃO: Usar DELETE ao invés de GET
           const logoutResponse = await retryWithBackoff(() =>
             fetch(`${cleanApiUrl}/instance/logout/${targetInstanceName}`, {
               method: 'DELETE',
@@ -595,15 +803,7 @@ serve(async (req) => {
         auditLog("DELETE_INSTANCE", user.id, { instanceName: targetInstanceName });
 
         try {
-          // CORREÇÃO: Usar DELETE ao invés de GET
-          const deleteResponse = await retryWithBackoff(() =>
-            fetch(`${cleanApiUrl}/instance/delete/${targetInstanceName}`, {
-              method: 'DELETE',
-              headers: { 'apikey': evolutionApiKey }
-            })
-          );
-
-          const success = deleteResponse.ok || deleteResponse.status === 404;
+          const deleteResult = await deleteInstance(targetInstanceName, cleanApiUrl, evolutionApiKey);
 
           // Limpar instance_name do perfil
           await supabaseServiceRole
@@ -613,7 +813,7 @@ serve(async (req) => {
           
           return new Response(JSON.stringify({ 
             success: true,
-            message: success ? 'Instância deletada com sucesso' : 'Instância removida do perfil'
+            message: deleteResult.success ? 'Instância deletada com sucesso' : 'Instância removida do perfil'
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });

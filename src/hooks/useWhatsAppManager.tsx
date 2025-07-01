@@ -1,5 +1,6 @@
-// ABOUTME: Hook principal para gerenciar a conexão WhatsApp com máquina de estados corrigida
-// ABOUTME: Implementa lógica unificada de inicialização e fluxo de estados previsível com correção do pairing code
+
+// ABOUTME: Hook principal para gerenciar a conexão WhatsApp com correções definitivas do pairing code
+// ABOUTME: Implementa validação correta de 8 dígitos e renovação automática no countdown
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +29,8 @@ export interface WhatsAppManagerState {
   countdownSeconds: number;
   hasConnectionError: boolean;
   errorCount: number;
+  generationAttempts: number;
+  isRenewing: boolean;
 }
 
 export const useWhatsAppManager = () => {
@@ -45,7 +48,9 @@ export const useWhatsAppManager = () => {
     isPolling: false,
     countdownSeconds: 60,
     hasConnectionError: false,
-    errorCount: 0
+    errorCount: 0,
+    generationAttempts: 0,
+    isRenewing: false
   });
 
   // Refs para controle de lifecycle
@@ -60,19 +65,16 @@ export const useWhatsAppManager = () => {
     const normalizedState = rawState.toLowerCase();
     console.log('[WA Manager] Interpretando estado Evolution:', normalizedState);
 
-    // CORREÇÃO: Aceitar tanto "open" quanto "connected" como conectado
     if (normalizedState === 'open' || normalizedState === 'connected') {
       console.log('[WA Manager] Estado interpretado: CONECTADO');
       return 'connected';
     }
     
-    // "close" ou "disconnected" significa desconectado
     if (normalizedState === 'close' || normalizedState === 'disconnected') {
       console.log('[WA Manager] Estado interpretado: DESCONECTADO');
       return 'disconnected';
     }
     
-    // TODO O RESTO (connecting, qr, pairing, etc.) significa conectando
     console.log('[WA Manager] Estado interpretado: CONECTANDO');
     return 'connecting';
   }, []);
@@ -104,9 +106,93 @@ export const useWhatsAppManager = () => {
     countdownIntervalRef.current = null;
   }, []);
 
-  // Iniciar contador regressivo
-  const startCountdown = useCallback(() => {
-    console.log('[WA Manager] Iniciando countdown de 60 segundos');
+  // CORREÇÃO: Validação rigorosa do pairing code - apenas 8 caracteres alfanuméricos
+  const validatePairingCode = useCallback((rawPairingCode: string | null | undefined): string | null => {
+    if (!rawPairingCode) {
+      console.log('[WA Manager] 🔍 Pairing code vazio ou nulo');
+      return null;
+    }
+
+    console.log('[WA Manager] 🔍 Validando pairing code bruto:', rawPairingCode);
+    
+    const cleanCode = rawPairingCode.toString().trim().toUpperCase();
+    
+    // CORREÇÃO: Validação rigorosa - exatos 8 caracteres alfanuméricos
+    if (/^[A-Z0-9]{8}$/.test(cleanCode)) {
+      console.log('[WA Manager] ✅ Pairing code válido:', cleanCode);
+      return cleanCode;
+    }
+    
+    console.log('[WA Manager] ❌ Pairing code inválido - formato:', cleanCode, 'comprimento:', cleanCode.length);
+    return null;
+  }, []);
+
+  // CORREÇÃO: Renovar códigos com implementação automática no countdown
+  const renewCodes = useCallback(async (instanceName: string, isAutomatic = false) => {
+    if (!isMountedRef.current) return;
+    
+    console.log(`[WA Manager] ${isAutomatic ? 'Renovação automática' : 'Renovação manual'} de códigos para:`, instanceName);
+    
+    setState(prev => ({ ...prev, isRenewing: true }));
+    
+    try {
+      const result: ConnectionResult = await generateConnectionCodes(instanceName);
+
+      if (result.success && (result.qrCode || result.pairingCode)) {
+        console.log('[WA Manager] Códigos renovados com sucesso');
+        
+        const validPairingCode = validatePairingCode(result.pairingCode);
+        
+        setState(prev => ({
+          ...prev,
+          qrCode: result.qrCode || null,
+          pairingCode: validPairingCode,
+          message: validPairingCode && result.qrCode 
+            ? 'Códigos renovados - use qualquer um dos métodos'
+            : validPairingCode 
+            ? 'Código de pareamento renovado'
+            : result.qrCode 
+            ? 'QR Code renovado'
+            : 'Códigos renovados',
+          hasConnectionError: false,
+          errorCount: 0,
+          isRenewing: false,
+          countdownSeconds: 60 // Reset countdown após renovação
+        }));
+        
+        if (isAutomatic) {
+          toast({ 
+            title: "🔄 Códigos renovados", 
+            description: "Novos códigos de conexão foram gerados automaticamente.", 
+            duration: 3000 
+          });
+        }
+        
+      } else {
+        console.log('[WA Manager] Falha ao renovar códigos:', result.error);
+        setState(prev => ({
+          ...prev,
+          hasConnectionError: true,
+          errorCount: prev.errorCount + 1,
+          message: `Erro ao renovar códigos: ${result.error}`,
+          isRenewing: false
+        }));
+      }
+    } catch (error: any) {
+      console.error('[WA Manager] Erro ao renovar códigos:', error);
+      setState(prev => ({
+        ...prev,
+        hasConnectionError: true,
+        errorCount: prev.errorCount + 1,
+        message: `Erro de conexão: ${error.message}`,
+        isRenewing: false
+      }));
+    }
+  }, [validatePairingCode, toast]);
+
+  // NOVA: Iniciar contador regressivo com renovação automática
+  const startCountdown = useCallback((instanceName: string) => {
+    console.log('[WA Manager] Iniciando countdown de 60 segundos com renovação automática');
     
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
@@ -121,109 +207,23 @@ export const useWhatsAppManager = () => {
         const newSeconds = prev.countdownSeconds - 1;
         
         if (newSeconds <= 0) {
-          console.log('[WA Manager] Countdown finalizado, renovando códigos...');
+          console.log('[WA Manager] ⏰ Countdown zerou - iniciando renovação automática');
+          // CORREÇÃO: Renovação automática quando countdown chega a zero
+          setTimeout(() => renewCodes(instanceName, true), 100);
           return { ...prev, countdownSeconds: 60 }; // Reset para próximo ciclo
         }
         
         return { ...prev, countdownSeconds: newSeconds };
       });
     }, 1000);
-  }, []);
+  }, [renewCodes]);
 
-  // CORREÇÃO: Validação flexível do pairing code
-  const validateAndCleanPairingCode = useCallback((rawPairingCode: string | null | undefined): string | null => {
-    if (!rawPairingCode) {
-      console.log('[WA Manager] 🚨 Pairing code vazio ou nulo');
-      return null;
-    }
-
-    console.log('[WA Manager] 🚨 Pairing code bruto recebido:', rawPairingCode);
-    
-    // CORREÇÃO: Validação mais flexível - aceitar códigos com 6-12 caracteres alfanuméricos
-    const cleanCode = rawPairingCode.toString().trim();
-    
-    // Se o código parece ser base64 ou tem caracteres especiais, tentar extrair apenas alfanuméricos
-    if (cleanCode.includes('@') || cleanCode.includes('=') || cleanCode.includes('/') || cleanCode.includes('+')) {
-      console.log('[WA Manager] 🚨 Pairing code parece ser codificado, tentando extrair parte válida');
-      
-      // Tentar extrair apenas a primeira parte antes de @ ou =
-      const parts = cleanCode.split(/[@=,\/\+]/);
-      for (const part of parts) {
-        const alphanumericPart = part.replace(/[^A-Z0-9]/gi, '');
-        if (alphanumericPart.length >= 6 && alphanumericPart.length <= 12) {
-          console.log('[WA Manager] ✅ Parte válida extraída:', alphanumericPart);
-          return alphanumericPart.toUpperCase();
-        }
-      }
-    }
-    
-    // Validação direta para códigos já limpos
-    const alphanumericCode = cleanCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    
-    if (alphanumericCode.length >= 6 && alphanumericCode.length <= 12) {
-      console.log('[WA Manager] ✅ Pairing code válido:', alphanumericCode);
-      return alphanumericCode;
-    }
-    
-    console.log('[WA Manager] ❌ Pairing code inválido - comprimento:', alphanumericCode.length, 'conteúdo:', alphanumericCode);
-    return null;
-  }, []);
-
-  // CORREÇÃO: Renovar códigos com melhor validação do pairing code
-  const renewCodes = useCallback(async (instanceName: string) => {
-    if (!isMountedRef.current) return;
-    
-    console.log('[WA Manager] Renovando códigos para:', instanceName);
-    
-    try {
-      const result: ConnectionResult = await generateConnectionCodes(instanceName);
-
-      if (result.success && (result.qrCode || result.pairingCode)) {
-        console.log('[WA Manager] Códigos renovados com sucesso');
-        console.log('[WA Manager] 🚨 DEBUG - Raw pairing code:', result.pairingCode);
-        
-        // CORREÇÃO: Usar validação flexível
-        const validPairingCode = validateAndCleanPairingCode(result.pairingCode);
-        
-        setState(prev => ({
-          ...prev,
-          qrCode: result.qrCode || null,
-          pairingCode: validPairingCode,
-          message: 'Códigos renovados - use qualquer um dos métodos para conectar',
-          hasConnectionError: false,
-          errorCount: 0
-        }));
-        
-        // Reiniciar contador
-        startCountdown();
-        
-      } else {
-        console.log('[WA Manager] Falha ao renovar códigos:', result.error);
-        setState(prev => ({
-          ...prev,
-          hasConnectionError: true,
-          errorCount: prev.errorCount + 1,
-          message: `Erro ao renovar códigos: ${result.error}`
-        }));
-      }
-    } catch (error: any) {
-      console.error('[WA Manager] Erro ao renovar códigos:', error);
-      setState(prev => ({
-        ...prev,
-        hasConnectionError: true,
-        errorCount: prev.errorCount + 1,
-        message: `Erro de conexão: ${error.message}`
-      }));
-    }
-  }, [startCountdown, validateAndCleanPairingCode]);
-
-  // CORREÇÃO: Polling simplificado sem reinicialização
+  // Polling simplificado sem reinicialização
   const startPolling = useCallback((instanceName: string) => {
     console.log('[WA Manager] Iniciando polling para:', instanceName);
     
     if (!isMountedRef.current) return;
     
-    // Limpar apenas os timers sem resetar o estado
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     if (codeRenewalIntervalRef.current) clearInterval(codeRenewalIntervalRef.current);
     
@@ -245,8 +245,10 @@ export const useWhatsAppManager = () => {
           message: 'WhatsApp conectado e funcionando!',
           isLoading: false,
           isPolling: false,
+          isRenewing: false,
           hasConnectionError: false,
           errorCount: 0,
+          generationAttempts: 0,
           countdownSeconds: 60
         }));
         toast({ 
@@ -264,21 +266,20 @@ export const useWhatsAppManager = () => {
     // Polling regular a cada 7 segundos
     pollingIntervalRef.current = setInterval(checkStatus, 7000);
 
-    // Renovação automática dos códigos a cada 60 segundos
-    codeRenewalIntervalRef.current = setInterval(() => {
-      renewCodes(instanceName);
-    }, 60000);
+  }, [checkConnectionAndUpdate, cleanupResources, refreshProfile, toast]);
 
-  }, [checkConnectionAndUpdate, cleanupResources, refreshProfile, toast, renewCodes]);
-
-  // CORREÇÃO: Gerar códigos de conexão com validação melhorada
+  // CORREÇÃO: Gerar códigos de conexão com controle de tentativas
   const handleGenerateCodes = useCallback(async (instanceName: string) => {
-    console.log(`[WA Manager] Gerando códigos para:`, instanceName);
+    const maxAttempts = 3;
+    
+    console.log(`[WA Manager] Gerando códigos para: ${instanceName} (tentativa ${state.generationAttempts + 1}/${maxAttempts})`);
+    
     setState(prev => ({ 
       ...prev, 
       isLoading: true, 
-      message: `Gerando códigos de conexão...`,
-      hasConnectionError: false
+      message: `Gerando códigos de conexão (tentativa ${prev.generationAttempts + 1}/${maxAttempts})...`,
+      hasConnectionError: false,
+      generationAttempts: prev.generationAttempts + 1
     }));
     
     try {
@@ -288,9 +289,7 @@ export const useWhatsAppManager = () => {
         success: result.success, 
         hasQR: !!result.qrCode, 
         hasPairing: !!result.pairingCode, 
-        state: result.state,
-        pairingCodeLength: result.pairingCode?.length,
-        rawPairingCode: result.pairingCode
+        state: result.state
       });
 
       if (result.state === 'already_connected') {
@@ -303,17 +302,16 @@ export const useWhatsAppManager = () => {
           message: 'WhatsApp conectado e funcionando!',
           isLoading: false,
           hasConnectionError: false,
-          errorCount: 0
+          errorCount: 0,
+          generationAttempts: 0
         }));
         return;
       }
 
       if (result.success && (result.qrCode || result.pairingCode)) {
         console.log('[WA Manager] Códigos recebidos, validando pairing code...');
-        console.log('[WA Manager] 🚨 DEBUG - Raw pairing code:', result.pairingCode);
         
-        // CORREÇÃO: Usar validação flexível
-        const validPairingCode = validateAndCleanPairingCode(result.pairingCode);
+        const validPairingCode = validatePairingCode(result.pairingCode);
         
         setState(prev => ({
           ...prev,
@@ -326,29 +324,40 @@ export const useWhatsAppManager = () => {
             ? 'Use o QR Code para conectar'
             : validPairingCode 
             ? 'Use o código de pareamento para conectar'
-            : 'Gerando novos códigos...',
+            : 'Códigos gerados - verificando disponibilidade...',
           isLoading: false,
           hasConnectionError: false,
-          errorCount: 0
+          errorCount: 0,
+          generationAttempts: 0
         }));
         
-        startCountdown();
+        startCountdown(instanceName);
         startPolling(instanceName);
       } else {
         throw new Error(result.error || 'Falha ao gerar códigos.');
       }
     } catch (error: any) {
       console.error('[WA Manager] Erro ao gerar códigos:', error);
+      
+      const shouldRetry = state.generationAttempts < maxAttempts;
+      
       setState(prev => ({ 
         ...prev, 
-        connectionState: 'error', 
-        message: error.message, 
+        connectionState: shouldRetry ? 'needs_connection' : 'error', 
+        message: shouldRetry 
+          ? `Erro na tentativa ${prev.generationAttempts}. Tentando novamente...`
+          : `Falha após ${maxAttempts} tentativas: ${error.message}`, 
         isLoading: false,
         hasConnectionError: true,
         errorCount: prev.errorCount + 1
       }));
+      
+      // Retry automático se ainda tem tentativas
+      if (shouldRetry) {
+        setTimeout(() => handleGenerateCodes(instanceName), 2000);
+      }
     }
-  }, [startPolling, startCountdown, validateAndCleanPairingCode]);
+  }, [state.generationAttempts, validatePairingCode, startCountdown, startPolling]);
 
   // Função handleConnect simplificada
   const handleConnect = useCallback(async (method: ConnectionMethod = state.connectionMethod) => {
@@ -377,7 +386,9 @@ export const useWhatsAppManager = () => {
       message: 'Iniciando conexão...', 
       qrCode: null,
       pairingCode: null,
-      hasConnectionError: false
+      hasConnectionError: false,
+      generationAttempts: 0,
+      isRenewing: false
     }));
 
     try {
@@ -407,7 +418,8 @@ export const useWhatsAppManager = () => {
         isLoading: false, 
         message: err.message || 'Erro inesperado.',
         hasConnectionError: true,
-        errorCount: prev.errorCount + 1
+        errorCount: prev.errorCount + 1,
+        generationAttempts: 0
       }));
       toast({ 
         title: "❌ Erro na Conexão", 
@@ -435,11 +447,13 @@ export const useWhatsAppManager = () => {
         connectionState: 'needs_connection',
         isLoading: false,
         isPolling: false,
+        isRenewing: false,
         qrCode: null,
         pairingCode: null,
         message: 'WhatsApp desconectado com sucesso.',
         hasConnectionError: false,
         errorCount: 0,
+        generationAttempts: 0,
         countdownSeconds: 60
       }));
       
@@ -472,13 +486,12 @@ export const useWhatsAppManager = () => {
   // Função para forçar renovação manual dos códigos
   const forceRenewCodes = useCallback(async () => {
     if (profile?.instance_name && state.connectionState === 'is_connecting') {
-      await renewCodes(profile.instance_name);
+      await renewCodes(profile.instance_name, false);
     }
   }, [profile?.instance_name, state.connectionState, renewCodes]);
 
-  // CORREÇÃO: useEffect de inicialização controlado para evitar loops
+  // useEffect de inicialização controlado para evitar loops
   useEffect(() => {
-    // Evitar múltiplas inicializações
     if (isInitializedRef.current || !profile) {
       return;
     }
@@ -520,7 +533,8 @@ export const useWhatsAppManager = () => {
             message: 'WhatsApp conectado e funcionando!',
             instanceName: profile.instance_name,
             hasConnectionError: false,
-            errorCount: 0
+            errorCount: 0,
+            generationAttempts: 0
           }));
           break;
           
@@ -550,7 +564,7 @@ export const useWhatsAppManager = () => {
     };
 
     initializeConnectionState();
-  }, [profile?.id, profile?.numero, profile?.instance_name]); // Dependências específicas para evitar loops
+  }, [profile?.id, profile?.numero, profile?.instance_name, checkConnectionAndUpdate, startPolling]);
 
   // Cleanup ao desmontar
   useEffect(() => {
