@@ -1,3 +1,4 @@
+
 // ABOUTME: Hook principal para gerenciar a conexão WhatsApp com correções definitivas para status "connecting"
 // ABOUTME: Implementa detecção inteligente de status connecting e renovação automática no countdown
 
@@ -308,14 +309,6 @@ export const useWhatsAppManager = () => {
       }));
     }
   }, [validatePairingCode, toast, handleRestartInstance]);
-
-  // NOVA: Função para forçar restart manual
-  const forceRestartInstance = useCallback(async () => {
-    if (profile?.instance_name) {
-      setState(prev => ({ ...prev, restartAttempts: 0 })); // Reset tentativas para permitir restart manual
-      await handleRestartInstance(profile.instance_name);
-    }
-  }, [profile?.instance_name, handleRestartInstance]);
 
   // CORREÇÃO: Iniciar contador regressivo com renovação automática
   const startCountdown = useCallback((instanceName: string) => {
@@ -632,7 +625,7 @@ export const useWhatsAppManager = () => {
     }
   }, [profile?.instance_name, state.connectionState, renewCodes]);
 
-  // NOVA: Função para forçar restart manual
+  // Função para forçar restart manual
   const forceRestartInstance = useCallback(async () => {
     if (profile?.instance_name) {
       setState(prev => ({ ...prev, restartAttempts: 0 })); // Reset tentativas para permitir restart manual
@@ -733,6 +726,6 @@ export const useWhatsAppManager = () => {
     handleDisconnect,
     switchConnectionMethod,
     forceRenewCodes,
-    forceRestartInstance, // NOVA função exportada
+    forceRestartInstance,
   };
 };
