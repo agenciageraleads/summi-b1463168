@@ -1,6 +1,5 @@
-
-// ABOUTME: Componente principal para gerenciar conexão WhatsApp com interface aprimorada e robustez
-// ABOUTME: Design refinado com indicadores visuais claros e ações específicas para cada situação
+// ABOUTME: Componente principal para gerenciar conexão WhatsApp com interface aprimorada para status connecting
+// ABOUTME: Design refinado com indicadores visuais específicos para restart e recriação de instância
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,13 +25,14 @@ import {
   AlertTriangle,
   Check,
   X,
-  Trash2
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 
 export const WhatsAppConnectionManager: React.FC = () => {
   const { profile, refreshProfile } = useProfile();
   const navigate = useNavigate();
-  const { state, handleConnect, handleDisconnect, forceRenewCodes } = useWhatsAppManager();
+  const { state, handleConnect, handleDisconnect, forceRenewCodes, forceRestartInstance } = useWhatsAppManager();
   const { toast } = useToast();
   const [isRecreating, setIsRecreating] = React.useState(false);
 
@@ -112,7 +112,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
     }
   };
 
-  // Renderizar status elegante
+  // Renderizar status elegante com detecção de connecting
   const renderStatus = () => {
     switch (state.connectionState) {
       case 'already_connected':
@@ -136,26 +136,83 @@ export const WhatsAppConnectionManager: React.FC = () => {
           </div>
         );
       case 'is_connecting':
+        // NOVA LÓGICA: Diferentes indicadores baseados no estado interno
+        const isConnectingPersistent = state.connectingDetectedAt && (Date.now() - state.connectingDetectedAt) > 10000;
+        const showRestartIndicator = state.isRestarting || isConnectingPersistent;
+        
         return (
-          <div className="flex items-center space-x-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              {state.isRenewing ? (
-                <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />
+          <div className={`flex items-center space-x-3 p-4 rounded-xl ${
+            showRestartIndicator 
+              ? 'bg-orange-50 border border-orange-200' 
+              : 'bg-blue-50 border border-blue-200'
+          }`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              showRestartIndicator 
+                ? 'bg-orange-100' 
+                : 'bg-blue-100'
+            }`}>
+              {state.isRestarting ? (
+                <RotateCcw className={`w-5 h-5 animate-spin ${
+                  showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
+                }`} />
+              ) : state.isRenewing ? (
+                <RefreshCw className={`w-5 h-5 animate-spin ${
+                  showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
+                }`} />
               ) : (
-                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                <Loader2 className={`w-5 h-5 animate-spin ${
+                  showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
+                }`} />
               )}
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-blue-900">
-                {state.isRenewing ? 'Renovando códigos...' : 'Conectando...'}
+              <h3 className={`font-medium ${
+                showRestartIndicator ? 'text-orange-900' : 'text-blue-900'
+              }`}>
+                {state.isRestarting 
+                  ? `Reiniciando instância (${state.restartAttempts}/2)...`
+                  : state.isRenewing 
+                  ? 'Renovando códigos...' 
+                  : isConnectingPersistent
+                  ? 'Status connecting detectado'
+                  : 'Conectando...'
+                }
               </h3>
-              <p className="text-sm text-blue-700">
-                {state.isRenewing ? 'Gerando novos códigos de conexão' : 'Use um dos métodos abaixo'}
+              <p className={`text-sm ${
+                showRestartIndicator ? 'text-orange-700' : 'text-blue-700'
+              }`}>
+                {state.isRestarting 
+                  ? 'Corrigindo status connecting persistente'
+                  : state.isRenewing 
+                  ? 'Gerando novos códigos de conexão' 
+                  : isConnectingPersistent
+                  ? 'Instância será reiniciada automaticamente'
+                  : 'Use um dos métodos abaixo'
+                }
               </p>
-              {state.isPolling && !state.isRenewing && (
-                <p className="text-xs text-blue-600 mt-1">🔄 Aguardando confirmação</p>
+              {state.isPolling && !state.isRenewing && !state.isRestarting && (
+                <p className={`text-xs mt-1 ${
+                  showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
+                }`}>🔄 Aguardando confirmação</p>
               )}
             </div>
+            
+            {/* NOVO: Botão de restart manual */}
+            {!state.isRestarting && state.restartAttempts < 2 && (
+              <Button 
+                onClick={forceRestartInstance} 
+                variant="outline" 
+                size="sm" 
+                className={`${
+                  showRestartIndicator 
+                    ? 'border-orange-300 text-orange-700 hover:bg-orange-100' 
+                    : 'border-blue-300 text-blue-700 hover:bg-blue-100'
+                }`}
+              >
+                <RotateCcw className="w-4 h-4 mr-1" />
+                Reiniciar
+              </Button>
+            )}
           </div>
         );
       case 'error':
@@ -172,12 +229,17 @@ export const WhatsAppConnectionManager: React.FC = () => {
                   Tentativas: {state.generationAttempts}/3
                 </p>
               )}
+              {state.restartAttempts > 0 && (
+                <p className="text-xs text-red-600 mt-1">
+                  Restarts: {state.restartAttempts}/2
+                </p>
+              )}
             </div>
             <div className="flex space-x-2">
               <Button onClick={() => handleConnect()} variant="outline" size="sm" className="border-red-300 text-red-700 hover:bg-red-100">
                 Tentar Novamente
               </Button>
-              {profile?.instance_name && state.errorCount >= 3 && (
+              {profile?.instance_name && (state.errorCount >= 3 || state.restartAttempts >= 2) && (
                 <Button onClick={handleRecreateInstance} variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-100" disabled={isRecreating}>
                   {isRecreating ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-1" />
@@ -220,9 +282,9 @@ export const WhatsAppConnectionManager: React.FC = () => {
     }
   };
 
-  // NOVA: Renderizar contador elegante com renovação automática
+  // Renderizar contador elegante com renovação automática
   const renderCountdown = () => {
-    if (state.connectionState !== 'is_connecting' || (!state.qrCode && !state.pairingCode) || state.isRenewing) {
+    if (state.connectionState !== 'is_connecting' || (!state.qrCode && !state.pairingCode) || state.isRenewing || state.isRestarting) {
       return null;
     }
 
@@ -277,22 +339,32 @@ export const WhatsAppConnectionManager: React.FC = () => {
     );
   };
 
-  // Renderizar alerta de erro elegante
+  // Renderizar alerta de erro elegante com informações de restart
   const renderErrorAlert = () => {
     if (!state.hasConnectionError || state.errorCount === 0) return null;
+
+    const showRestartInfo = state.restartAttempts > 0;
+    const canRecreate = state.errorCount >= 3 || state.restartAttempts >= 2;
 
     return (
       <div className="flex items-center space-x-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
         <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm text-orange-800 font-medium">
-            {state.errorCount >= 5 
-              ? `Muitos erros detectados (${state.errorCount}). Recomendamos recriar a instância.`
+            {canRecreate
+              ? `Múltiplas falhas detectadas (${state.errorCount} erros, ${state.restartAttempts} restarts). Recomendamos recriar a instância.`
+              : showRestartInfo
+              ? `Tentativa ${state.errorCount}/5 com ${state.restartAttempts} restarts. Sistema tentando resolver automaticamente...`
               : `Tentativa ${state.errorCount}/5. Tentando reconectar...`
             }
           </p>
+          {state.connectingDetectedAt && (
+            <p className="text-xs text-orange-600 mt-1">
+              Status connecting detectado há {Math.floor((Date.now() - state.connectingDetectedAt) / 1000)}s
+            </p>
+          )}
         </div>
-        {state.errorCount >= 3 && (
+        {canRecreate && (
           <Button
             variant="outline"
             size="sm"
@@ -326,7 +398,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
       {renderCountdown()}
 
       {/* Métodos de Conexão */}
-      {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && !state.isRenewing && (
+      {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && !state.isRenewing && !state.isRestarting && (
         <div className="grid gap-6 md:grid-cols-2">
           {/* Método do Código (Preferido) */}
           {state.pairingCode && (
@@ -405,7 +477,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
       )}
 
       {/* Dica de Uso */}
-      {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && !state.isRenewing && (
+      {(state.qrCode || state.pairingCode) && state.connectionState === 'is_connecting' && !state.isRenewing && !state.isRestarting && (
         <div className="text-center space-y-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <p className="text-sm text-gray-600 font-medium">
             💡 Use qualquer um dos métodos - ambos funcionam perfeitamente
@@ -416,6 +488,11 @@ export const WhatsAppConnectionManager: React.FC = () => {
           {state.generationAttempts > 0 && (
             <p className="text-xs text-blue-600">
               ⚡ Sistema com 3 tentativas automáticas para máxima confiabilidade
+            </p>
+          )}
+          {state.restartAttempts > 0 && (
+            <p className="text-xs text-orange-600">
+              🔄 Sistema com restart automático para corrigir status connecting
             </p>
           )}
         </div>

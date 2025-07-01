@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -149,20 +148,47 @@ const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDela
   }
 };
 
-// NOVA: Função para validar pairing code de 8 dígitos
+// CORREÇÃO: Validação rigorosa do pairing code - apenas 8 caracteres alfanuméricos
 const validatePairingCode = (code: string | null | undefined): string | null => {
   if (!code) return null;
   
   const cleanCode = code.toString().trim().toUpperCase();
   
-  // Validar formato: exatos 8 caracteres alfanuméricos
+  // Validação rigorosa - exatos 8 caracteres alfanuméricos
   if (/^[A-Z0-9]{8}$/.test(cleanCode)) {
     console.log(`[PAIRING-VALIDATOR] ✅ Pairing code válido: ${cleanCode}`);
     return cleanCode;
   }
   
-  console.log(`[PAIRING-VALIDATOR] ❌ Pairing code inválido: "${code}" -> limpo: "${cleanCode}"`);
+  console.log(`[PAIRING-VALIDATOR] ❌ Pairing code inválido - formato: "${code}" -> limpo: "${cleanCode}"`);
   return null;
+};
+
+// NOVA: Função para reiniciar instância quando detectar "connecting"
+const restartInstance = async (instanceName: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+  console.log(`[RESTART-INSTANCE] 🔄 Reiniciando instância: ${instanceName}`);
+  
+  try {
+    const restartResponse = await fetch(`${evolutionApiUrl}/instance/restart/${instanceName}`, {
+      method: 'PUT',
+      headers: { 'apikey': evolutionApiKey }
+    });
+    
+    console.log(`[RESTART-INSTANCE] Response status: ${restartResponse.status}, ok: ${restartResponse.ok}`);
+    
+    if (restartResponse.ok) {
+      const restartData = await restartResponse.json();
+      console.log('[RESTART-INSTANCE] ✅ Instância reiniciada com sucesso:', JSON.stringify(restartData, null, 2));
+      return { success: true, data: restartData };
+    } else {
+      const errorText = await restartResponse.text();
+      console.log(`[RESTART-INSTANCE] ❌ Erro ao reiniciar: ${restartResponse.status} - ${errorText}`);
+      return { success: false, error: `HTTP ${restartResponse.status}: ${errorText}` };
+    }
+  } catch (error) {
+    console.error(`[RESTART-INSTANCE] ❌ Erro na requisição:`, error);
+    return { success: false, error: `Erro na requisição: ${error.message}` };
+  }
 };
 
 // CORREÇÃO: Função específica para gerar QR Code (sem parâmetros)
@@ -224,13 +250,14 @@ const generateQRCodeOnly = async (instanceName: string, evolutionApiUrl: string,
   }
 };
 
-// CORREÇÃO: Função específica para gerar Pairing Code (com parâmetro number)
+// CORREÇÃO: Função específica para gerar Pairing Code (com parâmetro number OBRIGATÓRIO)
 const generatePairingCodeOnly = async (instanceName: string, phoneNumber: string, evolutionApiUrl: string, evolutionApiKey: string) => {
   console.log(`[PAIRING-GENERATOR] 🎯 Gerando pairing code para instância: ${instanceName} com número: ${phoneNumber}`);
   
   try {
+    // CORREÇÃO CRÍTICA: Usar endpoint correto com ?number= obrigatório
     const pairingUrl = `${evolutionApiUrl}/instance/connect/${instanceName}?number=${phoneNumber}`;
-    console.log(`[PAIRING-GENERATOR] 🎯 URL do pairing code: ${pairingUrl}`);
+    console.log(`[PAIRING-GENERATOR] 🎯 URL CORRETA do pairing code: ${pairingUrl}`);
     
     const pairingResponse = await retryWithBackoff(() =>
       fetch(pairingUrl, {
@@ -246,7 +273,7 @@ const generatePairingCodeOnly = async (instanceName: string, phoneNumber: string
       console.log('[PAIRING-GENERATOR] 🎯 RAW PAIRING RESPONSE:', JSON.stringify(pairingData, null, 2));
       
       // Buscar pairing code em diferentes propriedades possíveis
-      let rawPairingCode = pairingData.qrcode?.pairingCode || pairingData.pairingCode || pairingData.code;
+      let rawPairingCode = pairingData.pairingCode || pairingData.qrcode?.pairingCode || pairingData.code;
       
       // Validar se é realmente um pairing code de 8 dígitos
       const validPairingCode = validatePairingCode(rawPairingCode);
@@ -264,7 +291,7 @@ const generatePairingCodeOnly = async (instanceName: string, phoneNumber: string
           success: false,
           error: 'Pairing code de 8 dígitos não encontrado na resposta da API',
           rawResponse: pairingData,
-          needsRecreation: true // Sinaliza que precisa recriar a instância
+          needsRestart: true // Sinaliza que precisa reiniciar
         };
       }
     } else {
@@ -398,79 +425,104 @@ const createInstanceWithPairingSupport = async (instanceName: string, phoneNumbe
   }
 };
 
-// NOVA: Função para recriar instância quando pairing code não for gerado corretamente
-const recreateInstanceForPairingCode = async (instanceName: string, phoneNumber: string, webhookUrl: string, evolutionApiUrl: string, evolutionApiKey: string, maxAttempts = 2) => {
-  console.log(`[RECREATE-INSTANCE] 🔄 Iniciando recriação de instância para pairing code: ${instanceName}`);
+// NOVA: Função robusta para lidar com status "connecting" persistente
+const handleConnectingStatus = async (instanceName: string, phoneNumber: string, webhookUrl: string, evolutionApiUrl: string, evolutionApiKey: string, maxRestartAttempts = 2) => {
+  console.log(`[HANDLE-CONNECTING] 🔄 Lidando com status connecting para: ${instanceName}`);
   
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    console.log(`[RECREATE-INSTANCE] 🔄 Tentativa ${attempt}/${maxAttempts}`);
+  for (let restartAttempt = 1; restartAttempt <= maxRestartAttempts; restartAttempt++) {
+    console.log(`[HANDLE-CONNECTING] 🔄 Tentativa de restart ${restartAttempt}/${maxRestartAttempts}`);
     
     try {
-      // 1. Deletar instância existente
-      console.log(`[RECREATE-INSTANCE] 🗑️ Deletando instância existente...`);
-      const deleteResult = await deleteInstance(instanceName, evolutionApiUrl, evolutionApiKey);
+      // 1. Tentar reiniciar a instância
+      const restartResult = await restartInstance(instanceName, evolutionApiUrl, evolutionApiKey);
       
-      if (!deleteResult.success) {
-        console.log(`[RECREATE-INSTANCE] ⚠️ Erro ao deletar, continuando... ${deleteResult.error}`);
-      }
-      
-      // 2. Aguardar processamento da Evolution API
-      console.log(`[RECREATE-INSTANCE] ⏳ Aguardando 5 segundos para processamento...`);
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // 3. Criar nova instância
-      console.log(`[RECREATE-INSTANCE] 🏗️ Criando nova instância...`);
-      const createResult = await createInstanceWithPairingSupport(instanceName, phoneNumber, webhookUrl, evolutionApiUrl, evolutionApiKey);
-      
-      if (createResult.success && createResult.pairingCode) {
-        console.log(`[RECREATE-INSTANCE] ✅ Instância recriada com sucesso - Pairing code: ${createResult.pairingCode}`);
-        return {
-          success: true,
-          pairingCode: createResult.pairingCode,
-          qrCode: createResult.qrCode,
-          attempt: attempt
-        };
-      } else if (createResult.success && createResult.alreadyExists) {
-        console.log(`[RECREATE-INSTANCE] ⚠️ Instância já existe na tentativa ${attempt}, tentando gerar pairing code...`);
-        
-        // Tentar gerar pairing code para instância existente
-        const pairingResult = await generatePairingCodeOnly(instanceName, phoneNumber, evolutionApiUrl, evolutionApiKey);
-        
-        if (pairingResult.success && pairingResult.pairingCode) {
-          console.log(`[RECREATE-INSTANCE] ✅ Pairing code gerado para instância existente: ${pairingResult.pairingCode}`);
-          return {
-            success: true,
-            pairingCode: pairingResult.pairingCode,
-            attempt: attempt
-          };
+      if (!restartResult.success) {
+        console.log(`[HANDLE-CONNECTING] ❌ Restart ${restartAttempt} falhou:`, restartResult.error);
+        if (restartAttempt < maxRestartAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          continue;
+        } else {
+          break; // Vai para recriação
         }
       }
       
-      console.log(`[RECREATE-INSTANCE] ❌ Tentativa ${attempt} falhou:`, createResult.error);
+      // 2. Aguardar estabilização após restart
+      console.log(`[HANDLE-CONNECTING] ⏳ Aguardando 5 segundos após restart...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
-      if (attempt < maxAttempts) {
-        console.log(`[RECREATE-INSTANCE] ⏳ Aguardando antes da próxima tentativa...`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+      // 3. Tentar gerar pairing code após restart
+      const pairingResult = await generatePairingCodeOnly(instanceName, phoneNumber, evolutionApiUrl, evolutionApiKey);
+      
+      if (pairingResult.success && pairingResult.pairingCode) {
+        console.log(`[HANDLE-CONNECTING] ✅ Pairing code gerado após restart: ${pairingResult.pairingCode}`);
+        
+        // Tentar gerar QR Code também
+        const qrResult = await generateQRCodeOnly(instanceName, evolutionApiUrl, evolutionApiKey);
+        
+        return {
+          success: true,
+          pairingCode: pairingResult.pairingCode,
+          qrCode: qrResult.success ? qrResult.qrCode : null,
+          method: 'restart',
+          attempt: restartAttempt
+        };
+      } else {
+        console.log(`[HANDLE-CONNECTING] ❌ Pairing code não gerado após restart ${restartAttempt}`);
+        if (restartAttempt < maxRestartAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
       }
       
     } catch (error) {
-      console.error(`[RECREATE-INSTANCE] ❌ Erro na tentativa ${attempt}:`, error);
-      
-      if (attempt === maxAttempts) {
-        return {
-          success: false,
-          error: `Falha após ${maxAttempts} tentativas: ${error.message}`,
-          attempt: attempt
-        };
+      console.error(`[HANDLE-CONNECTING] ❌ Erro na tentativa de restart ${restartAttempt}:`, error);
+      if (restartAttempt < maxRestartAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
   }
   
-  return {
-    success: false,
-    error: `Falha após ${maxAttempts} tentativas de recriação`,
-    attempt: maxAttempts
-  };
+  // Se chegou aqui, todos os restarts falharam, tentar recriação
+  console.log(`[HANDLE-CONNECTING] 🔄 Todos os restarts falharam, tentando recriação...`);
+  
+  try {
+    // 1. Deletar instância existente
+    const deleteResult = await deleteInstance(instanceName, evolutionApiUrl, evolutionApiKey);
+    if (!deleteResult.success) {
+      console.log(`[HANDLE-CONNECTING] ⚠️ Erro ao deletar, continuando... ${deleteResult.error}`);
+    }
+    
+    // 2. Aguardar processamento da Evolution API
+    console.log(`[HANDLE-CONNECTING] ⏳ Aguardando 5 segundos para processamento...`);
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // 3. Criar nova instância
+    const createResult = await createInstanceWithPairingSupport(instanceName, phoneNumber, webhookUrl, evolutionApiUrl, evolutionApiKey);
+    
+    if (createResult.success && createResult.pairingCode) {
+      console.log(`[HANDLE-CONNECTING] ✅ Instância recriada com pairing code: ${createResult.pairingCode}`);
+      return {
+        success: true,
+        pairingCode: createResult.pairingCode,
+        qrCode: createResult.qrCode,
+        method: 'recreation'
+      };
+    } else {
+      console.log(`[HANDLE-CONNECTING] ❌ Falha na recriação:`, createResult.error);
+      return {
+        success: false,
+        error: `Falha após ${maxRestartAttempts} restarts e recriação: ${createResult.error}`,
+        method: 'recreation'
+      };
+    }
+    
+  } catch (error) {
+    console.error(`[HANDLE-CONNECTING] ❌ Erro na recriação:`, error);
+    return {
+      success: false,
+      error: `Erro na recriação: ${error.message}`,
+      method: 'recreation'
+    };
+  }
 };
 
 serve(async (req) => {
@@ -617,11 +669,12 @@ serve(async (req) => {
 
         auditLog(action.toUpperCase(), user.id, { instanceName: targetInstanceName });
 
-        // Usar função unificada para verificar status
+        // NOVA LÓGICA: Verificar status e lidar com "connecting"
         const statusInfo = await getInstanceStatus(targetInstanceName, cleanApiUrl, evolutionApiKey);
         
         console.log(`[EVOLUTION-HANDLER] Status verificado:`, statusInfo);
         
+        // Se já conectado, retornar
         if (statusInfo.exists && statusInfo.state === 'connected') {
           console.log('[EVOLUTION-HANDLER] Instância já conectada');
           return new Response(JSON.stringify({ 
@@ -633,10 +686,49 @@ serve(async (req) => {
           });
         }
 
+        // CORREÇÃO CRÍTICA: Se detectar "connecting", usar função robusta
+        if (statusInfo.exists && statusInfo.state === 'connecting') {
+          console.log('[EVOLUTION-HANDLER] 🔄 Status connecting detectado - iniciando processo de correção');
+          
+          const connectingResult = await handleConnectingStatus(
+            targetInstanceName, 
+            profile.numero, 
+            webhookUrl, 
+            cleanApiUrl, 
+            evolutionApiKey
+          );
+          
+          if (connectingResult.success) {
+            return new Response(JSON.stringify({ 
+              success: true,
+              state: 'needs_connection',
+              qrCode: connectingResult.qrCode,
+              pairingCode: connectingResult.pairingCode,
+              message: `Códigos gerados após ${connectingResult.method === 'restart' ? 'reiniciar' : 'recriar'} instância`,
+              debug: {
+                method: connectingResult.method,
+                attempt: connectingResult.attempt
+              }
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          } else {
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: `Falha ao corrigir status connecting: ${connectingResult.error}`,
+              needsRecreation: true
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+        }
+
+        // Lógica normal para outros estados
         let qrCode = null;
         let pairingCode = null;
 
-        // CORREÇÃO: Gerar QR Code separadamente (sem parâmetros)
+        // Gerar QR Code separadamente (sem parâmetros)
         console.log(`[EVOLUTION-HANDLER] 🎯 Gerando QR Code...`);
         const qrResult = await generateQRCodeOnly(targetInstanceName, cleanApiUrl, evolutionApiKey);
         
@@ -647,8 +739,8 @@ serve(async (req) => {
           console.error(`[EVOLUTION-HANDLER] ❌ Erro ao gerar QR Code:`, qrResult.error);
         }
 
-        // CORREÇÃO: Gerar Pairing Code separadamente (com parâmetro number)
-        console.log(`[EVOLUTION-HANDLER] 🎯 Gerando Pairing Code...`);
+        // CORREÇÃO CRÍTICA: Gerar Pairing Code com endpoint correto
+        console.log(`[EVOLUTION-HANDLER] 🎯 Gerando Pairing Code com endpoint correto...`);
         const pairingResult = await generatePairingCodeOnly(targetInstanceName, profile.numero, cleanApiUrl, evolutionApiKey);
         
         if (pairingResult.success) {
@@ -657,11 +749,11 @@ serve(async (req) => {
         } else {
           console.error(`[EVOLUTION-HANDLER] ❌ Erro ao gerar pairing code:`, pairingResult.error);
           
-          // NOVA: Se pairing code falhou e sinaliza necessidade de recriação
-          if (pairingResult.needsRecreation) {
-            console.log(`[EVOLUTION-HANDLER] 🔄 Tentando recriar instância para gerar pairing code...`);
+          // Se sinalizar necessidade de restart, usar função robusta
+          if (pairingResult.needsRestart) {
+            console.log(`[EVOLUTION-HANDLER] 🔄 Pairing code necessita restart - usando função robusta...`);
             
-            const recreateResult = await recreateInstanceForPairingCode(
+            const restartResult = await handleConnectingStatus(
               targetInstanceName, 
               profile.numero, 
               webhookUrl, 
@@ -669,12 +761,10 @@ serve(async (req) => {
               evolutionApiKey
             );
             
-            if (recreateResult.success) {
-              pairingCode = recreateResult.pairingCode;
-              if (recreateResult.qrCode) qrCode = recreateResult.qrCode;
-              console.log(`[EVOLUTION-HANDLER] ✅ Instância recriada com pairing code: ${pairingCode}`);
-            } else {
-              console.error(`[EVOLUTION-HANDLER] ❌ Falha na recriação:`, recreateResult.error);
+            if (restartResult.success) {
+              pairingCode = restartResult.pairingCode;
+              if (restartResult.qrCode) qrCode = restartResult.qrCode;
+              console.log(`[EVOLUTION-HANDLER] ✅ Códigos gerados após correção: ${pairingCode}`);
             }
           }
         }
@@ -683,10 +773,12 @@ serve(async (req) => {
         if (!qrCode && !pairingCode) {
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "Não foi possível gerar códigos de conexão. Tente recriar a instância.",
+            error: "Não foi possível gerar códigos de conexão. A instância pode estar em estado connecting.",
+            needsRestart: true,
             debug: {
               qrResult: qrResult.error,
-              pairingResult: pairingResult.error
+              pairingResult: pairingResult.error,
+              instanceStatus: statusInfo.state
             }
           }), {
             status: 500,
@@ -703,7 +795,8 @@ serve(async (req) => {
           debug: {
             qrCodeGenerated: !!qrCode,
             pairingCodeGenerated: !!pairingCode,
-            pairingCodeLength: pairingCode?.length || 0
+            pairingCodeLength: pairingCode?.length || 0,
+            instanceStatus: statusInfo.state
           }
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -845,18 +938,11 @@ serve(async (req) => {
         auditLog("RESTART_INSTANCE", user.id, { instanceName: targetInstanceName });
 
         try {
-          const restartResponse = await retryWithBackoff(() =>
-            fetch(`${cleanApiUrl}/instance/restart/${targetInstanceName}`, {
-              method: 'PUT',
-              headers: { 'apikey': evolutionApiKey }
-            })
-          );
-
-          const success = restartResponse.ok;
+          const restartResult = await restartInstance(targetInstanceName, cleanApiUrl, evolutionApiKey);
           
           return new Response(JSON.stringify({ 
-            success: success,
-            message: success ? 'Instância reiniciada com sucesso' : 'Erro ao reiniciar instância'
+            success: restartResult.success,
+            message: restartResult.success ? 'Instância reiniciada com sucesso' : restartResult.error
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
