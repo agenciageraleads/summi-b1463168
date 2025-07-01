@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
+import { GoogleLoginButton } from '@/components/auth/GoogleLoginButton';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -156,51 +156,67 @@ const LoginPage = () => {
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="email" className="text-summi-gray-700 font-medium">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    placeholder="seu@email.com"
-                    className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
-                  />
+              <>
+                {/* **ADIÇÃO: Botão Google antes do formulário** */}
+                <div className="space-y-4">
+                  <GoogleLoginButton />
+                  
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-summi-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white px-2 text-summi-gray-500">Ou continue com</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="password" className="text-summi-gray-700 font-medium">Senha</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    placeholder="••••••••"
-                    className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
-                  />
-                </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="email" className="text-summi-gray-700 font-medium">E-mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      required
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="seu@email.com"
+                      className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
+                    />
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setShowResetPassword(true)}
-                    className="text-sm text-summi-green hover:text-summi-secondary transition-colors"
+                  <div>
+                    <Label htmlFor="password" className="text-summi-gray-700 font-medium">Senha</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      required
+                      value={formData.password}
+                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                      placeholder="••••••••"
+                      className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPassword(true)}
+                      className="text-sm text-summi-green hover:text-summi-secondary transition-colors"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
+                    disabled={isSubmitting}
                   >
-                    Esqueci minha senha
-                  </button>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Entrando...' : 'Entrar'}
-                </Button>
-              </form>
+                    {isSubmitting ? 'Entrando...' : 'Entrar'}
+                  </Button>
+                </form>
+              </>
             )}
           </CardContent>
         </Card>

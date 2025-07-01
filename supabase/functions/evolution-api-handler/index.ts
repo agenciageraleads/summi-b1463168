@@ -632,26 +632,149 @@ serve(async (req) => {
           });
         }
 
-        const instanceNameToUse = profile.instance_name || createValidInstanceName(profile.nome, profile.numero);
+        // **CORREÇÃO CRÍTICA: Diferenciação de Casos**
         
         if (!profile.instance_name) {
+          // **CASO 1 e 3: Novo Usuário ou Pós-Deleção**
+          console.log('[INITIALIZE] Novo usuário - criando instância');
+          
+          const instanceName = createValidInstanceName(profile.nome, profile.numero);
+          
+          // Salvar nome da instância no banco
           const { error: updateError } = await supabaseServiceRole
             .from('profiles')
-            .update({ instance_name: instanceNameToUse })
+            .update({ instance_name: instanceName })
             .eq('id', user.id);
+          
           if (updateError) {
-            console.error("[EVOLUTION-HANDLER] Erro ao salvar instance_name inicial:", updateError);
+            console.error("[INITIALIZE] Erro ao salvar instance_name:", updateError);
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: "Erro ao configurar instância" 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+          
+          // Criar nova instância
+          const createResult = await createInstanceWithPairingSupport(
+            instanceName, 
+            profile.numero, 
+            webhookUrl, 
+            cleanApiUrl, 
+            evolutionApiKey
+          );
+          
+          if (createResult.success) {
+            return new Response(JSON.stringify({ 
+              success: true,
+              state: 'needs_connection',
+              instanceName: instanceName,
+              qrCode: createResult.qrCode,
+              pairingCode: createResult.pairingCode,
+              message: 'Instância criada - conecte seu WhatsApp'
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          } else {
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: createResult.error || 'Falha ao criar instância'
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+          
+        } else {
+          // **CASO 2: Reconexão - Instância Existente**
+          console.log('[INITIALIZE] Usuário existente - reiniciando instância:', profile.instance_name);
+          
+          // Verificar status atual
+          const statusInfo = await getInstanceStatus(profile.instance_name, cleanApiUrl, evolutionApiKey);
+          
+          if (statusInfo.state === 'connected') {
+            return new Response(JSON.stringify({ 
+              success: true,
+              state: 'already_connected',
+              instanceName: profile.instance_name,
+              message: 'WhatsApp já está conectado'
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+          
+          // Reiniciar instância para gerar novos códigos
+          const restartResult = await restartInstance(profile.instance_name, cleanApiUrl, evolutionApiKey);
+          
+          if (restartResult.success) {
+            // Aguardar estabilização
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Gerar códigos após restart
+            const pairingResult = await generatePairingCodeOnly(profile.instance_name, profile.numero, cleanApiUrl, evolutionApiKey);
+            const qrResult = await generateQRCodeOnly(profile.instance_name, cleanApiUrl, evolutionApiKey);
+            
+            // Se não conseguir gerar pairing code válido, deletar e recriar
+            if (!pairingResult.success || !pairingResult.pairingCode) {
+              console.log('[INITIALIZE] Pairing code não gerado após restart - recriando instância');
+              
+              // Deletar instância atual
+              await deleteInstance(profile.instance_name, cleanApiUrl, evolutionApiKey);
+              
+              // Criar nova instância
+              const recreateResult = await createInstanceWithPairingSupport(
+                profile.instance_name, 
+                profile.numero, 
+                webhookUrl, 
+                cleanApiUrl, 
+                evolutionApiKey
+              );
+              
+              if (recreateResult.success) {
+                return new Response(JSON.stringify({ 
+                  success: true,
+                  state: 'needs_connection',
+                  instanceName: profile.instance_name,
+                  qrCode: recreateResult.qrCode,
+                  pairingCode: recreateResult.pairingCode,
+                  message: 'Instância recriada - conecte seu WhatsApp'
+                }), {
+                  headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+              } else {
+                return new Response(JSON.stringify({ 
+                  success: false, 
+                  error: 'Falha ao recriar instância após problemas de conexão'
+                }), {
+                  status: 500,
+                  headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+              }
+            }
+            
+            return new Response(JSON.stringify({ 
+              success: true,
+              state: 'needs_connection',
+              instanceName: profile.instance_name,
+              qrCode: qrResult.success ? qrResult.qrCode : null,
+              pairingCode: pairingResult.pairingCode,
+              message: 'Instância reiniciada - conecte seu WhatsApp'
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+            
+          } else {
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: 'Falha ao reiniciar instância existente'
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
           }
         }
-
-        return new Response(JSON.stringify({ 
-          success: true,
-          state: 'needs_qr_code',
-          instanceName: instanceNameToUse,
-          message: 'Instância inicializada, gere códigos para conectar'
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
       }
 
       case "generate-qr-code":
