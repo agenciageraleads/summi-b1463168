@@ -534,12 +534,40 @@ export const useWhatsAppManager = () => {
         if (initResult.success && initResult.instanceName) {
           instanceName = initResult.instanceName;
           await refreshProfile();
+          
+          // CORREÇÃO CRÍTICA: Se initResult já contém códigos, processar diretamente
+          if (initResult.qrCode || initResult.pairingCode) {
+            console.log('[WA Manager] Códigos retornados na inicialização');
+            const validPairingCode = validatePairingCode(initResult.pairingCode);
+            
+            setState(prev => ({
+              ...prev,
+              connectionState: 'is_connecting',
+              qrCode: initResult.qrCode || null,
+              pairingCode: validPairingCode,
+              message: initResult.qrCode && validPairingCode 
+                ? 'Use qualquer um dos métodos para conectar seu WhatsApp'
+                : initResult.qrCode 
+                ? 'Use o QR Code para conectar'
+                : validPairingCode 
+                ? 'Use o código de pareamento para conectar'
+                : 'Códigos gerados - verificando disponibilidade...',
+              isLoading: false,
+              hasConnectionError: false,
+              errorCount: 0,
+              generationAttempts: 0
+            }));
+            
+            startCountdown(instanceName);
+            startPolling(instanceName);
+            return; // Sair aqui, não precisa gerar códigos novamente
+          }
         } else {
           throw new Error(initResult.error || 'Falha ao criar a instância.');
         }
       }
       
-      // Gerar códigos de conexão
+      // Gerar códigos de conexão apenas se não foram retornados na inicialização
       await handleGenerateCodes(instanceName);
 
     } catch (err: any) {
@@ -559,7 +587,7 @@ export const useWhatsAppManager = () => {
         variant: 'destructive' 
       });
     }
-  }, [profile, state.isLoading, state.connectionMethod, toast, cleanupResources, refreshProfile, handleGenerateCodes]);
+  }, [profile, state.isLoading, state.connectionMethod, toast, cleanupResources, refreshProfile, handleGenerateCodes, validatePairingCode, startCountdown, startPolling]);
 
   // Desconectar com refresh de perfil
   const handleDisconnect = useCallback(async () => {
