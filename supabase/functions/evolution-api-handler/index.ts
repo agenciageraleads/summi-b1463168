@@ -612,7 +612,11 @@ serve(async (req) => {
       case "initialize-connection": {
         auditLog("INITIALIZE_CONNECTION", user.id);
         
+        console.log(`[INITIALIZE] 🚀 Iniciando inicialização para usuário ${user.id}`);
+        console.log(`[INITIALIZE] 📋 Perfil: nome="${profile.nome}", numero="${profile.numero}", instance_name="${profile.instance_name}"`);
+        
         if (!profile.numero) {
+          console.log('[INITIALIZE] ❌ Número não configurado');
           return new Response(JSON.stringify({ 
             success: true,
             state: 'needs_phone_number',
@@ -623,6 +627,7 @@ serve(async (req) => {
         }
 
         if (!validatePhoneNumber(profile.numero)) {
+          console.log('[INITIALIZE] ❌ Número inválido:', profile.numero);
           return new Response(JSON.stringify({ 
             success: false, 
             error: "Número de telefone inválido. Use formato brasileiro: 5511999999999" 
@@ -632,32 +637,37 @@ serve(async (req) => {
           });
         }
 
-        // **CORREÇÃO CRÍTICA: Diferenciação de Casos**
+        // **CORREÇÃO CRÍTICA: Lógica corrigida**
         
         if (!profile.instance_name) {
-          // **CASO 1 e 3: Novo Usuário ou Pós-Deleção**
-          console.log('[INITIALIZE] Novo usuário - criando instância');
+          // **CASO 1 e 3: Novo Usuário ou Pós-Deleção - CRIAR INSTÂNCIA**
+          console.log('[INITIALIZE] 🆕 NOVO USUÁRIO - criando instância pela primeira vez');
           
           const instanceName = createValidInstanceName(profile.nome, profile.numero);
+          console.log(`[INITIALIZE] 🏷️ Nome da instância gerado: ${instanceName}`);
           
-          // Salvar nome da instância no banco
+          // Salvar nome da instância no banco ANTES de criar
+          console.log('[INITIALIZE] 💾 Salvando instance_name no banco...');
           const { error: updateError } = await supabaseServiceRole
             .from('profiles')
             .update({ instance_name: instanceName })
             .eq('id', user.id);
           
           if (updateError) {
-            console.error("[INITIALIZE] Erro ao salvar instance_name:", updateError);
+            console.error("[INITIALIZE] ❌ Erro ao salvar instance_name:", updateError);
             return new Response(JSON.stringify({ 
               success: false, 
-              error: "Erro ao configurar instância" 
+              error: "Erro ao configurar instância no banco de dados" 
             }), {
               status: 500,
               headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
           }
           
+          console.log('[INITIALIZE] ✅ Instance_name salvo no banco com sucesso');
+          
           // Criar nova instância
+          console.log('[INITIALIZE] 🏗️ Chamando createInstanceWithPairingSupport...');
           const createResult = await createInstanceWithPairingSupport(
             instanceName, 
             profile.numero, 
@@ -666,6 +676,13 @@ serve(async (req) => {
             evolutionApiKey
           );
           
+          console.log('[INITIALIZE] 🏗️ Resultado da criação:', {
+            success: createResult.success,
+            hasQrCode: !!createResult.qrCode,
+            hasPairingCode: !!createResult.pairingCode,
+            error: createResult.error
+          });
+          
           if (createResult.success) {
             return new Response(JSON.stringify({ 
               success: true,
@@ -673,14 +690,15 @@ serve(async (req) => {
               instanceName: instanceName,
               qrCode: createResult.qrCode,
               pairingCode: createResult.pairingCode,
-              message: 'Instância criada - conecte seu WhatsApp'
+              message: 'Nova instância criada - conecte seu WhatsApp'
             }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
           } else {
+            console.error('[INITIALIZE] ❌ Falha na criação da instância:', createResult.error);
             return new Response(JSON.stringify({ 
               success: false, 
-              error: createResult.error || 'Falha ao criar instância'
+              error: createResult.error || 'Falha ao criar nova instância'
             }), {
               status: 500,
               headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -688,13 +706,21 @@ serve(async (req) => {
           }
           
         } else {
-          // **CASO 2: Reconexão - Instância Existente**
-          console.log('[INITIALIZE] Usuário existente - reiniciando instância:', profile.instance_name);
+          // **CASO 2: Usuário Existente - RECONEXÃO**
+          console.log('[INITIALIZE] 🔄 USUÁRIO EXISTENTE - reconectando instância:', profile.instance_name);
           
-          // Verificar status atual
+          // Verificar status atual da instância existente
+          console.log('[INITIALIZE] 🔍 Verificando status da instância existente...');
           const statusInfo = await getInstanceStatus(profile.instance_name, cleanApiUrl, evolutionApiKey);
           
+          console.log('[INITIALIZE] 📊 Status verificado:', {
+            exists: statusInfo.exists,
+            state: statusInfo.state,
+            rawState: statusInfo.rawState
+          });
+          
           if (statusInfo.state === 'connected') {
+            console.log('[INITIALIZE] ✅ Instância já conectada');
             return new Response(JSON.stringify({ 
               success: true,
               state: 'already_connected',
@@ -705,25 +731,46 @@ serve(async (req) => {
             });
           }
           
-          // Reiniciar instância para gerar novos códigos
+          // Para instâncias desconectadas ou com problemas, tentar restart
+          console.log('[INITIALIZE] 🔄 Instância precisa ser reiniciada - chamando restart...');
           const restartResult = await restartInstance(profile.instance_name, cleanApiUrl, evolutionApiKey);
           
+          console.log('[INITIALIZE] 🔄 Resultado do restart:', {
+            success: restartResult.success,
+            error: restartResult.error
+          });
+          
           if (restartResult.success) {
-            // Aguardar estabilização
+            // Aguardar estabilização após restart
+            console.log('[INITIALIZE] ⏳ Aguardando 3 segundos para estabilização...');
             await new Promise(resolve => setTimeout(resolve, 3000));
             
-            // Gerar códigos após restart
+            // Tentar gerar códigos após restart
+            console.log('[INITIALIZE] 🎯 Gerando códigos após restart...');
             const pairingResult = await generatePairingCodeOnly(profile.instance_name, profile.numero, cleanApiUrl, evolutionApiKey);
             const qrResult = await generateQRCodeOnly(profile.instance_name, cleanApiUrl, evolutionApiKey);
             
+            console.log('[INITIALIZE] 🎯 Códigos gerados:', {
+              pairingSuccess: pairingResult.success,
+              pairingCode: pairingResult.pairingCode,
+              qrSuccess: qrResult.success,
+              hasQrCode: !!qrResult.qrCode
+            });
+            
             // Se não conseguir gerar pairing code válido, deletar e recriar
             if (!pairingResult.success || !pairingResult.pairingCode) {
-              console.log('[INITIALIZE] Pairing code não gerado após restart - recriando instância');
+              console.log('[INITIALIZE] ⚠️ Pairing code não gerado após restart - recriando instância');
               
               // Deletar instância atual
+              console.log('[INITIALIZE] 🗑️ Deletando instância atual...');
               await deleteInstance(profile.instance_name, cleanApiUrl, evolutionApiKey);
               
+              // Aguardar processamento
+              console.log('[INITIALIZE] ⏳ Aguardando processamento da deleção...');
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              
               // Criar nova instância
+              console.log('[INITIALIZE] 🏗️ Criando nova instância...');
               const recreateResult = await createInstanceWithPairingSupport(
                 profile.instance_name, 
                 profile.numero, 
@@ -731,6 +778,13 @@ serve(async (req) => {
                 cleanApiUrl, 
                 evolutionApiKey
               );
+              
+              console.log('[INITIALIZE] 🏗️ Resultado da recriação:', {
+                success: recreateResult.success,
+                hasQrCode: !!recreateResult.qrCode,
+                hasPairingCode: !!recreateResult.pairingCode,
+                error: recreateResult.error
+              });
               
               if (recreateResult.success) {
                 return new Response(JSON.stringify({ 
@@ -744,6 +798,7 @@ serve(async (req) => {
                   headers: { ...corsHeaders, "Content-Type": "application/json" }
                 });
               } else {
+                console.error('[INITIALIZE] ❌ Falha na recriação da instância:', recreateResult.error);
                 return new Response(JSON.stringify({ 
                   success: false, 
                   error: 'Falha ao recriar instância após problemas de conexão'
@@ -754,6 +809,7 @@ serve(async (req) => {
               }
             }
             
+            // Se conseguiu gerar códigos após restart
             return new Response(JSON.stringify({ 
               success: true,
               state: 'needs_connection',
@@ -766,6 +822,7 @@ serve(async (req) => {
             });
             
           } else {
+            console.error('[INITIALIZE] ❌ Falha no restart da instância:', restartResult.error);
             return new Response(JSON.stringify({ 
               success: false, 
               error: 'Falha ao reiniciar instância existente'

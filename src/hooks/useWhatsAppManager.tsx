@@ -1,4 +1,3 @@
-
 // ABOUTME: Hook principal para gerenciar a conexão WhatsApp com correções definitivas para status "connecting"
 // ABOUTME: Implementa detecção inteligente de status connecting e renovação automática no countdown
 
@@ -491,9 +490,9 @@ export const useWhatsAppManager = () => {
     }
   }, [state.generationAttempts, validatePairingCode, startCountdown, startPolling, handleRestartInstance]);
 
-  // Função handleConnect simplificada
+  // Função handleConnect simplificada e otimizada
   const handleConnect = useCallback(async (method: ConnectionMethod = state.connectionMethod) => {
-    console.log('[WA Manager] Iniciando processo de conexão');
+    console.log('[WA Manager] 🚀 Iniciando processo de conexão');
 
     if (state.isLoading) {
       console.log('[WA Manager] Já está carregando, ignorando');
@@ -520,24 +519,36 @@ export const useWhatsAppManager = () => {
       pairingCode: null,
       hasConnectionError: false,
       generationAttempts: 0,
-      isRenewing: false
+      isRenewing: false,
+      errorCount: 0,
+      restartAttempts: 0,
+      connectingDetectedAt: null
     }));
 
     try {
-      let instanceName = profile.instance_name;
+      console.log('[WA Manager] 🔧 Chamando initializeWhatsAppConnection...');
+      const initResult = await initializeWhatsAppConnection();
+      
+      console.log('[WA Manager] 🔧 Resultado da inicialização:', {
+        success: initResult.success,
+        instanceName: initResult.instanceName,
+        hasQrCode: !!initResult.qrCode,
+        hasPairingCode: !!initResult.pairingCode,
+        error: initResult.error
+      });
 
-      // Criar instância se necessário
-      if (!instanceName) {
-        console.log('[WA Manager] Criando nova instância...');
-        setState(prev => ({ ...prev, message: 'Criando nova instância...' }));
-        const initResult = await initializeWhatsAppConnection();
-        if (initResult.success && initResult.instanceName) {
-          instanceName = initResult.instanceName;
-          await refreshProfile();
+      if (initResult.success) {
+        let instanceName = initResult.instanceName || profile.instance_name;
+        
+        if (instanceName) {
+          // Atualizar perfil se necessário
+          if (initResult.instanceName && initResult.instanceName !== profile.instance_name) {
+            await refreshProfile();
+          }
           
           // CORREÇÃO CRÍTICA: Se initResult já contém códigos, processar diretamente
           if (initResult.qrCode || initResult.pairingCode) {
-            console.log('[WA Manager] Códigos retornados na inicialização');
+            console.log('[WA Manager] ✅ Códigos retornados na inicialização - processando diretamente');
             const validPairingCode = validatePairingCode(initResult.pairingCode);
             
             setState(prev => ({
@@ -562,16 +573,19 @@ export const useWhatsAppManager = () => {
             startPolling(instanceName);
             return; // Sair aqui, não precisa gerar códigos novamente
           }
+          
+          // Se não retornou códigos, gerar códigos de conexão
+          console.log('[WA Manager] 🎯 Códigos não retornados - gerando códigos...');
+          await handleGenerateCodes(instanceName);
         } else {
-          throw new Error(initResult.error || 'Falha ao criar a instância.');
+          throw new Error('Nome da instância não disponível após inicialização.');
         }
+      } else {
+        throw new Error(initResult.error || 'Falha na inicialização da conexão.');
       }
-      
-      // Gerar códigos de conexão apenas se não foram retornados na inicialização
-      await handleGenerateCodes(instanceName);
 
     } catch (err: any) {
-      console.error('[WA Manager] Erro durante handleConnect:', err);
+      console.error('[WA Manager] ❌ Erro durante handleConnect:', err);
       setState(prev => ({ 
         ...prev, 
         connectionState: 'error', 
