@@ -208,6 +208,8 @@ export type Database = {
           resume_audio: boolean | null
           role: string | null
           segundos_para_resumir: number | null
+          send_on_reaction: boolean | null
+          send_private_only: boolean | null
           "Summi em Audio?": boolean | null
           temas_importantes: string | null
           temas_urgentes: string | null
@@ -215,6 +217,8 @@ export type Database = {
           terms_version: string | null
           transcreve_audio_enviado: boolean | null
           transcreve_audio_recebido: boolean | null
+          translate_audio: boolean | null
+          translate_to: string | null
           updated_at: string | null
         }
         Insert: {
@@ -233,6 +237,8 @@ export type Database = {
           resume_audio?: boolean | null
           role?: string | null
           segundos_para_resumir?: number | null
+          send_on_reaction?: boolean | null
+          send_private_only?: boolean | null
           "Summi em Audio?"?: boolean | null
           temas_importantes?: string | null
           temas_urgentes?: string | null
@@ -240,6 +246,8 @@ export type Database = {
           terms_version?: string | null
           transcreve_audio_enviado?: boolean | null
           transcreve_audio_recebido?: boolean | null
+          translate_audio?: boolean | null
+          translate_to?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -258,6 +266,8 @@ export type Database = {
           resume_audio?: boolean | null
           role?: string | null
           segundos_para_resumir?: number | null
+          send_on_reaction?: boolean | null
+          send_private_only?: boolean | null
           "Summi em Audio?"?: boolean | null
           temas_importantes?: string | null
           temas_urgentes?: string | null
@@ -265,6 +275,8 @@ export type Database = {
           terms_version?: string | null
           transcreve_audio_enviado?: boolean | null
           transcreve_audio_recebido?: boolean | null
+          translate_audio?: boolean | null
+          translate_to?: string | null
           updated_at?: string | null
         }
         Relationships: [

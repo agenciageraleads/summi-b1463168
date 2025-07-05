@@ -1,4 +1,3 @@
-
 // ABOUTME: Hook principal para gerenciamento de perfis com validações de segurança aprimoradas
 // ABOUTME: Implementa operações CRUD com logs de auditoria e validações rigorosas
 
@@ -25,6 +24,7 @@ export interface Profile {
   segundos_para_resumir?: number;
   'Summi em Audio?'?: boolean;
   apenas_horario_comercial?: boolean;
+  send_private_only?: boolean;
   referral_code?: string;
   referred_by_user_id?: string;
   onboarding_completed?: boolean;
