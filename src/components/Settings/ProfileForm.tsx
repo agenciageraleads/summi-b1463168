@@ -7,13 +7,11 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Profile } from '@/hooks/useProfile';
-
 interface ProfileFormProps {
   profile: Profile;
   onSave: (data: Partial<Profile>) => Promise<void>;
   isUpdating: boolean;
 }
-
 export const ProfileForm: React.FC<ProfileFormProps> = ({
   profile,
   onSave,
@@ -23,13 +21,13 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
   const formatPhoneNumber = (value: string) => {
     // Remove tudo que não é dígito
     const cleanValue = value.replace(/\D/g, '');
-    
+
     // Se começar com 55, remove o código do país para formatação visual
     let phoneNumber = cleanValue;
     if (cleanValue.startsWith('55') && cleanValue.length >= 4) {
       phoneNumber = cleanValue.substring(2);
     }
-    
+
     // Aplica a máscara (XX) XXXXX-XXXX
     if (phoneNumber.length <= 2) {
       return phoneNumber;
@@ -38,7 +36,6 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     } else if (phoneNumber.length <= 11) {
       return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7)}`;
     }
-    
     return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`;
   };
 
@@ -87,15 +84,13 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       'Summi em Audio?': profile['Summi em Audio?'] ?? false,
       apenas_horario_comercial: profile.apenas_horario_comercial ?? true
     };
-    
     setFormData(newFormData);
-    
+
     // Atualizar a exibição formatada do número
     if (newFormData.numero) {
       setDisplayNumber(formatPhoneNumber(newFormData.numero));
     }
   }, [profile]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('[PROFILE_FORM] Submitting form with data:', formData);
@@ -106,7 +101,6 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       console.error('[PROFILE_FORM] Error during form submission:', error);
     }
   };
-
   const handleInputChange = (field: keyof typeof formData, value: any) => {
     console.log(`[PROFILE_FORM] Field ${field} changed to:`, value);
     setFormData(prev => ({
@@ -120,13 +114,10 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     const inputValue = e.target.value;
     const formattedValue = formatPhoneNumber(inputValue);
     const unformattedValue = unformatPhoneNumber(inputValue);
-    
     setDisplayNumber(formattedValue);
     handleInputChange('numero', unformattedValue);
   };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+  return <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Informações Pessoais</CardTitle>
@@ -137,29 +128,15 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="nome">Nome</Label>
-            <Input 
-              id="nome" 
-              value={formData.nome} 
-              onChange={e => handleInputChange('nome', e.target.value)} 
-              placeholder="Seu nome completo" 
-            />
+            <Input id="nome" value={formData.nome} onChange={e => handleInputChange('nome', e.target.value)} placeholder="Seu nome completo" />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="numero">Número de WhatsApp</Label>
-            <Input 
-              id="numero" 
-              value={displayNumber} 
-              onChange={handlePhoneChange} 
-              placeholder="(11) 99999-9999" 
-              disabled={isWhatsAppConnected}
-              maxLength={15}
-            />
-            {isWhatsAppConnected && (
-              <p className="text-sm text-orange-600">
+            <Input id="numero" value={displayNumber} onChange={handlePhoneChange} placeholder="(11) 99999-9999" disabled={isWhatsAppConnected} maxLength={15} />
+            {isWhatsAppConnected && <p className="text-sm text-orange-600">
                 ⚠️ Para alterar o número, desconecte primeiro o WhatsApp na aba Dashboard
-              </p>
-            )}
+              </p>}
           </div>
         </CardContent>
       </Card>
@@ -215,10 +192,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
 
       <Card>
         <CardHeader>
-          <CardTitle>Configurações Gerais</CardTitle>
-          <CardDescription>
-            Configurações gerais do sistema
-          </CardDescription>
+          <CardTitle>Configurações Gerais da Summi</CardTitle>
+          <CardDescription>Escolha como Receber seus Relatórios Peródicos (Summis)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
@@ -268,6 +243,5 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       <Button type="submit" className="w-full" disabled={isUpdating}>
         {isUpdating ? 'Salvando...' : 'Salvar Alterações'}
       </Button>
-    </form>
-  );
+    </form>;
 };
