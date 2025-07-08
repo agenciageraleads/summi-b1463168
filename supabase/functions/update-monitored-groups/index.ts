@@ -54,24 +54,6 @@ serve(async (req) => {
       )
     }
 
-    // Verificar se o usuário é admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile || profile.role !== 'admin') {
-      console.error('[UPDATE-MONITORED-GROUPS] Usuário não é admin:', profileError)
-      return new Response(
-        JSON.stringify({ error: 'Acesso negado. Apenas administradores podem acessar esta funcionalidade.' }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
-    }
-
     const { userId, groupId, groupName, action } = await req.json()
     
     if (!userId || !groupId || !action) {
@@ -79,6 +61,18 @@ serve(async (req) => {
         JSON.stringify({ error: 'userId, groupId e action são obrigatórios' }),
         {
           status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    // Verificar se o usuário está tentando modificar seus próprios grupos
+    if (userId !== user.id) {
+      console.error('[UPDATE-MONITORED-GROUPS] Usuário tentando modificar grupos de outro usuário:', { requestUserId: userId, authenticatedUserId: user.id });
+      return new Response(
+        JSON.stringify({ error: 'Você só pode modificar seus próprios grupos monitorados' }),
+        {
+          status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       )
@@ -94,8 +88,28 @@ serve(async (req) => {
         .eq('user_id', userId)
 
       if (currentCount && currentCount >= 3) {
+        console.log('[UPDATE-MONITORED-GROUPS] Limite de grupos atingido para usuário:', userId, 'count:', currentCount);
         return new Response(
           JSON.stringify({ error: 'Limite máximo de 3 grupos monitorados atingido' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
+      // Verificar se o grupo já está sendo monitorado
+      const { data: existingGroup } = await supabase
+        .from('monitored_whatsapp_groups')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('group_id', groupId)
+        .single()
+
+      if (existingGroup) {
+        console.log('[UPDATE-MONITORED-GROUPS] Grupo já está sendo monitorado:', groupId);
+        return new Response(
+          JSON.stringify({ error: 'Este grupo já está sendo monitorado' }),
           {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

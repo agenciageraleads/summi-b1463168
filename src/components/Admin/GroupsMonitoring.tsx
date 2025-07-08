@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,7 @@ interface WhatsAppGroup {
   isMonitored: boolean;
 }
 
-// Componente para monitoramento de grupos WhatsApp - SIMPLIFICADO
+// Componente para monitoramento de grupos WhatsApp - BETA FEATURE
 export const GroupsMonitoring: React.FC = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -28,8 +29,9 @@ export const GroupsMonitoring: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [isAddingGroups, setIsAddingGroups] = useState(false);
 
-  // CORREÇÃO: Buscar grupos automaticamente quando o componente carrega
+  // Buscar grupos automaticamente quando o componente carrega
   useEffect(() => {
     if (user && profile?.instance_name) {
       fetchWhatsAppGroups();
@@ -37,7 +39,7 @@ export const GroupsMonitoring: React.FC = () => {
     }
   }, [user, profile?.instance_name]);
 
-  // Buscar grupos do WhatsApp - CORRIGIDO para funcionar para qualquer usuário
+  // Buscar grupos do WhatsApp
   const fetchWhatsAppGroups = async () => {
     if (!user || !profile?.instance_name) {
       toast({
@@ -105,33 +107,69 @@ export const GroupsMonitoring: React.FC = () => {
       setMonitoredGroups(monitored);
     } catch (error) {
       console.error('Erro ao buscar grupos monitorados:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar grupos monitorados",
+        variant: "destructive",
+      });
     }
   };
 
-  // Adicionar grupos ao monitoramento
+  // Adicionar grupos ao monitoramento (um por vez)
   const addToMonitoring = async () => {
     if (!user || selectedGroups.length === 0) return;
 
+    setIsAddingGroups(true);
     try {
       const groupsToAdd = groups.filter(g => selectedGroups.includes(g.id));
-      
-      const { error } = await supabase.functions.invoke('update-monitored-groups', {
-        body: {
-          userId: user.id,
-          action: 'add',
-          groups: groupsToAdd.map(g => ({
-            group_id: g.id,
-            group_name: g.name
-          }))
-        },
-      });
+      let successCount = 0;
+      let errorCount = 0;
 
-      if (error) throw error;
+      // Processar grupos um por vez
+      for (const group of groupsToAdd) {
+        try {
+          console.log(`[GroupsMonitoring] Adicionando grupo: ${group.name} (${group.id})`);
+          
+          const { data, error } = await supabase.functions.invoke('update-monitored-groups', {
+            body: {
+              userId: user.id,
+              groupId: group.id,
+              groupName: group.name,
+              action: 'add'
+            },
+          });
 
-      toast({
-        title: "Sucesso",
-        description: `${selectedGroups.length} grupo(s) adicionado(s) ao monitoramento`,
-      });
+          if (error) {
+            console.error(`[GroupsMonitoring] Erro ao adicionar grupo ${group.name}:`, error);
+            errorCount++;
+          } else if (data?.success) {
+            console.log(`[GroupsMonitoring] Grupo ${group.name} adicionado com sucesso`);
+            successCount++;
+          } else {
+            console.error(`[GroupsMonitoring] Falha ao adicionar grupo ${group.name}:`, data?.error);
+            errorCount++;
+          }
+        } catch (error) {
+          console.error(`[GroupsMonitoring] Erro inesperado ao adicionar grupo ${group.name}:`, error);
+          errorCount++;
+        }
+      }
+
+      // Feedback para o usuário
+      if (successCount > 0) {
+        toast({
+          title: "Sucesso",
+          description: `${successCount} grupo(s) adicionado(s) ao monitoramento`,
+        });
+      }
+
+      if (errorCount > 0) {
+        toast({
+          title: "Atenção",
+          description: `${errorCount} grupo(s) não puderam ser adicionados. Verifique se já estão sendo monitorados ou se atingiu o limite.`,
+          variant: "destructive",
+        });
+      }
 
       setSelectedGroups([]);
       await fetchMonitoredGroups();
@@ -139,9 +177,11 @@ export const GroupsMonitoring: React.FC = () => {
       console.error('Erro ao adicionar grupos:', error);
       toast({
         title: "Erro",
-        description: "Erro ao adicionar grupos ao monitoramento",
+        description: "Erro inesperado ao adicionar grupos ao monitoramento",
         variant: "destructive",
       });
+    } finally {
+      setIsAddingGroups(false);
     }
   };
 
@@ -150,20 +190,31 @@ export const GroupsMonitoring: React.FC = () => {
     if (!user) return;
 
     try {
-      const { error } = await supabase
-        .from('monitored_whatsapp_groups')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('group_id', groupId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: "Grupo removido do monitoramento",
+      console.log(`[GroupsMonitoring] Removendo grupo: ${groupId}`);
+      
+      const { data, error } = await supabase.functions.invoke('update-monitored-groups', {
+        body: {
+          userId: user.id,
+          groupId: groupId,
+          action: 'remove'
+        },
       });
 
-      await fetchMonitoredGroups();
+      if (error) {
+        console.error('[GroupsMonitoring] Erro ao remover grupo:', error);
+        throw error;
+      }
+
+      if (data?.success) {
+        console.log('[GroupsMonitoring] Grupo removido com sucesso');
+        toast({
+          title: "Sucesso",
+          description: "Grupo removido do monitoramento",
+        });
+        await fetchMonitoredGroups();
+      } else {
+        throw new Error(data?.error || 'Erro ao remover grupo');
+      }
     } catch (error) {
       console.error('Erro ao remover grupo:', error);
       toast({
@@ -185,7 +236,7 @@ export const GroupsMonitoring: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* CORREÇÃO: Controles simplificados */}
+      {/* Controles de busca e ações */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
@@ -204,9 +255,13 @@ export const GroupsMonitoring: React.FC = () => {
             Atualizar Grupos
           </Button>
           {selectedGroups.length > 0 && (
-            <Button onClick={addToMonitoring} className="bg-green-600 hover:bg-green-700">
+            <Button 
+              onClick={addToMonitoring} 
+              disabled={isAddingGroups}
+              className="bg-green-600 hover:bg-green-700"
+            >
               <Plus className="h-4 w-4 mr-2" />
-              Monitorar ({selectedGroups.length})
+              {isAddingGroups ? 'Adicionando...' : `Monitorar (${selectedGroups.length})`}
             </Button>
           )}
         </div>
