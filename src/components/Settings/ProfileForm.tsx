@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Profile } from '@/hooks/useProfile';
+import { GoogleCalendarIntegration } from './GoogleCalendarIntegration';
 
 interface ProfileFormProps {
   profile: Profile;
@@ -62,6 +63,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
     resume_audio: profile.resume_audio ?? false,
     segundos_para_resumir: profile.segundos_para_resumir ?? 45,
+    send_on_reaction: profile.send_on_reaction ?? false,
     send_private_only: profile.send_private_only ?? false,
     'Summi em Audio?': profile['Summi em Audio?'] ?? false,
     apenas_horario_comercial: profile.apenas_horario_comercial ?? true
@@ -85,6 +87,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
       resume_audio: profile.resume_audio ?? false,
       segundos_para_resumir: profile.segundos_para_resumir ?? 45,
+      send_on_reaction: profile.send_on_reaction ?? false,
       send_private_only: profile.send_private_only ?? false,
       'Summi em Audio?': profile['Summi em Audio?'] ?? false,
       apenas_horario_comercial: profile.apenas_horario_comercial ?? true
@@ -198,6 +201,12 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         </CardContent>
       </Card>
 
+      {/* GOOGLE CALENDAR INTEGRATION */}
+      <GoogleCalendarIntegration 
+        profile={profile} 
+        onUpdate={onSave}
+      />
+
       {/* 3. CONFIGURAÇÕES GERAIS DA SUMMI */}
       <Card>
         <CardHeader>
@@ -244,16 +253,26 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Send on Reaction - Nova flag prioritária */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Transcrever áudios recebidos</Label>
-              <p className="text-sm text-muted-foreground">
-                Converter áudios recebidos em texto automaticamente
-              </p>
+              <Label className="text-base font-medium">
+                ⚡ Transcrever apenas ao reagir
+              </Label>
+              <div className="text-sm text-muted-foreground">
+                Transcrever áudios apenas quando você reagir com o emoji ⚡ na mensagem
+              </div>
             </div>
             <Switch
-              checked={formData.transcreve_audio_recebido}
-              onCheckedChange={(checked) => handleInputChange('transcreve_audio_recebido', checked)}
+              checked={formData.send_on_reaction || false}
+              onCheckedChange={(checked) => {
+                handleInputChange('send_on_reaction', checked);
+                // Se ativado, desativa as outras flags de transcrição
+                if (checked) {
+                  handleInputChange('transcreve_audio_recebido', false);
+                  handleInputChange('transcreve_audio_enviado', false);
+                }
+              }}
             />
           </div>
 
@@ -261,14 +280,53 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Transcrever áudios enviados</Label>
-              <p className="text-sm text-muted-foreground">
-                Converter áudios enviados em texto automaticamente
-              </p>
+              <Label className={`text-base font-medium ${formData.send_on_reaction ? 'text-muted-foreground' : ''}`}>
+                Transcrever áudios recebidos
+              </Label>
+              <div className="text-sm text-muted-foreground">
+                {formData.send_on_reaction 
+                  ? 'Desabilitado - usando transcrição por reação ⚡'
+                  : 'Converter áudios recebidos em texto automaticamente'
+                }
+              </div>
+            </div>
+            <Switch
+              checked={formData.transcreve_audio_recebido}
+              onCheckedChange={(checked) => {
+                handleInputChange('transcreve_audio_recebido', checked);
+                // Se ativado, desativa send_on_reaction
+                if (checked) {
+                  handleInputChange('send_on_reaction', false);
+                }
+              }}
+              disabled={formData.send_on_reaction}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className={`text-base font-medium ${formData.send_on_reaction ? 'text-muted-foreground' : ''}`}>
+                Transcrever áudios enviados
+              </Label>
+              <div className="text-sm text-muted-foreground">
+                {formData.send_on_reaction 
+                  ? 'Desabilitado - usando transcrição por reação ⚡'
+                  : 'Converter áudios enviados em texto automaticamente'
+                }
+              </div>
             </div>
             <Switch
               checked={formData.transcreve_audio_enviado}
-              onCheckedChange={(checked) => handleInputChange('transcreve_audio_enviado', checked)}
+              onCheckedChange={(checked) => {
+                handleInputChange('transcreve_audio_enviado', checked);
+                // Se ativado, desativa send_on_reaction
+                if (checked) {
+                  handleInputChange('send_on_reaction', false);
+                }
+              }}
+              disabled={formData.send_on_reaction}
             />
           </div>
 

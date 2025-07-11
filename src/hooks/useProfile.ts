@@ -22,12 +22,18 @@ export interface Profile {
   transcreve_audio_enviado?: boolean;
   resume_audio?: boolean;
   segundos_para_resumir?: number;
+  send_on_reaction?: boolean;
   'Summi em Audio?'?: boolean;
   apenas_horario_comercial?: boolean;
   send_private_only?: boolean;
   referral_code?: string;
   referred_by_user_id?: string;
   onboarding_completed?: boolean;
+  google_calendar_connected?: boolean;
+  google_calendar_token?: string;
+  google_calendar_refresh_token?: string;
+  default_calendar_id?: string;
+  calendar_preferences?: any;
   role?: string;
 }
 

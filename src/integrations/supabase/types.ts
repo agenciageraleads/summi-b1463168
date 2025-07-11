@@ -200,8 +200,13 @@ export type Database = {
         Row: {
           apenas_horario_comercial: boolean | null
           avatar: string | null
+          calendar_preferences: Json | null
           created_at: string | null
+          default_calendar_id: string | null
           email: string | null
+          google_calendar_connected: boolean | null
+          google_calendar_refresh_token: string | null
+          google_calendar_token: string | null
           id: string
           instance_name: string | null
           name: string | null
@@ -229,8 +234,13 @@ export type Database = {
         Insert: {
           apenas_horario_comercial?: boolean | null
           avatar?: string | null
+          calendar_preferences?: Json | null
           created_at?: string | null
+          default_calendar_id?: string | null
           email?: string | null
+          google_calendar_connected?: boolean | null
+          google_calendar_refresh_token?: string | null
+          google_calendar_token?: string | null
           id: string
           instance_name?: string | null
           name?: string | null
@@ -258,8 +268,13 @@ export type Database = {
         Update: {
           apenas_horario_comercial?: boolean | null
           avatar?: string | null
+          calendar_preferences?: Json | null
           created_at?: string | null
+          default_calendar_id?: string | null
           email?: string | null
+          google_calendar_connected?: boolean | null
+          google_calendar_refresh_token?: string | null
+          google_calendar_token?: string | null
           id?: string
           instance_name?: string | null
           name?: string | null
@@ -341,6 +356,50 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      user_calendars: {
+        Row: {
+          calendar_id: string
+          calendar_name: string
+          color: string | null
+          created_at: string
+          id: string
+          is_default: boolean | null
+          is_enabled: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_id: string
+          calendar_name: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          is_enabled?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_id?: string
+          calendar_name?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          is_enabled?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_calendars_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_groups_cache: {
         Row: {
