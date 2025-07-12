@@ -4,11 +4,41 @@ import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 import { SubscriptionStatus } from '@/components/SubscriptionStatus';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 const SettingsPage = () => {
-  const { profile, isLoading, updateProfile } = useProfile();
+  const { profile, isLoading, updateProfile, refreshProfile } = useProfile();
   const [isUpdating, setIsUpdating] = useState(false);
+  const { toast } = useToast();
+
+  // Listener global para mensagens do Google Calendar
+  useEffect(() => {
+    const handleGoogleCalendarMessage = async (event: MessageEvent) => {
+      if (event.data.type === 'GOOGLE_CALENDAR_SUCCESS') {
+        console.log('[SETTINGS_PAGE] Google Calendar success detected, refreshing profile...');
+        
+        // Pequeno delay para garantir que o backend processou tudo
+        setTimeout(async () => {
+          try {
+            await refreshProfile();
+            toast({
+              title: "Conectado!",
+              description: "Google Calendar conectado e dados atualizados automaticamente.",
+            });
+          } catch (error) {
+            console.error('[SETTINGS_PAGE] Error refreshing profile:', error);
+          }
+        }, 1000);
+      }
+    };
+
+    window.addEventListener('message', handleGoogleCalendarMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleGoogleCalendarMessage);
+    };
+  }, [refreshProfile, toast]);
 
   // Função para salvar as alterações do perfil
   const handleSaveProfile = async (data: Partial<typeof profile>) => {
@@ -17,6 +47,15 @@ const SettingsPage = () => {
       await updateProfile(data);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // Função para refresh do perfil (passa para componentes filhos)
+  const handleRefreshProfile = async () => {
+    try {
+      await refreshProfile();
+    } catch (error) {
+      console.error('[SETTINGS_PAGE] Error in handleRefreshProfile:', error);
     }
   };
 
@@ -55,6 +94,7 @@ const SettingsPage = () => {
           profile={profile}
           onSave={handleSaveProfile}
           isUpdating={isUpdating}
+          onRefreshProfile={handleRefreshProfile}
         />
         
         {/* Status da assinatura */}

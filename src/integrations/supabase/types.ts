@@ -172,6 +172,27 @@ export type Database = {
         }
         Relationships: []
       }
+      leads: {
+        Row: {
+          created_at: string
+          id: number
+          name: string | null
+          number: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name?: string | null
+          number?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string | null
+          number?: string | null
+        }
+        Relationships: []
+      }
       monitored_whatsapp_groups: {
         Row: {
           created_at: string

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,12 +13,14 @@ interface ProfileFormProps {
   profile: Profile;
   onSave: (data: Partial<Profile>) => Promise<void>;
   isUpdating: boolean;
+  onRefreshProfile?: () => Promise<void>;
 }
 
 export const ProfileForm: React.FC<ProfileFormProps> = ({
   profile,
   onSave,
-  isUpdating
+  isUpdating,
+  onRefreshProfile
 }) => {
   // Função para formatar número de telefone brasileiro
   const formatPhoneNumber = (value: string) => {
@@ -128,6 +129,15 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     handleInputChange('numero', unformattedValue);
   };
 
+  // Função melhorada para lidar com updates do Google Calendar
+  const handleGoogleCalendarUpdate = async (updates: Partial<Profile>) => {
+    await onSave(updates);
+    // Opcional: refresh adicional se fornecido
+    if (onRefreshProfile) {
+      await onRefreshProfile();
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* 1. INFORMAÇÕES PESSOAIS */}
@@ -201,10 +211,10 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         </CardContent>
       </Card>
 
-      {/* GOOGLE CALENDAR INTEGRATION */}
+      {/* GOOGLE CALENDAR INTEGRATION com callback de refresh */}
       <GoogleCalendarIntegration 
         profile={profile} 
-        onUpdate={onSave}
+        onUpdate={handleGoogleCalendarUpdate}
       />
 
       {/* 3. CONFIGURAÇÕES GERAIS DA SUMMI */}

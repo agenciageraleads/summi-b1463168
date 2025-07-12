@@ -1,12 +1,13 @@
+
 // ABOUTME: Componente para gerenciar integração com Google Calendar
-// ABOUTME: Conectar, listar calendários e configurar preferências
+// ABOUTME: Conectar, listar calendários e configurar preferências com UX aprimorada
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, RefreshCw, Unlink, CheckCircle, Star } from 'lucide-react';
+import { Calendar, RefreshCw, Unlink, CheckCircle, Star, Loader } from 'lucide-react';
 import { useGoogleCalendar, UserCalendar } from '@/hooks/useGoogleCalendar';
 import { Profile } from '@/hooks/useProfile';
 
@@ -25,26 +26,49 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
     syncCalendars,
     updateCalendarSettings,
     loadUserCalendars,
-  } = useGoogleCalendar();
+  } = useGoogleCalendar({
+    onRefreshProfile: async () => {
+      // Esta função será chamada automaticamente após o sucesso da conexão
+      // O refresh do perfil será feito pelo componente pai
+      console.log('[GOOGLE_CALENDAR] Auto-refresh solicitado');
+    }
+  });
 
   const [isUpdating, setIsUpdating] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const isConnected = profile.google_calendar_connected;
 
   useEffect(() => {
     if (isConnected && profile.id) {
+      setConnectionStatus('connected');
       loadUserCalendars(profile.id);
+    } else {
+      setConnectionStatus('idle');
     }
   }, [isConnected, profile.id, loadUserCalendars]);
+
+  useEffect(() => {
+    if (isConnecting) {
+      setConnectionStatus('connecting');
+    }
+  }, [isConnecting]);
 
   const handleConnect = async () => {
     if (!profile.id) return;
     
+    setConnectionStatus('connecting');
+    
     const success = await connectGoogleCalendar(profile.id);
     if (success) {
-      // Atualiza o perfil local
+      // Atualiza o perfil local - o hook já cuida do refresh automático
       await onUpdate({ google_calendar_connected: true });
+      setConnectionStatus('connected');
       // Carrega os calendários
       await loadUserCalendars(profile.id);
+    } else {
+      setConnectionStatus('error');
+      // Volta para idle após 3 segundos
+      setTimeout(() => setConnectionStatus('idle'), 3000);
     }
   };
 
@@ -58,6 +82,7 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
         default_calendar_id: undefined,
         calendar_preferences: {}
       });
+      setConnectionStatus('idle');
     }
   };
 
@@ -92,19 +117,45 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
     }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          Google Calendar
-        </CardTitle>
-        <CardDescription>
-          Conecte sua agenda do Google para integração inteligente com suas mensagens.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!isConnected ? (
+  const getConnectionStatusContent = () => {
+    switch (connectionStatus) {
+      case 'connecting':
+        return (
+          <div className="flex flex-col items-center gap-4 py-6">
+            <div className="flex items-center gap-2">
+              <Loader className="h-5 w-5 animate-spin text-blue-500" />
+              <span className="font-medium text-blue-600">Conectando ao Google Calendar...</span>
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              Uma nova janela foi aberta para autorização. <br />
+              Após autorizar, esta página será atualizada automaticamente.
+            </p>
+          </div>
+        );
+      
+      case 'error':
+        return (
+          <div className="flex flex-col items-center gap-4 py-6">
+            <div className="text-center">
+              <h3 className="font-medium mb-2 text-red-600">Erro na Conexão</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Não foi possível conectar ao Google Calendar. Tente novamente.
+              </p>
+            </div>
+            <Button 
+              onClick={handleConnect}
+              disabled={isConnecting}
+              variant="outline"
+              className="min-w-[200px]"
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              Tentar Novamente
+            </Button>
+          </div>
+        );
+
+      default:
+        return (
           <div className="flex flex-col items-center gap-4 py-6">
             <div className="text-center">
               <h3 className="font-medium mb-2">Conectar Google Calendar</h3>
@@ -118,19 +169,28 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
               disabled={isConnecting}
               className="min-w-[200px]"
             >
-              {isConnecting ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Conectando...
-                </>
-              ) : (
-                <>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Conectar Google Calendar
-                </>
-              )}
+              <Calendar className="mr-2 h-4 w-4" />
+              Conectar Google Calendar
             </Button>
           </div>
+        );
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Google Calendar
+        </CardTitle>
+        <CardDescription>
+          Conecte sua agenda do Google para integração inteligente com suas mensagens.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!isConnected ? (
+          getConnectionStatusContent()
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">

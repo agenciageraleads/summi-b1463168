@@ -1,5 +1,5 @@
 // ABOUTME: Hook para gerenciar integração com Google Calendar
-// ABOUTME: Conectar, desconectar, sincronizar e gerenciar calendários
+// ABOUTME: Conectar, desconectar, sincronizar e gerenciar calendários com UX melhorada
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +17,11 @@ export interface UserCalendar {
   updated_at: string;
 }
 
-export const useGoogleCalendar = () => {
+interface UseGoogleCalendarProps {
+  onRefreshProfile?: () => Promise<void>;
+}
+
+export const useGoogleCalendar = ({ onRefreshProfile }: UseGoogleCalendarProps = {}) => {
   const [calendars, setCalendars] = useState<UserCalendar[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,16 +43,31 @@ export const useGoogleCalendar = () => {
         'width=500,height=600,scrollbars=yes'
       );
 
-      // Escuta mensagens do popup
+      // Escuta mensagens do popup com auto-refresh melhorado
       return new Promise<boolean>((resolve) => {
+        let isResolved = false;
+        
         const messageListener = (event: MessageEvent) => {
+          if (isResolved) return;
+          
           if (event.data.type === 'GOOGLE_CALENDAR_SUCCESS') {
+            isResolved = true;
             toast({
               title: "Sucesso!",
               description: "Google Calendar conectado com sucesso.",
             });
+            
+            // Auto-refresh do perfil se callback fornecido
+            if (onRefreshProfile) {
+              onRefreshProfile().then(() => {
+                // Recarrega calendários após refresh do perfil
+                loadUserCalendars(userId);
+              });
+            }
+            
             resolve(true);
           } else if (event.data.type === 'GOOGLE_CALENDAR_ERROR') {
+            isResolved = true;
             toast({
               title: "Erro na conexão",
               description: event.data.error || "Erro ao conectar Google Calendar.",
@@ -56,15 +75,27 @@ export const useGoogleCalendar = () => {
             });
             resolve(false);
           }
+          
           window.removeEventListener('message', messageListener);
         };
 
         window.addEventListener('message', messageListener);
 
+        // Timeout para popup abandonado (mais generoso)
+        const timeout = setTimeout(() => {
+          if (!isResolved) {
+            isResolved = true;
+            window.removeEventListener('message', messageListener);
+            resolve(false);
+          }
+        }, 300000); // 5 minutos
+
         // Verifica se o popup foi fechado manualmente
         const checkClosed = setInterval(() => {
-          if (popup?.closed) {
+          if (popup?.closed && !isResolved) {
+            isResolved = true;
             clearInterval(checkClosed);
+            clearTimeout(timeout);
             window.removeEventListener('message', messageListener);
             resolve(false);
           }
@@ -80,7 +111,7 @@ export const useGoogleCalendar = () => {
     } finally {
       setIsConnecting(false);
     }
-  }, [toast]);
+  }, [toast, onRefreshProfile]);
 
   const disconnectGoogleCalendar = useCallback(async (userId: string) => {
     setIsLoading(true);
@@ -96,6 +127,12 @@ export const useGoogleCalendar = () => {
         title: "Desconectado",
         description: "Google Calendar desconectado com sucesso.",
       });
+      
+      // Auto-refresh do perfil após desconectar
+      if (onRefreshProfile) {
+        await onRefreshProfile();
+      }
+      
       return true;
     } catch (error: any) {
       toast({
@@ -107,7 +144,7 @@ export const useGoogleCalendar = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, onRefreshProfile]);
 
   const syncCalendars = useCallback(async (userId: string) => {
     setIsLoading(true);
