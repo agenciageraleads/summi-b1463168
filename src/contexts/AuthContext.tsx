@@ -213,18 +213,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    setLoading(true);
+    try {
+      // Limpeza completa do estado local primeiro
+      setUser(null);
+      setSession(null);
+      
+      // Limpar localStorage (caso haja dados em cache)
+      localStorage.clear();
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('[AUTH] Erro no logout:', error);
+        toast({
+          title: "Erro ao sair",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Logout realizado!",
+          description: "Até logo!",
+        });
+      }
+      
+      // Forçar redirecionamento para página inicial
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+      
+    } catch (error) {
+      console.error('[AUTH] Erro inesperado no logout:', error);
       toast({
         title: "Erro ao sair",
-        description: error.message,
+        description: "Erro inesperado durante o logout",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Logout realizado!",
-        description: "Até logo!",
-      });
+    } finally {
+      setLoading(false);
     }
   };
 

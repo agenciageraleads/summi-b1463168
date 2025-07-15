@@ -590,17 +590,29 @@ serve(async (req) => {
     }
 
     // Verificar configuração das variáveis de ambiente
+    // Validação rigorosa das variáveis de ambiente
     const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
     const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
     const webhookUrl = Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
 
-    if (!evolutionApiUrl || !evolutionApiKey || !webhookUrl) {
-      auditLog("MISSING_ENV_VARS", user.id, { action });
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: "Configuração da API Evolution ou Webhook não encontrada" 
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      console.error('[EVOLUTION-HANDLER] ❌ Variáveis de ambiente não configuradas');
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Configuração da Evolution API não encontrada"
       }), {
-        status: 500,
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    if (!webhookUrl) {
+      console.error('[EVOLUTION-HANDLER] ❌ Webhook URL não configurada');
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Webhook não configurado"
+      }), {
+        status: 503,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }

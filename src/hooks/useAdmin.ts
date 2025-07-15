@@ -330,28 +330,46 @@ export const useAdmin = () => {
     }
   };
 
-  // Deletar conta de usuário
+  // Deletar conta de usuário (com validação de permissões admin)
   const deleteUserAccount = async (userId: string) => {
-    if (!isAdmin) {
+    const hasAccess = await validateAccess('admin', 'delete_user_account');
+    if (!hasAccess) {
       toast({
-        title: "Erro",
-        description: "Acesso negado",
+        title: "Acesso Negado",
+        description: "Você não tem permissão para deletar contas de usuários",
         variant: "destructive",
       });
       return false;
     }
 
     try {
+      console.log(`[Admin] Iniciando exclusão de conta para usuário: ${userId}`);
+      
+      await logSecurityEvent('admin_action', {
+        action: 'user_deletion_started',
+        target_user_id: userId
+      }, 'high');
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        throw new Error('Sessão não encontrada');
+      }
+
       const { data, error } = await supabase.functions.invoke('delete-user-account', {
         body: { target_user_id: userId },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${sessionData.session.access_token}`,
         },
       });
 
       if (error) throw error;
 
       if (data.success) {
+        await logSecurityEvent('admin_action', {
+          action: 'user_deletion_success',
+          target_user_id: userId
+        }, 'high');
+        
         toast({
           title: "Sucesso",
           description: "Conta do usuário deletada com sucesso",
@@ -363,6 +381,13 @@ export const useAdmin = () => {
       }
     } catch (error) {
       console.error('Erro ao deletar conta:', error);
+      
+      await logSecurityEvent('admin_action', {
+        action: 'user_deletion_error',
+        target_user_id: userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'high');
+      
       toast({
         title: "Erro",
         description: "Erro ao deletar conta do usuário",

@@ -27,6 +27,10 @@ serve(async (req) => {
       });
     }
 
+    // Extrair dados da requisição 
+    const requestBody = await req.json();
+    const targetUserId = requestBody.target_user_id;
+
     const supabaseServiceRole = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -52,11 +56,27 @@ serve(async (req) => {
       });
     }
 
-    // Buscar dados do usuário
+    // Verificar se é admin (para exclusão de outros usuários) ou usuário excluindo própria conta
+    const isAdmin = await supabaseServiceRole.rpc('verify_admin_access', { user_id: user.id });
+    const userToDelete = targetUserId || user.id;
+
+    if (targetUserId && !isAdmin) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Apenas administradores podem excluir contas de outros usuários"
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log(`[DELETE-ACCOUNT] Iniciando exclusão - Admin: ${isAdmin}, Target: ${userToDelete}, Requester: ${user.id}`);
+
+    // Buscar dados do usuário a ser deletado
     const { data: profile, error: profileError } = await supabaseServiceRole
       .from('profiles')
-      .select('instance_name, nome, email')
-      .eq('id', user.id)
+      .select('instance_name, nome, email, role')
+      .eq('id', userToDelete)
       .single();
 
     if (profileError) {
@@ -106,18 +126,18 @@ serve(async (req) => {
     // 2º) Deletar dados relacionados do Supabase (SOMENTE se Evolution API foi bem-sucedida)
     try {
       // Deletar chats
-      await supabaseServiceRole.from('chats').delete().eq('id_usuario', user.id);
+      await supabaseServiceRole.from('chats').delete().eq('id_usuario', userToDelete);
       
       // Deletar feedback
-      await supabaseServiceRole.from('feedback').delete().eq('user_id', user.id);
+      await supabaseServiceRole.from('feedback').delete().eq('user_id', userToDelete);
       
       // Deletar assinatura
-      await supabaseServiceRole.from('subscribers').delete().eq('user_id', user.id);
+      await supabaseServiceRole.from('subscribers').delete().eq('user_id', userToDelete);
       
       // Deletar perfil
-      await supabaseServiceRole.from('profiles').delete().eq('id', user.id);
+      await supabaseServiceRole.from('profiles').delete().eq('id', userToDelete);
       
-      console.log(`Dados do usuário ${user.id} deletados do Supabase`);
+      console.log(`Dados do usuário ${userToDelete} deletados do Supabase`);
       
     } catch (supabaseError) {
       console.error('Erro ao deletar dados Supabase:', supabaseError);
@@ -132,13 +152,13 @@ serve(async (req) => {
 
     // 3º) Deletar usuário do Auth (SOMENTE se Supabase foi bem-sucedido)
     try {
-      const { error: deleteAuthError } = await supabaseServiceRole.auth.admin.deleteUser(user.id);
+      const { error: deleteAuthError } = await supabaseServiceRole.auth.admin.deleteUser(userToDelete);
       
       if (deleteAuthError) {
         throw new Error(`Erro ao deletar usuário da autenticação: ${deleteAuthError.message}`);
       }
       
-      console.log(`Usuário ${user.id} deletado do Auth`);
+      console.log(`Usuário ${userToDelete} deletado do Auth`);
       
     } catch (authDeleteError) {
       console.error('Erro ao deletar usuário Auth:', authDeleteError);
