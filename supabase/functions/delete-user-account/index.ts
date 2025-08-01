@@ -16,8 +16,11 @@ serve(async (req) => {
   }
 
   try {
+    console.log(`[DELETE-ACCOUNT] 🗑️ Iniciando função de exclusão de conta`);
+    
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error('[DELETE-ACCOUNT] ❌ Token de autorização não fornecido');
       return new Response(JSON.stringify({ 
         success: false, 
         error: 'Token de autorização obrigatório' 
@@ -31,7 +34,7 @@ serve(async (req) => {
     const requestBody = await req.json();
     const targetUserId = requestBody.target_user_id;
 
-    const supabaseServiceRole = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
@@ -42,11 +45,13 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
+    console.log(`[DELETE-ACCOUNT] 🔍 Verificando autenticação do usuário...`);
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(
       authHeader.replace('Bearer ', '')
     );
 
     if (authError || !user) {
+      console.error('[DELETE-ACCOUNT] ❌ Token inválido:', authError?.message);
       return new Response(JSON.stringify({
         success: false,
         error: "Token inválido ou sessão expirada"
@@ -57,10 +62,16 @@ serve(async (req) => {
     }
 
     // Verificar se é admin (para exclusão de outros usuários) ou usuário excluindo própria conta
-    const isAdmin = await supabaseServiceRole.rpc('verify_admin_access', { user_id: user.id });
-    const userToDelete = targetUserId || user.id;
+    const { data: isAdminData } = await supabaseAdmin.rpc('verify_admin_access', { user_id: user.id });
+    const isAdmin = !!isAdminData;
+    const userId = user.id;
+    const targetUserId = requestBody.target_user_id || userId;
 
-    if (targetUserId && !isAdmin) {
+    console.log(`[DELETE-ACCOUNT] 👤 Usuário autenticado: ${userId} (admin: ${isAdmin})`);
+    console.log(`[DELETE-ACCOUNT] 🎯 Usuário alvo: ${targetUserId}`);
+
+    if (requestBody.target_user_id && !isAdmin) {
+      console.error('[DELETE-ACCOUNT] ❌ Usuário não admin tentando deletar outro usuário');
       return new Response(JSON.stringify({
         success: false,
         error: "Apenas administradores podem excluir contas de outros usuários"
@@ -70,110 +81,137 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[DELETE-ACCOUNT] Iniciando exclusão - Admin: ${isAdmin}, Target: ${userToDelete}, Requester: ${user.id}`);
+    // AUDITORIA: Log de segurança crítico
+    console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - DELETE_ACCOUNT_ATTEMPT - User: ${userId} (admin: ${isAdmin}) targeting: ${targetUserId}`);
 
     // Buscar dados do usuário a ser deletado
-    const { data: profile, error: profileError } = await supabaseServiceRole
+    console.log(`[DELETE-ACCOUNT] 🔍 Buscando dados do usuário: ${targetUserId}`);
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('instance_name, nome, email, role')
-      .eq('id', userToDelete)
+      .select('instance_name, nome, email, numero')
+      .eq('id', targetUserId)
       .single();
 
-    if (profileError) {
+    if (profileError || !profile) {
+      console.error('[DELETE-ACCOUNT] ❌ Perfil não encontrado:', profileError?.message);
       return new Response(JSON.stringify({ 
         success: false, 
-        error: "Perfil não encontrado" 
+        error: "Usuário não encontrado" 
       }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // **CORREÇÃO CRÍTICA: Sequência Transacional Correta**
-    
+    console.log(`[DELETE-ACCOUNT] 📋 Perfil encontrado: ${profile.nome} (${profile.email})`);
+
     // 1º) Deletar instância na Evolution API (se existir)
     if (profile.instance_name) {
+      console.log(`[DELETE-ACCOUNT] 🔗 Deletando instância Evolution: ${profile.instance_name}`);
+      
       try {
         const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
         const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
         
-        if (evolutionApiUrl && evolutionApiKey) {
+        if (!evolutionApiUrl || !evolutionApiKey) {
+          console.warn('[DELETE-ACCOUNT] ⚠️ Evolution API não configurada, pulando exclusão da instância');
+        } else {
           const cleanApiUrl = evolutionApiUrl.replace(/\/$/, '');
           const deleteInstanceResponse = await fetch(`${cleanApiUrl}/instance/delete/${profile.instance_name}`, {
             method: 'DELETE',
-            headers: { 'apikey': evolutionApiKey }
+            headers: { 'apikey': evolutionApiKey },
+            signal: AbortSignal.timeout(10000) // 10s timeout
           });
           
-          // Aceitar tanto sucesso (200) quanto não encontrado (404)
-          if (!deleteInstanceResponse.ok && deleteInstanceResponse.status !== 404) {
-            throw new Error(`Falha ao deletar instância: ${deleteInstanceResponse.status}`);
+          if (deleteInstanceResponse.ok || deleteInstanceResponse.status === 404) {
+            console.log(`[DELETE-ACCOUNT] ✅ Instância Evolution deletada: ${profile.instance_name}`);
+          } else {
+            const errorText = await deleteInstanceResponse.text();
+            console.warn(`[DELETE-ACCOUNT] ⚠️ Falha ao deletar instância Evolution: ${deleteInstanceResponse.status} - ${errorText}`);
           }
-          
-          console.log(`Instância ${profile.instance_name} deletada da Evolution API`);
         }
       } catch (evolutionError) {
-        console.error('Erro ao deletar instância Evolution:', evolutionError);
+        console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao deletar instância Evolution:`, evolutionError.message);
+      }
+    }
+
+    // 2º) Deletar dados relacionados no Supabase
+    const tablesToClean = [
+      'chats',
+      'feedback', 
+      'subscribers',
+      'monitored_whatsapp_groups',
+      'user_calendars',
+      'whatsapp_groups_cache'
+    ];
+
+    console.log(`[DELETE-ACCOUNT] 🧹 Limpando ${tablesToClean.length} tabelas relacionadas...`);
+
+    for (const table of tablesToClean) {
+      try {
+        const userIdField = table === 'chats' ? 'id_usuario' : 'user_id';
+        const { error: deleteError } = await supabaseAdmin
+          .from(table)
+          .delete()
+          .eq(userIdField, targetUserId);
+
+        if (deleteError) {
+          console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao limpar tabela ${table}:`, deleteError.message);
+        } else {
+          console.log(`[DELETE-ACCOUNT] ✅ Dados limpos da tabela: ${table}`);
+        }
+      } catch (error) {
+        console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao processar tabela ${table}:`, error.message);
+      }
+    }
+
+    // 3º) Deletar perfil
+    console.log(`[DELETE-ACCOUNT] 👤 Deletando perfil do usuário...`);
+    const { error: profileDeleteError } = await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', targetUserId);
+
+    if (profileDeleteError) {
+      console.error('[DELETE-ACCOUNT] ❌ Erro ao deletar perfil:', profileDeleteError.message);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Erro ao deletar perfil do usuário'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log(`[DELETE-ACCOUNT] ✅ Perfil deletado: ${targetUserId}`);
+
+    // 4º) Deletar usuário da auth (apenas se não for admin fazendo exclusão de outro usuário)
+    if (!isAdmin || targetUserId === userId) {
+      console.log(`[DELETE-ACCOUNT] 🔐 Deletando usuário da autenticação...`);
+      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
+      
+      if (authDeleteError) {
+        console.error('[DELETE-ACCOUNT] ❌ Erro ao deletar usuário da auth:', authDeleteError.message);
         return new Response(JSON.stringify({
           success: false,
-          error: 'Erro ao deletar instância WhatsApp'
+          error: 'Erro ao deletar conta de autenticação'
         }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
+
+      console.log(`[DELETE-ACCOUNT] ✅ Usuário deletado da auth: ${targetUserId}`);
+    } else {
+      console.log(`[DELETE-ACCOUNT] 🔒 Admin deletion - mantendo auth do usuário: ${targetUserId}`);
     }
 
-    // 2º) Deletar dados relacionados do Supabase (SOMENTE se Evolution API foi bem-sucedida)
-    try {
-      // Deletar chats
-      await supabaseServiceRole.from('chats').delete().eq('id_usuario', userToDelete);
-      
-      // Deletar feedback
-      await supabaseServiceRole.from('feedback').delete().eq('user_id', userToDelete);
-      
-      // Deletar assinatura
-      await supabaseServiceRole.from('subscribers').delete().eq('user_id', userToDelete);
-      
-      // Deletar perfil
-      await supabaseServiceRole.from('profiles').delete().eq('id', userToDelete);
-      
-      console.log(`Dados do usuário ${userToDelete} deletados do Supabase`);
-      
-    } catch (supabaseError) {
-      console.error('Erro ao deletar dados Supabase:', supabaseError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Erro ao deletar dados da conta'
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // 3º) Deletar usuário do Auth (SOMENTE se Supabase foi bem-sucedido)
-    try {
-      const { error: deleteAuthError } = await supabaseServiceRole.auth.admin.deleteUser(userToDelete);
-      
-      if (deleteAuthError) {
-        throw new Error(`Erro ao deletar usuário da autenticação: ${deleteAuthError.message}`);
-      }
-      
-      console.log(`Usuário ${userToDelete} deletado do Auth`);
-      
-    } catch (authDeleteError) {
-      console.error('Erro ao deletar usuário Auth:', authDeleteError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Erro ao deletar conta de usuário'
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
+    // Log final de auditoria
+    console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - DELETE_ACCOUNT_SUCCESS - User: ${userId} (admin: ${isAdmin}) deleted: ${targetUserId} (${profile.email})`);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: "Conta deletada com sucesso" 
+      message: isAdmin && targetUserId !== userId ? 'Usuário deletado pelo admin com sucesso' : 'Conta deletada com sucesso'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });

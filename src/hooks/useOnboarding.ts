@@ -10,43 +10,50 @@ interface OnboardingStep {
   description: string;
   target?: string;
   icon?: string;
+  actionText?: string;
+  actionPath?: string;
 }
 
 // Passos do onboarding
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: 'Bem-vindo ao Summi! 🎉',
-    description: 'Vamos te ajudar a configurar sua conta e conectar seu WhatsApp em alguns passos simples.',
+    title: 'Bem-vindo ao ConectaMentor IA! 🎉',
+    description: 'Vamos configurar sua conta em 3 passos simples para começar a monitorar mensagens importantes do WhatsApp.',
     icon: '👋'
   },
   {
     id: 'profile',
-    title: 'Configure seu Perfil',
-    description: 'Primeiro, vamos configurar seu número de telefone nas configurações para conectar o WhatsApp.',
-    target: 'settings-button',
-    icon: '📱'
+    title: 'Passo 1: Configure seu Perfil',
+    description: 'Clique no botão "Ir para Configurações" abaixo para adicionar seu nome e número de telefone.',
+    target: 'profile-section',
+    icon: '👤',
+    actionText: 'Ir para Configurações',
+    actionPath: '/settings'
   },
   {
     id: 'whatsapp',
-    title: 'Conecte seu WhatsApp',
-    description: 'Após configurar seu telefone, você poderá conectar sua conta do WhatsApp usando o QR Code.',
-    target: 'whatsapp-section',
-    icon: '💬'
+    title: 'Passo 2: Conecte o WhatsApp',
+    description: 'Após configurar seu perfil, clique em "Conectar WhatsApp" no menu lateral para vincular sua conta.',
+    target: 'whatsapp-connection',
+    icon: '💬',
+    actionText: 'Conectar WhatsApp',
+    actionPath: '/whatsapp-connection'
   },
   {
-    id: 'messages',
-    title: 'Monitore suas Conversas',
-    description: 'Aqui você verá todas as suas conversas e poderá analisar as mensagens recebidas.',
-    target: 'chats-section',
-    icon: '📊'
+    id: 'dashboard',
+    title: 'Passo 3: Monitore suas Conversas',
+    description: 'Com tudo conectado, acesse o Dashboard para ver suas conversas sendo analisadas automaticamente.',
+    target: 'dashboard-link',
+    icon: '📊',
+    actionText: 'Ir para Dashboard',
+    actionPath: '/dashboard'
   },
   {
-    id: 'subscription',
-    title: 'Gerencie sua Assinatura',
-    description: 'Acompanhe seu plano e aproveite todas as funcionalidades da plataforma.',
-    target: 'subscription-section',
-    icon: '⭐'
+    id: 'complete',
+    title: 'Tudo Pronto! ✨',
+    description: 'Parabéns! Sua conta está configurada. O ConectaMentor IA já está monitorando suas conversas e identificando mensagens importantes.',
+    icon: '🎊'
   }
 ];
 

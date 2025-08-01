@@ -36,24 +36,37 @@ export const AccountDeletion = () => {
     }
 
     setIsDeleting(true);
+    
     try {
+      console.log('🗑️ Iniciando processo de exclusão da conta...');
+      
       const result = await deleteAccount();
       
+      console.log('📋 Resultado da exclusão:', result);
+      
       if (result.success) {
-        // O redirecionamento será feito automaticamente pelo logout
-        setIsOpen(false);
-      } else {
         toast({
-          title: "Erro",
-          description: result.error || "Não foi possível deletar a conta",
+          title: "Conta deletada",
+          description: "Sua conta foi deletada com sucesso. Você será redirecionado para a página inicial.",
+          variant: "default",
+        });
+        
+        // O redirecionamento será feito automaticamente pelo AuthContext
+        setIsOpen(false);
+        setConfirmText('');
+      } else {
+        console.error('❌ Erro na exclusão:', result.error);
+        toast({
+          title: "Erro na exclusão",
+          description: result.error || "Não foi possível deletar a conta. Tente novamente.",
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Erro ao deletar conta:', error);
+      console.error('🚨 Erro crítico ao deletar conta:', error);
       toast({
-        title: "Erro",
-        description: "Erro inesperado ao tentar deletar a conta",
+        title: "Erro crítico",
+        description: "Erro inesperado ao tentar deletar a conta. Entre em contato com o suporte.",
         variant: "destructive",
       });
     } finally {

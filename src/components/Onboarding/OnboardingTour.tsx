@@ -14,7 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useOnboarding } from '@/hooks/useOnboarding';
-import { ChevronLeft, ChevronRight, X, SkipForward } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, SkipForward, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export const OnboardingTour: React.FC = () => {
   const {
@@ -26,6 +27,8 @@ export const OnboardingTour: React.FC = () => {
     skipOnboarding,
     totalSteps
   } = useOnboarding();
+  
+  const navigate = useNavigate();
 
   if (!isOnboardingActive) return null;
 
@@ -73,8 +76,28 @@ export const OnboardingTour: React.FC = () => {
             </p>
           </div>
 
+          {/* Botão de ação se disponível */}
+          {currentStepData.actionText && currentStepData.actionPath && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+              <Button 
+                onClick={() => {
+                  navigate(currentStepData.actionPath!);
+                  // Fechar o tutorial temporariamente para o usuário navegar
+                }} 
+                className="w-full"
+                variant="default"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                {currentStepData.actionText}
+              </Button>
+              <p className="text-sm text-muted-foreground mt-2">
+                Após completar esta etapa, você pode continuar o tutorial.
+              </p>
+            </div>
+          )}
+
           {/* Destacar elemento alvo se existir */}
-          {currentStepData.target && (
+          {currentStepData.target && !currentStepData.actionPath && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-800">
                 💡 <strong>Dica:</strong> Procure pelo elemento destacado na tela para seguir este passo.
