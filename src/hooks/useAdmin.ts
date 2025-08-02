@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useSecurityAudit } from './useSecurityAudit';
+import { useEnhancedSecurity } from './useEnhancedSecurity';
 
 // Interface para dados administrativos
 export interface AdminStats {
@@ -31,7 +31,7 @@ export interface AdminUser {
 export const useAdmin = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { logSecurityEvent, validateAccess } = useSecurityAudit();
+  const { logSecurityEvent, validateAdminAccess, checkRateLimit } = useEnhancedSecurity();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -46,7 +46,15 @@ export const useAdmin = () => {
     }
 
     try {
-      const isValidAdmin = await validateAccess('admin', 'admin_status_check');
+      // Check rate limit for admin status checks
+      const rateLimitOk = await checkRateLimit('admin_status_check', 50, 60);
+      if (!rateLimitOk) {
+        setIsAdmin(false);
+        setIsLoading(false);
+        return;
+      }
+
+      const isValidAdmin = await validateAdminAccess('admin_status_check');
       setIsAdmin(isValidAdmin);
       
       if (isValidAdmin) {
@@ -101,7 +109,7 @@ export const useAdmin = () => {
   const fetchStats = async () => {
     if (!isAdmin) return;
 
-    const hasAccess = await validateAccess('admin', 'fetch_admin_stats');
+    const hasAccess = await validateAdminAccess('fetch_admin_stats');
     if (!hasAccess) {
       toast({
         title: "Acesso Negado",
@@ -203,7 +211,7 @@ export const useAdmin = () => {
   const fetchUsers = async () => {
     if (!isAdmin) return;
 
-    const hasAccess = await validateAccess('admin', 'fetch_all_users');
+    const hasAccess = await validateAdminAccess('fetch_all_users');
     if (!hasAccess) {
       toast({
         title: "Acesso Negado",
@@ -332,7 +340,7 @@ export const useAdmin = () => {
 
   // Deletar conta de usuário (com validação de permissões admin)
   const deleteUserAccount = async (userId: string) => {
-    const hasAccess = await validateAccess('admin', 'delete_user_account');
+    const hasAccess = await validateAdminAccess('delete_user_account');
     if (!hasAccess) {
       toast({
         title: "Acesso Negado",

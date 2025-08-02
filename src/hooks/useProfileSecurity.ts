@@ -6,14 +6,21 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useSecurityValidation } from './useSecurityValidation';
+import { useEnhancedSecurity } from './useEnhancedSecurity';
 import type { Profile } from './useProfile';
 
 export const useProfileSecurity = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
-  const { validateUserPermission, logSecurityEvent, sanitizeInput, validateInput } = useSecurityValidation();
+  const { 
+    logSecurityEvent, 
+    checkRateLimit, 
+    validateAdminAccess, 
+    sanitizeInput, 
+    validateInput, 
+    detectSuspiciousActivity 
+  } = useEnhancedSecurity();
 
   // Atualizar perfil com validações de segurança aprimoradas
   const secureUpdateProfile = async (updates: Partial<Profile>) => {
@@ -29,36 +36,34 @@ export const useProfileSecurity = () => {
     setIsUpdating(true);
     
     try {
-      // Validar permissões
-      const { isValid, error: permissionError } = await validateUserPermission('user', 'profile_update');
-      if (!isValid) {
-        await logSecurityEvent('unauthorized_access', {
-          action: 'profile_update_denied',
-          reason: permissionError,
-          attemptedUpdates: Object.keys(updates)
-        });
-        
+      // SECURITY: Check rate limiting first
+      const rateLimitOk = await checkRateLimit('profile_update', 20, 60);
+      if (!rateLimitOk) {
         toast({
-          title: "Acesso Negado",
-          description: permissionError || "Sem permissão para esta operação",
+          title: "Muitas Tentativas",
+          description: "Limite de atualizações excedido. Tente novamente em alguns minutos.",
           variant: "destructive",
         });
-        return { success: false, error: permissionError };
+        return { success: false, error: 'Rate limit excedido' };
       }
+
+      // Check for suspicious activity patterns
+      await detectSuspiciousActivity();
 
       // Validar e sanitizar dados de entrada
       const sanitizedUpdates: any = {};
       const validationErrors: string[] = [];
 
-      // Função auxiliar async para validar roles
+      // CRITICAL SECURITY: Role change validation using enhanced security
       const validateRoleChange = async (value: any): Promise<boolean> => {
-        const { isValid: isAdmin } = await validateUserPermission('admin', 'role_change');
+        const isAdmin = await validateAdminAccess('role_change');
         if (!isAdmin) {
           await logSecurityEvent('unauthorized_access', {
             action: 'role_escalation_attempt',
             userId: user.id,
-            attemptedRole: value
-          });
+            attemptedRole: value,
+            blocked_reason: 'insufficient_admin_privileges'
+          }, 'critical');
           return false;
         }
         return true;
