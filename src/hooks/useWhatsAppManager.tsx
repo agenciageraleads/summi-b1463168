@@ -98,34 +98,34 @@ export const useWhatsAppManager = () => {
 
       const interpretedState = interpretEvolutionState(rawState);
       
-      // NOVA LÓGICA: Detectar connecting persistente
-      if (interpretedState === 'connecting') {
-        const now = Date.now();
-        const connectingStartTime = state.connectingDetectedAt || now;
-        const connectingDuration = now - connectingStartTime;
-        
-        console.log(`[WA Manager] Status connecting por ${connectingDuration}ms`);
-        
-        // Se conectando por mais de 15 segundos, marcar para restart
-        if (connectingDuration > 15000 && !state.isRestarting) {
-          console.log('[WA Manager] ⚠️ Status connecting persistente detectado - será reiniciado');
-          setState(prev => ({ 
-            ...prev, 
-            connectingDetectedAt: connectingStartTime,
-            message: 'Status connecting persistente detectado - reiniciando instância...'
-          }));
-          
-          // Agendar restart após retornar o estado
-          setTimeout(() => handleRestartInstance(instanceName), 1000);
-        } else if (!state.connectingDetectedAt) {
-          setState(prev => ({ ...prev, connectingDetectedAt: now }));
-        }
-      } else {
-        // Resetar tracking de connecting se mudou de estado
-        if (state.connectingDetectedAt) {
-          setState(prev => ({ ...prev, connectingDetectedAt: null }));
-        }
-      }
+  // CORREÇÃO: Detectar connecting persistente com timeout ajustado para 30s
+  if (interpretedState === 'connecting') {
+    const now = Date.now();
+    const connectingStartTime = state.connectingDetectedAt || now;
+    const connectingDuration = now - connectingStartTime;
+    
+    console.log(`[WA Manager] Status connecting por ${connectingDuration}ms`);
+    
+    // CORREÇÃO: Aumentar timeout de 15s para 30s para evitar restarts prematuros
+    if (connectingDuration > 30000 && !state.isRestarting && state.restartAttempts < 2) {
+      console.log('[WA Manager] ⚠️ Status connecting persistente detectado - será reiniciado');
+      setState(prev => ({ 
+        ...prev, 
+        connectingDetectedAt: connectingStartTime,
+        message: `Status connecting persistente há ${Math.floor(connectingDuration/1000)}s - reiniciando...`
+      }));
+      
+      // Agendar restart após retornar o estado
+      setTimeout(() => handleRestartInstance(instanceName), 1000);
+    } else if (!state.connectingDetectedAt) {
+      setState(prev => ({ ...prev, connectingDetectedAt: now }));
+    }
+  } else {
+    // Resetar tracking de connecting se mudou de estado
+    if (state.connectingDetectedAt) {
+      setState(prev => ({ ...prev, connectingDetectedAt: null }));
+    }
+  }
 
       return interpretedState;
     } catch (error) {
@@ -134,7 +134,7 @@ export const useWhatsAppManager = () => {
     }
   }, [interpretEvolutionState, state.connectingDetectedAt, state.isRestarting]);
 
-  // NOVA: Função para reiniciar instância quando detectar connecting persistente
+  // CORREÇÃO: Função robusta para reiniciar instância com fallback para recriação
   const handleRestartInstance = useCallback(async (instanceName: string) => {
     if (state.isRestarting || state.restartAttempts >= 2) {
       console.log('[WA Manager] Restart já em andamento ou limite de tentativas atingido');
@@ -156,8 +156,17 @@ export const useWhatsAppManager = () => {
       if (restartResult.success) {
         console.log('[WA Manager] ✅ Instância reiniciada com sucesso');
         
-        // Aguardar estabilização
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // CORREÇÃO: Aguardar mais tempo para estabilização completa
+        await new Promise(resolve => setTimeout(resolve, 8000));
+        
+        // Verificar se realmente funcionou antes de gerar códigos
+        const statusCheck = await checkConnectionStatus(instanceName);
+        const checkState = interpretEvolutionState(statusCheck.state || '');
+        
+        if (checkState === 'connecting') {
+          console.log('[WA Manager] ⚠️ Ainda em connecting após restart - tentando novamente');
+          throw new Error('Status connecting persiste após restart');
+        }
         
         // Tentar gerar códigos novamente
         await handleGenerateCodes(instanceName);
@@ -190,19 +199,25 @@ export const useWhatsAppManager = () => {
         message: `Erro no restart (${prev.restartAttempts}/2): ${error.message}`
       }));
       
-      // Se ainda há tentativas, tentar novamente após delay
-      if (state.restartAttempts < 2) {
-        setTimeout(() => handleRestartInstance(instanceName), 5000);
-      } else {
+      // CORREÇÃO: Se atingir limite de restarts, sugerir recriação automática
+      if (state.restartAttempts >= 2) {
+        setState(prev => ({ 
+          ...prev,
+          message: 'Limite de restarts atingido. Recomendamos recriar a instância para resolver o problema.'
+        }));
+        
         toast({ 
           title: "❌ Restart Falhou", 
-          description: "Falha ao reiniciar instância. Tente recriar a instância.", 
+          description: "Múltiplas tentativas de restart falharam. Tente recriar a instância.", 
           variant: "destructive",
-          duration: 6000
+          duration: 8000
         });
+      } else {
+        // Tentar novamente após delay maior
+        setTimeout(() => handleRestartInstance(instanceName), 8000);
       }
     }
-  }, [state.isRestarting, state.restartAttempts, toast]);
+  }, [state.isRestarting, state.restartAttempts, toast, interpretEvolutionState, checkConnectionStatus]);
 
   // Limpar todos os recursos
   const cleanupResources = useCallback(() => {
@@ -309,15 +324,15 @@ export const useWhatsAppManager = () => {
     }
   }, [validatePairingCode, toast, handleRestartInstance]);
 
-  // CORREÇÃO: Iniciar contador regressivo com renovação automática
+  // CORREÇÃO: Countdown melhorado com 90s e renovação mais inteligente
   const startCountdown = useCallback((instanceName: string) => {
-    console.log('[WA Manager] Iniciando countdown de 60 segundos com renovação automática');
+    console.log('[WA Manager] Iniciando countdown de 90 segundos com renovação automática');
     
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
     }
     
-    setState(prev => ({ ...prev, countdownSeconds: 60 }));
+    setState(prev => ({ ...prev, countdownSeconds: 90 })); // CORREÇÃO: 90s para dar mais tempo
     
     countdownIntervalRef.current = setInterval(() => {
       if (!isMountedRef.current) return;
@@ -327,9 +342,15 @@ export const useWhatsAppManager = () => {
         
         if (newSeconds <= 0) {
           console.log('[WA Manager] ⏰ Countdown zerou - iniciando renovação automática');
-          // CORREÇÃO CRÍTICA: Renovação automática quando countdown chega a zero
-          setTimeout(() => renewCodes(instanceName, true), 100);
-          return { ...prev, countdownSeconds: 60 }; // Reset para próximo ciclo
+          
+          // CORREÇÃO: Não renovar se está em processo de restart ou connecting persistente
+          if (!prev.isRestarting && !prev.connectingDetectedAt) {
+            setTimeout(() => renewCodes(instanceName, true), 100);
+          } else {
+            console.log('[WA Manager] ⏰ Renovação automática cancelada - restart em andamento ou connecting detectado');
+          }
+          
+          return { ...prev, countdownSeconds: 90 }; // Reset para próximo ciclo
         }
         
         return { ...prev, countdownSeconds: newSeconds };

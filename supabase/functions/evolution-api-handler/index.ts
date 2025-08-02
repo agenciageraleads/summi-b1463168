@@ -133,16 +133,30 @@ const validatePhoneNumber = (phone: string): boolean => {
   return phoneRegex.test(cleanPhone);
 };
 
-// Função para retry com backoff exponencial
-const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDelay = 1000) => {
+// CORREÇÃO: Função para retry com backoff exponencial e timeout robusto
+const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDelay = 2000, timeoutMs = 30000) => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      console.log(`[EVOLUTION-HANDLER] Tentativa ${attempt}/${maxRetries} com timeout de ${timeoutMs}ms`);
+      
+      // Implementar timeout para cada tentativa
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Timeout de ${timeoutMs}ms atingido`)), timeoutMs)
+      );
+      
+      const result = await Promise.race([fn(), timeoutPromise]);
+      console.log(`[EVOLUTION-HANDLER] ✅ Tentativa ${attempt} bem-sucedida`);
+      return result;
     } catch (error) {
-      if (attempt === maxRetries) throw error;
+      console.log(`[EVOLUTION-HANDLER] ❌ Tentativa ${attempt} falhou:`, error.message);
+      
+      if (attempt === maxRetries) {
+        console.log(`[EVOLUTION-HANDLER] ❌ Todas as ${maxRetries} tentativas falharam`);
+        throw error;
+      }
       
       const delay = baseDelay * Math.pow(2, attempt - 1);
-      console.log(`[EVOLUTION-HANDLER] Tentativa ${attempt} falhou, tentando novamente em ${delay}ms`);
+      console.log(`[EVOLUTION-HANDLER] ⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -164,22 +178,37 @@ const validatePairingCode = (code: string | null | undefined): string | null => 
   return null;
 };
 
-// NOVA: Função para reiniciar instância quando detectar "connecting"
+// CORREÇÃO: Função robusta para reiniciar instância com timeout adequado
 const restartInstance = async (instanceName: string, evolutionApiUrl: string, evolutionApiKey: string) => {
   console.log(`[RESTART-INSTANCE] 🔄 Reiniciando instância: ${instanceName}`);
   
   try {
-    const restartResponse = await fetch(`${evolutionApiUrl}/instance/restart/${instanceName}`, {
-      method: 'PUT',
-      headers: { 'apikey': evolutionApiKey }
-    });
+    const restartResponse = await retryWithBackoff(() => 
+      fetch(`${evolutionApiUrl}/instance/restart/${instanceName}`, {
+        method: 'PUT',
+        headers: { 'apikey': evolutionApiKey },
+        signal: AbortSignal.timeout(20000) // Timeout de 20s por tentativa
+      }), 2, 3000, 20000 // 2 tentativas, delay base 3s, timeout 20s
+    );
     
     console.log(`[RESTART-INSTANCE] Response status: ${restartResponse.status}, ok: ${restartResponse.ok}`);
     
     if (restartResponse.ok) {
       const restartData = await restartResponse.json();
       console.log('[RESTART-INSTANCE] ✅ Instância reiniciada com sucesso:', JSON.stringify(restartData, null, 2));
-      return { success: true, data: restartData };
+      
+      // CORREÇÃO: Validar se o restart realmente funcionou
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar estabilização
+      
+      const statusCheck = await getInstanceStatus(instanceName, evolutionApiUrl, evolutionApiKey);
+      console.log(`[RESTART-INSTANCE] 🔍 Verificação pós-restart: ${statusCheck.state}`);
+      
+      return { 
+        success: true, 
+        data: restartData,
+        postRestartStatus: statusCheck.state,
+        validated: statusCheck.state !== 'connecting'
+      };
     } else {
       const errorText = await restartResponse.text();
       console.log(`[RESTART-INSTANCE] ❌ Erro ao reiniciar: ${restartResponse.status} - ${errorText}`);
@@ -191,19 +220,42 @@ const restartInstance = async (instanceName: string, evolutionApiUrl: string, ev
   }
 };
 
-// CORREÇÃO: Função específica para gerar QR Code (sem parâmetros)
+// CORREÇÃO: Função robusta para gerar QR Code com validação de connecting
 const generateQRCodeOnly = async (instanceName: string, evolutionApiUrl: string, evolutionApiKey: string) => {
   console.log(`[QR-GENERATOR] 🎯 Gerando QR Code para instância: ${instanceName}`);
   
   try {
+    // CORREÇÃO: Verificar status antes de gerar QR Code
+    const statusCheck = await getInstanceStatus(instanceName, evolutionApiUrl, evolutionApiKey);
+    
+    if (statusCheck.state === 'connected') {
+      console.log(`[QR-GENERATOR] ⚠️ Instância já conectada - não é necessário QR Code`);
+      return {
+        success: false,
+        error: 'Instance is already connected',
+        state: 'already_connected'
+      };
+    }
+    
+    if (statusCheck.state === 'connecting') {
+      console.log(`[QR-GENERATOR] ⚠️ Instância em status connecting - pode precisar restart`);
+      return {
+        success: false,
+        error: 'Instance is in connecting state - may need restart',
+        needsRestart: true,
+        state: 'connecting'
+      };
+    }
+    
     const qrUrl = `${evolutionApiUrl}/instance/connect/${instanceName}`;
     console.log(`[QR-GENERATOR] 🎯 URL do QR Code: ${qrUrl}`);
     
     const qrResponse = await retryWithBackoff(() =>
       fetch(qrUrl, {
         method: 'GET',
-        headers: { 'apikey': evolutionApiKey }
-      })
+        headers: { 'apikey': evolutionApiKey },
+        signal: AbortSignal.timeout(15000) // Timeout de 15s
+      }), 3, 2000, 15000
     );
 
     console.log(`[QR-GENERATOR] Response status: ${qrResponse.status}, ok: ${qrResponse.ok}`);
@@ -230,7 +282,8 @@ const generateQRCodeOnly = async (instanceName: string, evolutionApiUrl: string,
         return {
           success: false,
           error: 'QR Code não encontrado na resposta da API',
-          rawResponse: qrData
+          rawResponse: qrData,
+          needsRestart: true // Pode indicar problema que necessita restart
         };
       }
     } else {
