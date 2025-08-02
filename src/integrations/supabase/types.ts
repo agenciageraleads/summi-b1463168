@@ -107,7 +107,7 @@ export type Database = {
           id: string
           id_usuario: string
           modificado_em: string | null
-          nome: string
+          nome: string | null
           prioridade: string | null
           remote_jid: string
         }
@@ -120,7 +120,7 @@ export type Database = {
           id?: string
           id_usuario: string
           modificado_em?: string | null
-          nome: string
+          nome?: string | null
           prioridade?: string | null
           remote_jid: string
         }
@@ -133,7 +133,7 @@ export type Database = {
           id?: string
           id_usuario?: string
           modificado_em?: string | null
-          nome?: string
+          nome?: string | null
           prioridade?: string | null
           remote_jid?: string
         }
@@ -330,6 +330,69 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          attempts: number
+          id: string
+          last_attempt: string
+          operation_type: string
+          reset_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          id?: string
+          last_attempt?: string
+          operation_type: string
+          reset_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          id?: string
+          last_attempt?: string
+          operation_type?: string
+          reset_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      security_audit_log: {
+        Row: {
+          created_at: string
+          event_details: Json | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          session_id: string | null
+          severity: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_details?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          session_id?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_details?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          session_id?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       subscribers: {
         Row: {
           created_at: string
@@ -454,6 +517,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          _user_id: string
+          _operation_type: string
+          _max_attempts?: number
+          _window_minutes?: number
+        }
+        Returns: boolean
+      }
       generate_referral_code: {
         Args: Record<PropertyKey, never>
         Returns: string
