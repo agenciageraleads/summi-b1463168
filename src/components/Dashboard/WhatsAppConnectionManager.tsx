@@ -170,7 +170,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
                 showRestartIndicator ? 'text-orange-900' : 'text-blue-900'
               }`}>
                 {state.isRestarting 
-                  ? `Reiniciando instância (${state.restartAttempts}/2)...`
+                  ? `Reiniciando instância (${state.restartAttempts}/3)...`
                   : state.isRenewing 
                   ? 'Renovando códigos...' 
                   : isConnectingPersistent
@@ -198,7 +198,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
             </div>
             
             {/* NOVO: Botão de restart manual */}
-            {!state.isRestarting && state.restartAttempts < 2 && (
+            {!state.isRestarting && state.restartAttempts < 3 && (
               <Button 
                 onClick={forceRestartInstance} 
                 variant="outline" 
@@ -231,7 +231,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
               )}
               {state.restartAttempts > 0 && (
                 <p className="text-xs text-red-600 mt-1">
-                  Restarts: {state.restartAttempts}/2
+                  Restarts: {state.restartAttempts}/3
                 </p>
               )}
             </div>
@@ -239,7 +239,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
               <Button onClick={() => handleConnect()} variant="outline" size="sm" className="border-red-300 text-red-700 hover:bg-red-100">
                 Tentar Novamente
               </Button>
-              {profile?.instance_name && (state.errorCount >= 3 || state.restartAttempts >= 2) && (
+              {profile?.instance_name && (state.errorCount >= 3 || state.restartAttempts >= 3) && (
                 <Button onClick={handleRecreateInstance} variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-100" disabled={isRecreating}>
                   {isRecreating ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-1" />
@@ -344,7 +344,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
     if (!state.hasConnectionError || state.errorCount === 0) return null;
 
     const showRestartInfo = state.restartAttempts > 0;
-    const canRecreate = state.errorCount >= 3 || state.restartAttempts >= 2;
+    const canRecreate = state.errorCount >= 3 || state.restartAttempts >= 3;
 
     return (
       <div className="flex items-center space-x-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
@@ -352,9 +352,9 @@ export const WhatsAppConnectionManager: React.FC = () => {
         <div className="flex-1 min-w-0">
           <p className="text-sm text-orange-800 font-medium">
             {canRecreate
-              ? `Múltiplas falhas detectadas (${state.errorCount} erros, ${state.restartAttempts} restarts). Recomendamos recriar a instância.`
+            ? `Circuit breaker ativado (${state.errorCount} erros, ${state.restartAttempts} restarts). Auto-recovery em execução.`
               : showRestartInfo
-              ? `Tentativa ${state.errorCount}/5 com ${state.restartAttempts} restarts. Sistema tentando resolver automaticamente...`
+              ? `Tentativa ${state.errorCount}/5 com ${state.restartAttempts}/3 restarts. Sistema corrigindo automaticamente...`
               : `Tentativa ${state.errorCount}/5. Tentando reconectar...`
             }
           </p>
@@ -429,7 +429,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-center space-x-2 text-xs text-emerald-600 mb-3">
                     <Check className="w-3 h-3" />
-                    <span>8 dígitos válidos</span>
+                    <span>6-10 dígitos válidos</span>
                   </div>
                   <Button
                     variant="outline"
@@ -483,7 +483,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
             💡 Use qualquer um dos métodos - ambos funcionam perfeitamente
           </p>
           <p className="text-xs text-gray-500">
-            Os códigos são renovados automaticamente a cada 60 segundos para sua segurança
+            Os códigos são renovados automaticamente a cada 120 segundos para sua segurança
           </p>
           {state.generationAttempts > 0 && (
             <p className="text-xs text-blue-600">

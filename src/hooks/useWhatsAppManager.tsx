@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
+import { supabase } from '@/integrations/supabase/client';
 import {
   initializeWhatsAppConnection,
   generateConnectionCodes,
@@ -98,7 +99,7 @@ export const useWhatsAppManager = () => {
 
       const interpretedState = interpretEvolutionState(rawState);
       
-  // CORREÇÃO: Detectar connecting persistente com timeout ajustado para 30s
+  // CORREÇÃO: Detectar connecting persistente com timeout ajustado para 45s
   if (interpretedState === 'connecting') {
     const now = Date.now();
     const connectingStartTime = state.connectingDetectedAt || now;
@@ -106,8 +107,8 @@ export const useWhatsAppManager = () => {
     
     console.log(`[WA Manager] Status connecting por ${connectingDuration}ms`);
     
-    // CORREÇÃO: Aumentar timeout de 15s para 30s para evitar restarts prematuros
-    if (connectingDuration > 30000 && !state.isRestarting && state.restartAttempts < 2) {
+    // CORREÇÃO: Aumentar timeout de 30s para 45s para dar mais tempo à API Evolution
+    if (connectingDuration > 45000 && !state.isRestarting && state.restartAttempts < 3) {
       console.log('[WA Manager] ⚠️ Status connecting persistente detectado - será reiniciado');
       setState(prev => ({ 
         ...prev, 
@@ -134,20 +135,20 @@ export const useWhatsAppManager = () => {
     }
   }, [interpretEvolutionState, state.connectingDetectedAt, state.isRestarting]);
 
-  // CORREÇÃO: Função robusta para reiniciar instância com fallback para recriação
+  // CORREÇÃO: Função robusta para reiniciar instância com circuit breaker e retry logic
   const handleRestartInstance = useCallback(async (instanceName: string) => {
-    if (state.isRestarting || state.restartAttempts >= 2) {
-      console.log('[WA Manager] Restart já em andamento ou limite de tentativas atingido');
+    if (state.isRestarting || state.restartAttempts >= 3) {
+      console.log('[WA Manager] Restart já em andamento ou limite de tentativas atingido (circuit breaker)');
       return;
     }
 
-    console.log(`[WA Manager] 🔄 Reiniciando instância devido a connecting persistente (tentativa ${state.restartAttempts + 1}/2)`);
+    console.log(`[WA Manager] 🔄 Reiniciando instância devido a connecting persistente (tentativa ${state.restartAttempts + 1}/3)`);
     
     setState(prev => ({ 
       ...prev, 
       isRestarting: true,
       restartAttempts: prev.restartAttempts + 1,
-      message: `Reiniciando instância (tentativa ${prev.restartAttempts + 1}/2)...`
+      message: `Reiniciando instância (tentativa ${prev.restartAttempts + 1}/3)...`
     }));
 
     try {
@@ -156,16 +157,28 @@ export const useWhatsAppManager = () => {
       if (restartResult.success) {
         console.log('[WA Manager] ✅ Instância reiniciada com sucesso');
         
-        // CORREÇÃO: Aguardar mais tempo para estabilização completa
-        await new Promise(resolve => setTimeout(resolve, 8000));
+        // CORREÇÃO: Aguardar mais tempo para estabilização completa com retry logic
+        await new Promise(resolve => setTimeout(resolve, 10000));
         
-        // Verificar se realmente funcionou antes de gerar códigos
-        const statusCheck = await checkConnectionStatus(instanceName);
-        const checkState = interpretEvolutionState(statusCheck.state || '');
+        // Retry logic para verificação pós-restart
+        let retryCount = 0;
+        let statusCheckPassed = false;
         
-        if (checkState === 'connecting') {
-          console.log('[WA Manager] ⚠️ Ainda em connecting após restart - tentando novamente');
-          throw new Error('Status connecting persiste após restart');
+        while (retryCount < 3 && !statusCheckPassed) {
+          const statusCheck = await checkConnectionStatus(instanceName);
+          const checkState = interpretEvolutionState(statusCheck.state || '');
+          
+          if (checkState === 'connecting') {
+            console.log(`[WA Manager] ⚠️ Ainda em connecting após restart - retry ${retryCount + 1}/3`);
+            retryCount++;
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          } else {
+            statusCheckPassed = true;
+          }
+        }
+        
+        if (!statusCheckPassed) {
+          throw new Error('Status connecting persiste após múltiplas verificações');
         }
         
         // Tentar gerar códigos novamente
@@ -196,43 +209,93 @@ export const useWhatsAppManager = () => {
         isRestarting: false,
         hasConnectionError: true,
         errorCount: prev.errorCount + 1,
-        message: `Erro no restart (${prev.restartAttempts}/2): ${error.message}`
+        message: `Erro no restart (${prev.restartAttempts}/3): ${error.message}`
       }));
       
-      // CORREÇÃO: Se atingir limite de restarts, sugerir recriação automática
-      if (state.restartAttempts >= 2) {
+      // CORREÇÃO: Circuit breaker - Se atingir limite de restarts, implementar auto-recovery
+      if (state.restartAttempts >= 3) {
+        console.log('[WA Manager] Circuit breaker ativado - tentativas de restart esgotadas');
         setState(prev => ({ 
           ...prev,
-          message: 'Limite de restarts atingido. Recomendamos recriar a instância para resolver o problema.'
+          message: 'Circuit breaker ativado. Sistema implementará recuperação automática.'
         }));
         
         toast({ 
-          title: "❌ Restart Falhou", 
-          description: "Múltiplas tentativas de restart falharam. Tente recriar a instância.", 
+          title: "🔄 Circuit Breaker Ativado", 
+          description: "Múltiplas falhas detectadas. Implementando recuperação automática.", 
           variant: "destructive",
           duration: 8000
         });
+        
+        // Auto-recovery: deletar e recriar instância automaticamente após 15 segundos
+        setTimeout(async () => {
+          try {
+            console.log('[WA Manager] Iniciando auto-recovery - deletando instância');
+            await supabase.functions.invoke('evolution-api-handler', {
+              body: { action: 'delete', instanceName },
+              headers: { Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+            });
+            
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            setState(prev => ({ 
+              ...prev,
+              restartAttempts: 0,
+              connectingDetectedAt: null,
+              message: 'Auto-recovery executado. Reconectando...'
+            }));
+            
+            // Tentar reconectar
+            await handleConnect();
+          } catch (error) {
+            console.error('[WA Manager] Erro no auto-recovery:', error);
+          }
+        }, 15000);
       } else {
-        // Tentar novamente após delay maior
-        setTimeout(() => handleRestartInstance(instanceName), 8000);
+        // Tentar novamente após delay exponencial
+        const delay = Math.pow(2, state.restartAttempts) * 5000; // 5s, 10s, 20s
+        setTimeout(() => handleRestartInstance(instanceName), delay);
       }
     }
   }, [state.isRestarting, state.restartAttempts, toast, interpretEvolutionState, checkConnectionStatus]);
 
-  // Limpar todos os recursos
+  // CORREÇÃO: Limpeza robusta de recursos com verificação de estado
   const cleanupResources = useCallback(() => {
     console.log('[WA Manager] Limpando recursos');
-    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-    if (codeRenewalIntervalRef.current) clearInterval(codeRenewalIntervalRef.current);
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    if (connectingTimeoutRef.current) clearTimeout(connectingTimeoutRef.current);
-    pollingIntervalRef.current = null;
-    codeRenewalIntervalRef.current = null;
-    countdownIntervalRef.current = null;
-    connectingTimeoutRef.current = null;
+    
+    // Cleanup com verificação de existência
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    
+    if (codeRenewalIntervalRef.current) {
+      clearInterval(codeRenewalIntervalRef.current);
+      codeRenewalIntervalRef.current = null;
+    }
+    
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    
+    if (connectingTimeoutRef.current) {
+      clearTimeout(connectingTimeoutRef.current);
+      connectingTimeoutRef.current = null;
+    }
+    
+    // Reset de estados relacionados ao polling
+    setState(prev => ({
+      ...prev,
+      isPolling: false,
+      isRenewing: false,
+      countdownSeconds: 120
+    }));
+    
+    console.log('[WA Manager] ✅ Recursos limpos com sucesso');
   }, []);
 
-  // CORREÇÃO: Validação rigorosa do pairing code - apenas 8 caracteres alfanuméricos
+  // CORREÇÃO: Validação relaxada do pairing code - 6 a 10 caracteres alfanuméricos
   const validatePairingCode = useCallback((rawPairingCode: string | null | undefined): string | null => {
     if (!rawPairingCode) {
       console.log('[WA Manager] 🔍 Pairing code vazio ou nulo');
@@ -243,8 +306,8 @@ export const useWhatsAppManager = () => {
     
     const cleanCode = rawPairingCode.toString().trim().toUpperCase();
     
-    // CORREÇÃO: Validação rigorosa - exatos 8 caracteres alfanuméricos
-    if (/^[A-Z0-9]{8}$/.test(cleanCode)) {
+    // CORREÇÃO: Validação relaxada - 6 a 10 caracteres alfanuméricos para maior compatibilidade
+    if (/^[A-Z0-9]{6,10}$/.test(cleanCode)) {
       console.log('[WA Manager] ✅ Pairing code válido:', cleanCode);
       return cleanCode;
     }
@@ -283,7 +346,7 @@ export const useWhatsAppManager = () => {
           hasConnectionError: false,
           errorCount: 0,
           isRenewing: false,
-          countdownSeconds: 60, // Reset countdown após renovação
+          countdownSeconds: 120, // Reset countdown após renovação
           restartAttempts: 0, // Reset restart attempts após renovação bem-sucedida
           connectingDetectedAt: null
         }));
@@ -324,15 +387,15 @@ export const useWhatsAppManager = () => {
     }
   }, [validatePairingCode, toast, handleRestartInstance]);
 
-  // CORREÇÃO: Countdown melhorado com 90s e renovação mais inteligente
+  // CORREÇÃO: Countdown ajustado para 120s com renovação mais inteligente
   const startCountdown = useCallback((instanceName: string) => {
-    console.log('[WA Manager] Iniciando countdown de 90 segundos com renovação automática');
+    console.log('[WA Manager] Iniciando countdown de 120 segundos com renovação automática');
     
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
     }
     
-    setState(prev => ({ ...prev, countdownSeconds: 90 })); // CORREÇÃO: 90s para dar mais tempo
+    setState(prev => ({ ...prev, countdownSeconds: 120 })); // CORREÇÃO: 120s para dar mais tempo
     
     countdownIntervalRef.current = setInterval(() => {
       if (!isMountedRef.current) return;
@@ -350,7 +413,7 @@ export const useWhatsAppManager = () => {
             console.log('[WA Manager] ⏰ Renovação automática cancelada - restart em andamento ou connecting detectado');
           }
           
-          return { ...prev, countdownSeconds: 90 }; // Reset para próximo ciclo
+          return { ...prev, countdownSeconds: 120 }; // Reset para próximo ciclo
         }
         
         return { ...prev, countdownSeconds: newSeconds };
@@ -389,7 +452,7 @@ export const useWhatsAppManager = () => {
           hasConnectionError: false,
           errorCount: 0,
           generationAttempts: 0,
-          countdownSeconds: 60,
+          countdownSeconds: 120,
           isRestarting: false,
           restartAttempts: 0,
           connectingDetectedAt: null
@@ -649,7 +712,7 @@ export const useWhatsAppManager = () => {
         hasConnectionError: false,
         errorCount: 0,
         generationAttempts: 0,
-        countdownSeconds: 60,
+        countdownSeconds: 120,
         isRestarting: false,
         restartAttempts: 0,
         connectingDetectedAt: null
