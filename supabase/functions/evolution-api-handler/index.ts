@@ -765,7 +765,6 @@ serve(async (req) => {
               success: false, 
               error: createResult.error || 'Falha ao criar nova instância'
             }), {
-              status: 500,
               headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
           }
@@ -868,7 +867,6 @@ serve(async (req) => {
                   success: false, 
                   error: 'Falha ao recriar instância após problemas de conexão'
                 }), {
-                  status: 500,
                   headers: { ...corsHeaders, "Content-Type": "application/json" }
                 });
               }
@@ -888,11 +886,60 @@ serve(async (req) => {
             
           } else {
             console.error('[INITIALIZE] ❌ Falha no restart da instância:', restartResult.error);
+            // Fallback: tentar gerar códigos mesmo sem restart (evita 500 para o cliente)
+            console.log('[INITIALIZE] 🔁 Fallback sem restart: tentando gerar códigos diretamente...');
+            const pairingResult = await generatePairingCodeOnly(profile.instance_name, profile.numero, cleanApiUrl, evolutionApiKey);
+            const qrResult = await generateQRCodeOnly(profile.instance_name, cleanApiUrl, evolutionApiKey);
+
+            console.log('[INITIALIZE] 🔁 Resultado do fallback:', {
+              pairingSuccess: pairingResult.success,
+              qrSuccess: qrResult.success
+            });
+
+            if ((pairingResult.success && pairingResult.pairingCode) || (qrResult.success && qrResult.qrCode)) {
+              return new Response(JSON.stringify({ 
+                success: true,
+                state: 'needs_connection',
+                instanceName: profile.instance_name,
+                qrCode: qrResult.success ? qrResult.qrCode : null,
+                pairingCode: pairingResult.success ? pairingResult.pairingCode : null,
+                message: 'Prosseguindo sem restart: códigos gerados com sucesso'
+              }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              });
+            }
+
+            // Se ainda falhar, tentar recriar a instância como último recurso
+            console.log('[INITIALIZE] 🛠️ Fallback final: deletando e recriando instância...');
+            await deleteInstance(profile.instance_name, cleanApiUrl, evolutionApiKey);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const recreateResult = await createInstanceWithPairingSupport(
+              profile.instance_name, 
+              profile.numero, 
+              webhookUrl, 
+              cleanApiUrl, 
+              evolutionApiKey
+            );
+
+            if (recreateResult.success) {
+              return new Response(JSON.stringify({ 
+                success: true,
+                state: 'needs_connection',
+                instanceName: profile.instance_name,
+                qrCode: recreateResult.qrCode,
+                pairingCode: recreateResult.pairingCode,
+                message: 'Instância recriada após falha no restart'
+              }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              });
+            }
+
+            // Evitar FunctionsHttpError no cliente: retornar 200 com success:false
             return new Response(JSON.stringify({ 
               success: false, 
-              error: 'Falha ao reiniciar instância existente'
+              state: 'needs_connection',
+              error: 'Falha ao reiniciar e recriar instância. Tente novamente mais tarde.'
             }), {
-              status: 500,
               headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
           }

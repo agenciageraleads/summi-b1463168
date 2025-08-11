@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { Profile } from '@/hooks/useProfile';
 import { GoogleCalendarIntegration } from './GoogleCalendarIntegration';
+import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 
 interface ProfileFormProps {
   profile: Profile;
@@ -22,6 +23,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
   isUpdating,
   onRefreshProfile
 }) => {
+  const { state: waState } = useWhatsAppManager();
+  const connectionState = waState.connectionState;
   // Função para formatar número de telefone brasileiro
   const formatPhoneNumber = (value: string) => {
     // Remove tudo que não é dígito
@@ -72,9 +75,6 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
 
   // Estado para controlar a exibição formatada do número
   const [displayNumber, setDisplayNumber] = useState('');
-
-  // Verificar se o WhatsApp está conectado (tem instance_name)
-  const isWhatsAppConnected = Boolean(profile.instance_name);
 
   // Atualizar formData quando o profile mudar
   useEffect(() => {
@@ -166,10 +166,10 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
               value={displayNumber}
               onChange={handlePhoneChange}
               placeholder="(11) 99999-9999"
-              disabled={isWhatsAppConnected}
+              disabled={connectionState === 'already_connected'}
               maxLength={15}
             />
-            {isWhatsAppConnected && (
+            {connectionState === 'already_connected' && (
               <p className="text-sm text-orange-600">
                 ⚠️ Para alterar o número, desconecte primeiro o WhatsApp na aba Dashboard
               </p>
