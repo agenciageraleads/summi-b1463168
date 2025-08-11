@@ -50,7 +50,7 @@ export const useWhatsAppManager = () => {
     instanceName: null,
     message: 'Verificando estado da conexão...',
     isPolling: false,
-    countdownSeconds: 60,
+    countdownSeconds: 120,
     hasConnectionError: false,
     errorCount: 0,
     generationAttempts: 0,

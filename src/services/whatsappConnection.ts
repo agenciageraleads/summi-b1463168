@@ -72,6 +72,8 @@ export const initializeWhatsAppConnection = async (): Promise<ConnectionResult> 
       success: true,
       state: result.state || 'error',
       instanceName: result.instanceName,
+      qrCode: result.qrCode || result.qrcode || undefined,
+      pairingCode: result.pairingCode || undefined,
       message: result.message
     };
   } catch (error) {

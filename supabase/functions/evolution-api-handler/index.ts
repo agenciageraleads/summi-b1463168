@@ -162,14 +162,14 @@ const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDela
   }
 };
 
-// CORREÇÃO: Validação rigorosa do pairing code - apenas 8 caracteres alfanuméricos
+// CORREÇÃO: Validação do pairing code - aceitar 6 a 10 caracteres alfanuméricos
 const validatePairingCode = (code: string | null | undefined): string | null => {
   if (!code) return null;
   
   const cleanCode = code.toString().trim().toUpperCase();
   
-  // Validação rigorosa - exatos 8 caracteres alfanuméricos
-  if (/^[A-Z0-9]{8}$/.test(cleanCode)) {
+  // Validação relaxada - 6 a 10 caracteres alfanuméricos
+  if (/^[A-Z0-9]{6,10}$/.test(cleanCode)) {
     console.log(`[PAIRING-VALIDATOR] ✅ Pairing code válido: ${cleanCode}`);
     return cleanCode;
   }
@@ -342,7 +342,7 @@ const generatePairingCodeOnly = async (instanceName: string, phoneNumber: string
         console.log('[PAIRING-GENERATOR] ❌ Pairing code inválido ou não encontrado na resposta');
         return {
           success: false,
-          error: 'Pairing code de 8 dígitos não encontrado na resposta da API',
+          error: 'Pairing code não encontrado na resposta da API',
           rawResponse: pairingData,
           needsRestart: true // Sinaliza que precisa reiniciar
         };
