@@ -1,5 +1,4 @@
-// ABOUTME: Contexto de autenticação: gerencia sessão, login/registro e toasts.
-// ABOUTME: Dispara verificação de assinatura e força checkout após cadastro (sem trial automático).
+// ABOUTME: Contexto de autenticação: gerencia sessão, login/registro e toasts. Inclui criação de contas via Edge Function com trial de 7 dias.
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   login: (email: string, password: string) => Promise<{ error?: string }>;
-  register: (name: string, email: string, password: string) => Promise<{ error?: string }>;
+  register: (name: string, email: string, password: string, referralCode?: string) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error?: string }>;
   isLoading: boolean;
@@ -124,45 +123,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string, referralCode?: string) => {
     setLoading(true);
     try {
-      console.log('[AUTH] Iniciando registro sem criar trial automático');
+      console.log('[AUTH] Iniciando registro via Edge Function com trial de 7 dias');
 
-      const redirectUrl = `${window.location.origin}/`;
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { nome: name },
-          emailRedirectTo: redirectUrl,
-        },
+      // Cria conta e trial no backend (também salva subscritor e bônus por indicação)
+      const { data, error } = await supabase.functions.invoke('handle-signup', {
+        body: { name, email, password, referralCode },
       });
 
-      if (signUpError) {
-        console.error('[AUTH] Erro no signUp:', signUpError);
+      if (error) {
+        console.error('[AUTH] Erro no handle-signup:', error);
         toast({
           title: 'Erro no cadastro',
-          description: signUpError.message,
+          description: error.message || 'Tente novamente mais tarde.',
           variant: 'destructive',
         });
-        return { error: signUpError.message };
+        return { error: error.message };
       }
 
-      // Tentar login imediato para permitir redirecionar ao Stripe
+      // Realiza login para iniciar sessão local
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
-        console.warn('[AUTH] Login imediato falhou (provável confirmação de e-mail habilitada).');
+        console.warn('[AUTH] Login automático falhou. Pode ser necessário confirmar o e-mail.');
         toast({
-          title: 'Cadastro realizado!',
-          description: 'Verifique seu e-mail para confirmar a conta.',
+          title: 'Conta criada! Confirme seu e-mail',
+          description: 'Enviamos um link de confirmação para você.',
         });
         return {};
       }
 
+      // Sincroniza assinatura (vai marcar como trialing ativo)
+      if (supabase.auth.getSession) {
+        setTimeout(async () => {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData.session?.user) {
+            checkSubscription(sessionData.session.user.id);
+          }
+        }, 0);
+      }
+
       toast({
-        title: 'Conta criada!',
-        description: 'Finalize adicionando seu cartão para iniciar o teste grátis.',
+        title: 'Bem-vindo ao Summi! 🎉',
+        description: 'Seu teste grátis de 7 dias começou agora.',
       });
 
       return {};

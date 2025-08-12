@@ -3,7 +3,7 @@
 // ABOUTME: Foca apenas na criação da conta
 
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,8 +15,8 @@ import { useSubscription } from '@/hooks/useSubscription';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { register, user, isLoading } = useAuth();
-  const { createCheckout } = useSubscription();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -29,7 +29,7 @@ const RegisterPage = () => {
 
   useEffect(() => {
     if (user && !isLoading) {
-      navigate('/subscription');
+      navigate('/dashboard');
     }
   }, [user, isLoading, navigate]);
 
@@ -62,21 +62,19 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
     setIsSubmitting(true);
-    
-    const result = await register(formData.name, formData.email, formData.password);
-    
+
+    // Captura referral code via query string (?ref=CODE), se existir
+    const params = new URLSearchParams(location.search);
+    const referralCode = params.get('ref') || undefined;
+
+    const result = await register(formData.name, formData.email, formData.password, referralCode);
+
     if (!result.error) {
-      // Direcionar para a página de assinatura e abrir o checkout automaticamente (plano mensal por padrão)
-      navigate('/subscription');
-      setTimeout(() => {
-        createCheckout('monthly').catch(() => {/* fallback silencioso */});
-      }, 300);
+      navigate('/dashboard');
     }
-    
+
     setIsSubmitting(false);
   };
 

@@ -1,6 +1,6 @@
 
-// ABOUTME: Função para criar usuário com trial de 30 dias no Stripe
-// ABOUTME: Mantém toda a lógica de backend, apenas ajusta período do trial
+// ABOUTME: Função para criar usuário com trial de 7 dias no Stripe
+// ABOUTME: Lida com criação, trial inicial e bônus por indicação
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
@@ -90,7 +90,7 @@ serve(async (req) => {
   );
 
   try {
-    logStep("Iniciando processo de signup com trial de 30 dias");
+    logStep("Iniciando processo de signup com trial de 7 dias");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY não configurada");
@@ -107,7 +107,7 @@ serve(async (req) => {
     // Verificar se há código de indicação válido e obter dados do referrer
     let referrerUserId = null;
     let referrerRole = null;
-    let trialDays = 30; // Trial padrão de 30 dias
+    let trialDays = 7; // Trial padrão de 7 dias
     
     if (referralCode) {
       logStep("Verificando código de indicação", { referralCode });
@@ -121,7 +121,7 @@ serve(async (req) => {
       if (!referrerError && referrer) {
         referrerUserId = referrer.id;
         referrerRole = referrer.role;
-        trialDays = 30; // Mantém 30 dias mesmo com indicação
+        trialDays = 7; // Mantém 7 dias mesmo com indicação
         logStep("Código de indicação válido encontrado", { referrerUserId, referrerRole });
       } else {
         logStep("Código de indicação inválido ou não encontrado", { error: referrerError });
@@ -188,7 +188,7 @@ serve(async (req) => {
         items: [{
           price: "price_1RZ8j9KyDqE0F1PtNvJzdK0F"
         }],
-        trial_period_days: trialDays, // CORREÇÃO: Sempre 30 dias
+        trial_period_days: trialDays, // Sempre 7 dias por padrão
         payment_behavior: 'default_incomplete',
         metadata: {
           supabase_user_id: userId,
