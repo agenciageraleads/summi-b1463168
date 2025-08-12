@@ -11,10 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
 import { TermsCheckbox } from '@/components/TermsCheckbox';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
   const { register, user, isLoading } = useAuth();
+  const { createCheckout } = useSubscription();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -25,10 +27,9 @@ const RegisterPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Redirecionar se já estiver logado
   useEffect(() => {
     if (user && !isLoading) {
-      navigate('/dashboard');
+      navigate('/subscription');
     }
   }, [user, isLoading, navigate]);
 
@@ -69,7 +70,11 @@ const RegisterPage = () => {
     const result = await register(formData.name, formData.email, formData.password);
     
     if (!result.error) {
-      navigate('/dashboard');
+      // Direcionar para a página de assinatura e abrir o checkout automaticamente (plano mensal por padrão)
+      navigate('/subscription');
+      setTimeout(() => {
+        createCheckout('monthly').catch(() => {/* fallback silencioso */});
+      }, 300);
     }
     
     setIsSubmitting(false);

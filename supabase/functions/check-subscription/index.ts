@@ -174,7 +174,7 @@ serve(async (req) => {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'email' });
 
-    const subscribedStrict = (subscriptionStatus === 'active') || (subscriptionStatus === 'trialing');
+    const subscribedStrict = (subscriptionStatus === 'active') || (subscriptionStatus === 'trialing' && hasPaymentMethod);
 
     logStep("Updated database with subscription info", { subscribed: subscribedStrict, status: subscriptionStatus, planType, stripePriceId, hasPaymentMethod });
     return new Response(JSON.stringify({

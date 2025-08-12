@@ -1,4 +1,5 @@
-
+// ABOUTME: Contexto de autenticação: gerencia sessão, login/registro e toasts.
+// ABOUTME: Dispara verificação de assinatura e força checkout após cadastro (sem trial automático).
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -126,57 +127,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (name: string, email: string, password: string) => {
     setLoading(true);
     try {
-      console.log('[AUTH] Iniciando registro com trial automático');
-      
-      // Chamar a Edge Function para criar usuário + trial
-      const { data, error } = await supabase.functions.invoke('handle-signup', {
-        body: { name, email, password }
+      console.log('[AUTH] Iniciando registro sem criar trial automático');
+
+      const redirectUrl = `${window.location.origin}/`;
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { nome: name },
+          emailRedirectTo: redirectUrl,
+        },
       });
 
-      if (error) {
-        console.error('[AUTH] Erro na Edge Function:', error);
+      if (signUpError) {
+        console.error('[AUTH] Erro no signUp:', signUpError);
         toast({
-          title: "Erro no cadastro",
-          description: error.message,
-          variant: "destructive",
+          title: 'Erro no cadastro',
+          description: signUpError.message,
+          variant: 'destructive',
         });
-        return { error: error.message };
+        return { error: signUpError.message };
       }
 
-      if (!data.success) {
-        console.error('[AUTH] Erro retornado pela função:', data.error);
+      // Tentar login imediato para permitir redirecionar ao Stripe
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        console.warn('[AUTH] Login imediato falhou (provável confirmação de e-mail habilitada).');
         toast({
-          title: "Erro no cadastro",
-          description: data.error,
-          variant: "destructive",
+          title: 'Cadastro realizado!',
+          description: 'Verifique seu e-mail para confirmar a conta.',
         });
-        return { error: data.error };
+        return {};
       }
 
-      // Se o usuário foi criado com sucesso, fazer login automático
-      if (data.user && data.session) {
-        setUser(data.user);
-        setSession(data.session);
-        
-        toast({
-          title: "Conta criada com sucesso! 🎉",
-          description: "Seu trial de 7 dias foi ativado automaticamente.",
-        });
-      } else {
-        toast({
-          title: "Cadastro realizado!",
-          description: "Verifique seu e-mail para confirmar a conta.",
-        });
-      }
-      
+      toast({
+        title: 'Conta criada!',
+        description: 'Finalize adicionando seu cartão para iniciar o teste grátis.',
+      });
+
       return {};
     } catch (error) {
       console.error('[AUTH] Erro inesperado no registro:', error);
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
-        title: "Erro no cadastro",
+        title: 'Erro no cadastro',
         description: message,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return { error: message };
     } finally {
