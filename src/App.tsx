@@ -17,6 +17,7 @@ import BetaPage from "./pages/BetaPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SubscriptionGuard } from "./components/SubscriptionGuard";
 import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
 import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
@@ -45,22 +46,30 @@ function App() {
                 
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
-                    <DashboardPage />
+                    <SubscriptionGuard>
+                      <DashboardPage />
+                    </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
                 <Route path="/whatsapp" element={
                   <ProtectedRoute>
-                    <WhatsAppConnectionPage />
+                    <SubscriptionGuard>
+                      <WhatsAppConnectionPage />
+                    </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
                 <Route path="/whatsapp-v2" element={
                   <ProtectedRoute>
-                    <WhatsAppConnectionV2Page />
+                    <SubscriptionGuard>
+                      <WhatsAppConnectionV2Page />
+                    </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
                 <Route path="/settings" element={
                   <ProtectedRoute>
-                    <SettingsPage />
+                    <SubscriptionGuard>
+                      <SettingsPage />
+                    </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
                 <Route path="/subscription" element={
@@ -70,17 +79,23 @@ function App() {
                 } />
                 <Route path="/feedback" element={
                   <ProtectedRoute>
-                    <FeedbackPage />
+                    <SubscriptionGuard>
+                      <FeedbackPage />
+                    </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
                 <Route path="/referrals" element={
                   <ProtectedRoute>
-                    <ReferralsPage />
+                    <SubscriptionGuard>
+                      <ReferralsPage />
+                    </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
                 <Route path="/beta" element={
                   <ProtectedRoute>
-                    <BetaPage />
+                    <SubscriptionGuard>
+                      <BetaPage />
+                    </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
                 

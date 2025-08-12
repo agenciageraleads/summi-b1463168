@@ -121,6 +121,10 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
+    // Também recuperar o cliente para verificar método de pagamento padrão
+    const customer = await stripe.customers.retrieve(customerId) as any;
+    const hasCustomerDefaultPm = !!(customer && customer.invoice_settings && customer.invoice_settings.default_payment_method);
+
     // Busca por assinaturas ativas ou em trial, verificando as mais recentes
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
@@ -134,13 +138,19 @@ serve(async (req) => {
     let planType = null;
     let subscriptionEnd = null;
     let stripePriceId = null;
+    let hasPaymentMethod = hasCustomerDefaultPm;
 
     if (activeOrTrialingSubscription) {
       const subscription = activeOrTrialingSubscription;
       subscriptionStatus = subscription.status; // 'active' ou 'trialing'
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
       stripePriceId = subscription.items.data[0].price.id;
-      logStep("Active or trialing subscription found", { subscriptionId: subscription.id, status: subscriptionStatus, endDate: subscriptionEnd, priceId: stripePriceId });
+      // Verifica PM da assinatura (string ou objeto)
+      const subDefaultPm = (subscription as any).default_payment_method;
+      const subDefaultPmId = typeof subDefaultPm === 'string' ? subDefaultPm : subDefaultPm?.id;
+      hasPaymentMethod = hasPaymentMethod || !!subDefaultPmId;
+
+      logStep("Active or trialing subscription found", { subscriptionId: subscription.id, status: subscriptionStatus, endDate: subscriptionEnd, priceId: stripePriceId, hasPaymentMethod });
       
       // Determinar tipo do plano baseado no Price ID
       if (stripePriceId === "price_1RZ8j9KyDqE0F1PtNvJzdK0F") {
@@ -153,6 +163,7 @@ serve(async (req) => {
       logStep("No active or trialing subscription found");
     }
 
+    // Atualiza banco com o status mais recente (independente do critério "estrito")
     await supabaseClient.from("subscribers").upsert({
       email: user.email,
       user_id: user.id,
@@ -163,9 +174,11 @@ serve(async (req) => {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'email' });
 
-    logStep("Updated database with subscription info", { subscribed: subscriptionStatus !== 'inactive', status: subscriptionStatus, planType, stripePriceId });
+    const subscribedStrict = (subscriptionStatus === 'active') || (subscriptionStatus === 'trialing' && hasPaymentMethod);
+
+    logStep("Updated database with subscription info", { subscribed: subscribedStrict, status: subscriptionStatus, planType, stripePriceId, hasPaymentMethod });
     return new Response(JSON.stringify({
-      subscribed: subscriptionStatus !== 'inactive',
+      subscribed: subscribedStrict,
       status: subscriptionStatus,
       plan_type: planType,
       stripe_price_id: stripePriceId,

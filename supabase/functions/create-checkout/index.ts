@@ -53,6 +53,7 @@ serve(async (req) => {
           quantity: 1,
         },
       ],
+      payment_method_collection: "always",
       mode: "subscription",
       success_url: `${req.headers.get("origin")}/dashboard?success=true`,
       cancel_url: `${req.headers.get("origin")}/dashboard?canceled=true`,
