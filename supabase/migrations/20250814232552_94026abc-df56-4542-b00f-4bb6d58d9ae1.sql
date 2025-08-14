@@ -37,13 +37,13 @@ WITH CHECK (is_admin());
 CREATE POLICY "profiles_update_own" 
 ON public.profiles 
 FOR UPDATE 
-USING (id = auth.uid())
-WITH CHECK (id = auth.uid());
+USING (id = auth.uuid())
+WITH CHECK (id = auth.uuid());
 
 CREATE POLICY "profiles_insert_own" 
 ON public.profiles 
 FOR INSERT 
-WITH CHECK (id = auth.uid());
+WITH CHECK (id = auth.uuid());
 
 CREATE POLICY "profiles_delete_admin_only" 
 ON public.profiles 
