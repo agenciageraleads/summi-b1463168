@@ -38,30 +38,29 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     .filter(user => user.role === 'user')
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
 
-  // Função para promover usuário para beta
+  // Função para promover usuário para beta - VERSÃO SIMPLES SEM EDGE FUNCTION
   const promoteUserToBeta = async (userId: string, userName: string) => {
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
     try {
       console.log(`[BETA] Promovendo usuário ${userName} (${userId}) para beta`);
       
-      const { data, error } = await supabase.functions.invoke('promote-user-beta', {
-        body: {
-          userId: userId,
-          action: 'promote'
-        }
-      });
+      // Atualizar role diretamente no banco - sem edge function
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ role: 'beta' })
+        .eq('id', userId);
 
-      if (error) {
-        console.error('[BETA] Erro ao promover usuário:', error);
-        throw new Error(error.message || 'Erro ao promover usuário');
+      if (updateError) {
+        console.error('[BETA] Erro ao promover usuário:', updateError);
+        throw new Error(updateError.message || 'Erro ao promover usuário');
       }
 
-      console.log(`[BETA] Usuário ${userName} promovido com sucesso:`, data);
+      console.log(`[BETA] Usuário ${userName} promovido com sucesso`);
 
       toast({
         title: "Sucesso! 🎉",
-        description: data?.message || `${userName} foi promovido a usuário beta`,
+        description: `${userName} foi promovido a usuário beta`,
       });
       
       onRefresh();
@@ -77,30 +76,29 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     }
   };
 
-  // Função para remover usuário do programa beta
+  // Função para remover usuário do programa beta - VERSÃO SIMPLES SEM EDGE FUNCTION
   const removeUserFromBeta = async (userId: string, userName: string) => {
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
     try {
       console.log(`[BETA] Removendo usuário ${userName} (${userId}) do beta`);
       
-      const { data, error } = await supabase.functions.invoke('promote-user-beta', {
-        body: {
-          userId: userId,
-          action: 'remove'
-        }
-      });
+      // Atualizar role diretamente no banco - sem edge function
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ role: 'user' })
+        .eq('id', userId);
 
-      if (error) {
-        console.error('[BETA] Erro ao remover usuário do beta:', error);
-        throw new Error(error.message || 'Erro ao remover usuário do beta');
+      if (updateError) {
+        console.error('[BETA] Erro ao remover usuário do beta:', updateError);
+        throw new Error(updateError.message || 'Erro ao remover usuário do beta');
       }
 
-      console.log(`[BETA] Usuário ${userName} removido do beta:`, data);
+      console.log(`[BETA] Usuário ${userName} removido do beta`);
 
       toast({
         title: "Sucesso",
-        description: data?.message || `${userName} foi removido do programa beta`,
+        description: `${userName} foi removido do programa beta`,
       });
       
       onRefresh();
