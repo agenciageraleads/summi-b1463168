@@ -4,7 +4,7 @@ import { AdminRoute } from '@/components/Admin/AdminRoute';
 import { AdminLayout } from '@/components/Admin/AdminLayout';
 import { BetaUsersSection } from '@/components/Admin/BetaUsersSection';
 import { useAdmin } from '@/hooks/useAdmin';
-import { useAdminValidation } from '@/hooks/useAdminValidation';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RefreshCw, TestTube, Shield, AlertTriangle } from 'lucide-react';
@@ -17,9 +17,8 @@ const AdminBetaUsersPage: React.FC = () => {
     isLoading: isValidating, 
     error: validationError, 
     userRole, 
-    permissions,
-    refreshValidation 
-  } = useAdminValidation();
+    refresh: refreshValidation 
+  } = useAdminAccess();
 
   const handleRefresh = () => {
     console.log('[ADMIN-BETA-PAGE] 🔄 Atualizando dados...');

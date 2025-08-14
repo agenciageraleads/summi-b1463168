@@ -1,8 +1,8 @@
 // ABOUTME: Edge Function para promover/remover usuários do programa beta
 // ABOUTME: Funcionalidade limpa e simples para gestão de usuários beta
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,59 +20,77 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    )
 
     log('info', 'Iniciando promote-user-beta');
 
-    // Get user from JWT
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Token de autorização necessário' }),
-        { status: 401, headers: corsHeaders }
-      );
-    }
-
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
-
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
     if (authError || !user) {
-      log('error', 'Erro de autenticação', authError);
+      console.error('[ERROR] Falha na autenticação:', authError);
       return new Response(
-        JSON.stringify({ error: 'Token inválido' }),
-        { status: 401, headers: corsHeaders }
+        JSON.stringify({ error: 'Usuário não autenticado' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401 
+        }
       );
     }
 
     log('info', 'Usuário autenticado', { userId: user.id });
 
-    // Verificar se é admin diretamente na query
-    const { data: adminProfile, error: adminError } = await supabase
+    // Check if requesting user is admin - DIRECT QUERY WITHOUT is_admin()
+    const { data: adminProfile, error: adminError } = await supabaseClient
       .from('profiles')
-      .select('role')
+      .select('role, nome')
       .eq('id', user.id)
       .single();
 
-    if (adminError || !adminProfile || adminProfile.role !== 'admin') {
-      log('error', 'Usuário não é admin', { userId: user.id, adminProfile, adminError });
-      
-      // Log security violation
-      await supabase.from('security_audit_log').insert({
-        user_id: user.id,
-        event_type: 'unauthorized_beta_promotion_attempt',
-        event_details: {
-          attempted_action: 'promote_user_beta',
-          blocked_reason: 'insufficient_privileges'
-        },
-        severity: 'high'
+    if (adminError || !adminProfile) {
+      console.error('[ERROR] Erro ao verificar perfil admin:', adminError);
+      return new Response(
+        JSON.stringify({ error: 'Erro ao verificar permissões administrativas' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      );
+    }
+
+    if (adminProfile.role !== 'admin') {
+      console.error('[ERROR] Acesso negado - usuário não é admin:', { 
+        userId: user.id, 
+        userRole: adminProfile.role 
       });
+      
+      // Log unauthorized access attempt
+      await supabaseClient
+        .from('security_audit_log')
+        .insert({
+          user_id: user.id,
+          event_type: 'unauthorized_beta_promotion_attempt',
+          event_details: {
+            attempted_action: 'promote_user_beta',
+            user_role: adminProfile.role
+          },
+          severity: 'high'
+        });
 
       return new Response(
-        JSON.stringify({ error: 'Acesso negado: Apenas administradores podem promover usuários beta' }),
-        { status: 403, headers: corsHeaders }
+        JSON.stringify({ error: 'Acesso negado: apenas administradores podem promover usuários' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403 
+        }
       );
     }
 
@@ -98,7 +116,7 @@ serve(async (req) => {
     log('info', 'Processando ação beta', { userId, action, adminId: user.id });
 
     // Get target user profile
-    const { data: targetUser, error: userError } = await supabase
+    const { data: targetUser, error: userError } = await supabaseClient
       .from('profiles')
       .select('nome, role, instance_name')
       .eq('id', userId)
@@ -116,7 +134,7 @@ serve(async (req) => {
     const newRole = action === 'promote' ? 'beta' : 'user';
     
     // Update user role
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseClient
       .from('profiles')
       .update({ role: newRole })
       .eq('id', userId);
@@ -130,7 +148,7 @@ serve(async (req) => {
     }
 
     // Log the action
-    await supabase.from('security_audit_log').insert({
+    await supabaseClient.from('security_audit_log').insert({
       user_id: userId,
       event_type: 'beta_role_change',
       event_details: {

@@ -1,5 +1,5 @@
 
-import { useAdmin } from '@/hooks/useAdmin';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Navigate } from 'react-router-dom';
 
 interface AdminRouteProps {
@@ -7,7 +7,7 @@ interface AdminRouteProps {
 }
 
 export const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
-  const { isAdmin, isLoading } = useAdmin();
+  const { isAdmin, isLoading } = useAdminAccess();
 
   if (isLoading) {
     return (

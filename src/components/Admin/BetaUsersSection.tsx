@@ -9,7 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { UserCheck, UserX, Search, TestTube } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useAdminValidation } from '@/hooks/useAdminValidation';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 
 interface BetaUsersSectionProps {
   users: AdminUser[];
@@ -21,7 +21,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-  const { isAdmin } = useAdminValidation();
+  const { isAdmin } = useAdminAccess();
 
   // Filtrar usuários com base no termo de busca
   const filteredUsers = users.filter(user => 
