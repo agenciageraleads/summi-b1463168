@@ -63,8 +63,6 @@ verify_jwt = true
 [functions.google-calendar-disconnect]
 verify_jwt = true
 
-[functions.update-beta-webhook]
-verify_jwt = true
 
 [functions.create-announcement]
 verify_jwt = true
@@ -115,4 +113,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.check-connection-status]
+verify_jwt = true
+
+[functions.promote-user-beta]
 verify_jwt = true
