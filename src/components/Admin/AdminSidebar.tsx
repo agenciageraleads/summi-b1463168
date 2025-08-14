@@ -1,13 +1,16 @@
+// ABOUTME: Sidebar de navegação para o painel administrativo
+// ABOUTME: Contém links para todas as funcionalidades admin disponíveis
 
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { BarChart3, Users, ArrowLeft, TestTube } from 'lucide-react';
+import { BarChart3, Users, ArrowLeft, TestTube, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: BarChart3 },
   { name: 'Usuários', href: '/admin/users', icon: Users },
   { name: 'Usuários Beta', href: '/admin/beta-users', icon: TestTube },
+  { name: 'Anúncios', href: '/admin/announcements', icon: MessageSquare },
 ];
 
 export const AdminSidebar = () => {

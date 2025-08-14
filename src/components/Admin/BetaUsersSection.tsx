@@ -43,38 +43,50 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
     try {
-      // Primeiro, promover o usuário para beta
+      console.log(`[BETA] Promovendo usuário ${userName} (${userId}) para beta`);
+      
+      // 1. Atualizar role no banco
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ role: 'beta' })
         .eq('id', userId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('[BETA] Erro ao atualizar role:', updateError);
+        throw new Error(`Erro ao atualizar perfil: ${updateError.message}`);
+      }
 
-      // Depois, atualizar o webhook da instância se ela existir
+      // 2. Chamar edge function para atualizar webhook
       try {
-        const { data, error } = await supabase.functions.invoke('update-beta-webhook', {
-          body: { userId, action: 'promote' }
+        const { data: webhookResult, error: webhookError } = await supabase.functions.invoke('update-beta-webhook', {
+          body: {
+            userId: userId,
+            action: 'promote'
+          }
         });
 
-        if (error) {
-          console.warn('Erro ao atualizar webhook, mas promoção foi bem-sucedida:', error);
+        if (webhookError) {
+          console.error('[BETA] Erro ao atualizar webhook:', webhookError);
+          // Não falhar a operação por causa do webhook, apenas avisar
+          console.warn('[BETA] Webhook falhou, mas usuário foi promovido');
         }
+
+        console.log(`[BETA] Usuário ${userName} promovido com sucesso`, webhookResult);
       } catch (webhookError) {
-        console.warn('Erro ao atualizar webhook, mas promoção foi bem-sucedida:', webhookError);
+        console.warn('[BETA] Erro ao atualizar webhook, mas usuário foi promovido:', webhookError);
       }
 
       toast({
-        title: "Sucesso",
-        description: `${userName} foi promovido para usuário beta`,
+        title: "Sucesso! 🎉",
+        description: `${userName} foi promovido a usuário beta`,
       });
       
       onRefresh();
     } catch (error) {
-      console.error('Erro ao promover usuário:', error);
+      console.error('[BETA] Erro na promoção:', error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao promover usuário para beta",
+        description: `Falha ao promover usuário: ${error.message || 'Erro desconhecido'}`,
         variant: "destructive",
       });
     } finally {
@@ -87,25 +99,37 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
     try {
-      // Primeiro, remover o usuário do beta
+      console.log(`[BETA] Removendo usuário ${userName} (${userId}) do beta`);
+      
+      // 1. Atualizar role no banco
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ role: 'user' })
         .eq('id', userId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('[BETA] Erro ao atualizar role:', updateError);
+        throw new Error(`Erro ao atualizar perfil: ${updateError.message}`);
+      }
 
-      // Depois, atualizar o webhook da instância se ela existir
+      // 2. Chamar edge function para atualizar webhook
       try {
-        const { data, error } = await supabase.functions.invoke('update-beta-webhook', {
-          body: { userId, action: 'demote' }
+        const { data: webhookResult, error: webhookError } = await supabase.functions.invoke('update-beta-webhook', {
+          body: {
+            userId: userId,
+            action: 'remove'
+          }
         });
 
-        if (error) {
-          console.warn('Erro ao atualizar webhook, mas remoção foi bem-sucedida:', error);
+        if (webhookError) {
+          console.error('[BETA] Erro ao atualizar webhook:', webhookError);
+          // Não falhar a operação por causa do webhook, apenas avisar
+          console.warn('[BETA] Webhook falhou, mas usuário foi removido do beta');
         }
+
+        console.log(`[BETA] Usuário ${userName} removido do beta`, webhookResult);
       } catch (webhookError) {
-        console.warn('Erro ao atualizar webhook, mas remoção foi bem-sucedida:', webhookError);
+        console.warn('[BETA] Erro ao atualizar webhook, mas usuário foi removido:', webhookError);
       }
 
       toast({
@@ -115,10 +139,10 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
       
       onRefresh();
     } catch (error) {
-      console.error('Erro ao remover usuário do beta:', error);
+      console.error('[BETA] Erro na remoção:', error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao remover usuário do programa beta",
+        description: `Falha ao remover usuário: ${error.message || 'Erro desconhecido'}`,
         variant: "destructive",
       });
     } finally {

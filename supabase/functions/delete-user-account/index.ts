@@ -65,10 +65,10 @@ serve(async (req) => {
     const { data: isAdminData } = await supabaseAdmin.rpc('verify_admin_access', { user_id: user.id });
     const isAdmin = !!isAdminData;
     const userId = user.id;
-    const targetUserId = requestBody.target_user_id || userId;
+    const finalTargetUserId = requestBody.target_user_id || userId;
 
     console.log(`[DELETE-ACCOUNT] 👤 Usuário autenticado: ${userId} (admin: ${isAdmin})`);
-    console.log(`[DELETE-ACCOUNT] 🎯 Usuário alvo: ${targetUserId}`);
+    console.log(`[DELETE-ACCOUNT] 🎯 Usuário alvo: ${finalTargetUserId}`);
 
     if (requestBody.target_user_id && !isAdmin) {
       console.error('[DELETE-ACCOUNT] ❌ Usuário não admin tentando deletar outro usuário');
@@ -82,14 +82,14 @@ serve(async (req) => {
     }
 
     // AUDITORIA: Log de segurança crítico
-    console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - DELETE_ACCOUNT_ATTEMPT - User: ${userId} (admin: ${isAdmin}) targeting: ${targetUserId}`);
+    console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - DELETE_ACCOUNT_ATTEMPT - User: ${userId} (admin: ${isAdmin}) targeting: ${finalTargetUserId}`);
 
     // Buscar dados do usuário a ser deletado
-    console.log(`[DELETE-ACCOUNT] 🔍 Buscando dados do usuário: ${targetUserId}`);
+    console.log(`[DELETE-ACCOUNT] 🔍 Buscando dados do usuário: ${finalTargetUserId}`);
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('instance_name, nome, email, numero')
-      .eq('id', targetUserId)
+      .eq('id', finalTargetUserId)
       .single();
 
     if (profileError || !profile) {
@@ -153,7 +153,7 @@ serve(async (req) => {
         const { error: deleteError } = await supabaseAdmin
           .from(table)
           .delete()
-          .eq(userIdField, targetUserId);
+          .eq(userIdField, finalTargetUserId);
 
         if (deleteError) {
           console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao limpar tabela ${table}:`, deleteError.message);
@@ -170,7 +170,7 @@ serve(async (req) => {
     const { error: profileDeleteError } = await supabaseAdmin
       .from('profiles')
       .delete()
-      .eq('id', targetUserId);
+      .eq('id', finalTargetUserId);
 
     if (profileDeleteError) {
       console.error('[DELETE-ACCOUNT] ❌ Erro ao deletar perfil:', profileDeleteError.message);
@@ -183,12 +183,12 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[DELETE-ACCOUNT] ✅ Perfil deletado: ${targetUserId}`);
+    console.log(`[DELETE-ACCOUNT] ✅ Perfil deletado: ${finalTargetUserId}`);
 
     // 4º) Deletar usuário da auth (apenas se não for admin fazendo exclusão de outro usuário)
-    if (!isAdmin || targetUserId === userId) {
+    if (!isAdmin || finalTargetUserId === userId) {
       console.log(`[DELETE-ACCOUNT] 🔐 Deletando usuário da autenticação...`);
-      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
+      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(finalTargetUserId);
       
       if (authDeleteError) {
         console.error('[DELETE-ACCOUNT] ❌ Erro ao deletar usuário da auth:', authDeleteError.message);
@@ -201,17 +201,17 @@ serve(async (req) => {
         });
       }
 
-      console.log(`[DELETE-ACCOUNT] ✅ Usuário deletado da auth: ${targetUserId}`);
+      console.log(`[DELETE-ACCOUNT] ✅ Usuário deletado da auth: ${finalTargetUserId}`);
     } else {
-      console.log(`[DELETE-ACCOUNT] 🔒 Admin deletion - mantendo auth do usuário: ${targetUserId}`);
+      console.log(`[DELETE-ACCOUNT] 🔒 Admin deletion - mantendo auth do usuário: ${finalTargetUserId}`);
     }
 
     // Log final de auditoria
-    console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - DELETE_ACCOUNT_SUCCESS - User: ${userId} (admin: ${isAdmin}) deleted: ${targetUserId} (${profile.email})`);
+    console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - DELETE_ACCOUNT_SUCCESS - User: ${userId} (admin: ${isAdmin}) deleted: ${finalTargetUserId} (${profile.email})`);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: isAdmin && targetUserId !== userId ? 'Usuário deletado pelo admin com sucesso' : 'Conta deletada com sucesso'
+      message: isAdmin && finalTargetUserId !== userId ? 'Usuário deletado pelo admin com sucesso' : 'Conta deletada com sucesso'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });

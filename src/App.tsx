@@ -23,6 +23,7 @@ import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminBetaUsersPage from "./pages/AdminBetaUsersPage";
+import AdminAnnouncementsPage from "./pages/AdminAnnouncementsPage";
 import ReferralPage from '@/pages/ReferralPage';
 import TermsPage from "./pages/TermsPage";
 
@@ -103,6 +104,7 @@ function App() {
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
                 <Route path="/admin/beta-users" element={<AdminBetaUsersPage />} />
+                <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
                 
                 {/* Rotas de convite - ambas funcionam */}
                 <Route path="/convite/:referralCode" element={<ReferralPage />} />
