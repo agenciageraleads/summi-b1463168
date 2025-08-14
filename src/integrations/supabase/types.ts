@@ -538,20 +538,12 @@ export type Database = {
         Args: { user_id?: string }
         Returns: boolean
       }
-      is_current_user_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       sync_profile_emails: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
       validate_brazilian_phone: {
         Args: { phone_number: string }
-        Returns: boolean
-      }
-      verify_admin_access: {
-        Args: { user_id: string }
         Returns: boolean
       }
     }
