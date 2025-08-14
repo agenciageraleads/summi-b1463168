@@ -25,24 +25,44 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
   const filteredUsers = users.filter(user => 
     user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Separar usuários beta dos demais
-  const betaUsers = filteredUsers.filter(user => user.role === 'beta');
-  const regularUsers = filteredUsers.filter(user => user.role === 'user');
+  // Separar usuários beta dos demais e ordenar alfabeticamente
+  const betaUsers = filteredUsers
+    .filter(user => user.role === 'beta')
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
+    
+  const regularUsers = filteredUsers
+    .filter(user => user.role === 'user')
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
 
   // Função para promover usuário para beta
   const promoteUserToBeta = async (userId: string, userName: string) => {
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
     try {
-      const { error } = await supabase
+      // Primeiro, promover o usuário para beta
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ role: 'beta' })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // Depois, atualizar o webhook da instância se ela existir
+      try {
+        const { data, error } = await supabase.functions.invoke('update-beta-webhook', {
+          body: { userId, action: 'promote' }
+        });
+
+        if (error) {
+          console.warn('Erro ao atualizar webhook, mas promoção foi bem-sucedida:', error);
+        }
+      } catch (webhookError) {
+        console.warn('Erro ao atualizar webhook, mas promoção foi bem-sucedida:', webhookError);
+      }
 
       toast({
         title: "Sucesso",
@@ -54,7 +74,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
       console.error('Erro ao promover usuário:', error);
       toast({
         title: "Erro",
-        description: "Erro ao promover usuário para beta",
+        description: error.message || "Erro ao promover usuário para beta",
         variant: "destructive",
       });
     } finally {
@@ -67,12 +87,26 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
     try {
-      const { error } = await supabase
+      // Primeiro, remover o usuário do beta
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ role: 'user' })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // Depois, atualizar o webhook da instância se ela existir
+      try {
+        const { data, error } = await supabase.functions.invoke('update-beta-webhook', {
+          body: { userId, action: 'demote' }
+        });
+
+        if (error) {
+          console.warn('Erro ao atualizar webhook, mas remoção foi bem-sucedida:', error);
+        }
+      } catch (webhookError) {
+        console.warn('Erro ao atualizar webhook, mas remoção foi bem-sucedida:', webhookError);
+      }
 
       toast({
         title: "Sucesso",
@@ -84,7 +118,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
       console.error('Erro ao remover usuário do beta:', error);
       toast({
         title: "Erro",
-        description: "Erro ao remover usuário do programa beta",
+        description: error.message || "Erro ao remover usuário do programa beta",
         variant: "destructive",
       });
     } finally {
@@ -186,7 +220,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Buscar usuários por nome, número ou ID..."
+              placeholder="Buscar usuários por nome, número, email ou ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"

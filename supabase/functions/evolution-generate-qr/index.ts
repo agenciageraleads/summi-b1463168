@@ -110,7 +110,7 @@ serve(async (req) => {
       
       const { data: profile, error: profileError } = await supabaseClient
         .from('profiles')
-        .select('numero')
+        .select('numero, role')
         .eq('id', user.id)
         .single();
 
@@ -118,7 +118,12 @@ serve(async (req) => {
         throw new Error("User phone number not found in profile");
       }
 
-      const webhookUrl = Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
+      // Determinar webhook baseado no role do usuário
+      const webhookUrl = profile.role === 'beta' 
+        ? "https://webhookn8n.gera-leads.com/webhook/whatsapp-beta"
+        : Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
+      
+      logStep("Webhook selecionado baseado no role", { role: profile.role, webhookUrl });
       
       const createPayload = {
         instanceName,

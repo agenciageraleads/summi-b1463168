@@ -394,8 +394,16 @@ const deleteInstance = async (instanceName: string, evolutionApiUrl: string, evo
 };
 
 // NOVA: Função para criar instância com suporte correto ao pairing code
-const createInstanceWithPairingSupport = async (instanceName: string, phoneNumber: string, webhookUrl: string, evolutionApiUrl: string, evolutionApiKey: string) => {
+const createInstanceWithPairingSupport = async (instanceName: string, phoneNumber: string, webhookUrl: string, evolutionApiUrl: string, evolutionApiKey: string, userRole: string = 'user') => {
   console.log(`[CREATE-INSTANCE] 🏗️ Criando instância com suporte a pairing code: ${instanceName}`);
+  console.log(`[CREATE-INSTANCE] 👤 Role do usuário: ${userRole}`);
+  
+  // Determinar webhook baseado no role do usuário
+  const finalWebhookUrl = userRole === 'beta' 
+    ? "https://webhookn8n.gera-leads.com/webhook/whatsapp-beta"
+    : webhookUrl;
+  
+  console.log(`[CREATE-INSTANCE] 🎯 Webhook selecionado: ${finalWebhookUrl} (role: ${userRole})`);
   
   try {
     // CORREÇÃO: Usar endpoint correto com parâmetro number para garantir pairing code
@@ -407,7 +415,7 @@ const createInstanceWithPairingSupport = async (instanceName: string, phoneNumbe
       qrcode: true,
       integration: "WHATSAPP-BAILEYS",
       webhook: {
-        url: webhookUrl,
+        url: finalWebhookUrl,
         byEvents: false,
         base64: true,
         headers: {
@@ -479,8 +487,8 @@ const createInstanceWithPairingSupport = async (instanceName: string, phoneNumbe
 };
 
 // NOVA: Função robusta para lidar com status "connecting" persistente
-const handleConnectingStatus = async (instanceName: string, phoneNumber: string, webhookUrl: string, evolutionApiUrl: string, evolutionApiKey: string, maxRestartAttempts = 2) => {
-  console.log(`[HANDLE-CONNECTING] 🔄 Lidando com status connecting para: ${instanceName}`);
+const handleConnectingStatus = async (instanceName: string, phoneNumber: string, webhookUrl: string, evolutionApiUrl: string, evolutionApiKey: string, userRole: string = 'user', maxRestartAttempts = 2) => {
+  console.log(`[HANDLE-CONNECTING] 🔄 Lidando com status connecting para: ${instanceName} (role: ${userRole})`);
   
   for (let restartAttempt = 1; restartAttempt <= maxRestartAttempts; restartAttempt++) {
     console.log(`[HANDLE-CONNECTING] 🔄 Tentativa de restart ${restartAttempt}/${maxRestartAttempts}`);
@@ -549,7 +557,7 @@ const handleConnectingStatus = async (instanceName: string, phoneNumber: string,
     await new Promise(resolve => setTimeout(resolve, 5000));
     
     // 3. Criar nova instância
-    const createResult = await createInstanceWithPairingSupport(instanceName, phoneNumber, webhookUrl, evolutionApiUrl, evolutionApiKey);
+    const createResult = await createInstanceWithPairingSupport(instanceName, phoneNumber, webhookUrl, evolutionApiUrl, evolutionApiKey, userRole);
     
     if (createResult.success && createResult.pairingCode) {
       console.log(`[HANDLE-CONNECTING] ✅ Instância recriada com pairing code: ${createResult.pairingCode}`);
@@ -738,7 +746,8 @@ serve(async (req) => {
             profile.numero, 
             webhookUrl, 
             cleanApiUrl, 
-            evolutionApiKey
+            evolutionApiKey,
+            profile.role || 'user'
           );
           
           console.log('[INITIALIZE] 🏗️ Resultado da criação:', {
@@ -840,7 +849,8 @@ serve(async (req) => {
                 profile.numero, 
                 webhookUrl, 
                 cleanApiUrl, 
-                evolutionApiKey
+                evolutionApiKey,
+                profile.role || 'user'
               );
               
               console.log('[INITIALIZE] 🏗️ Resultado da recriação:', {
@@ -918,7 +928,8 @@ serve(async (req) => {
               profile.numero, 
               webhookUrl, 
               cleanApiUrl, 
-              evolutionApiKey
+              evolutionApiKey,
+              profile.role || 'user'
             );
 
             if (recreateResult.success) {
@@ -987,7 +998,8 @@ serve(async (req) => {
             profile.numero, 
             webhookUrl, 
             cleanApiUrl, 
-            evolutionApiKey
+            evolutionApiKey,
+            profile.role || 'user'
           );
           
           if (connectingResult.success) {
@@ -1050,7 +1062,8 @@ serve(async (req) => {
               profile.numero, 
               webhookUrl, 
               cleanApiUrl, 
-              evolutionApiKey
+              evolutionApiKey,
+              profile.role || 'user'
             );
             
             if (restartResult.success) {
