@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { UserCheck, UserX, Search, TestTube } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAdminValidation } from '@/hooks/useAdminValidation';
 
 interface BetaUsersSectionProps {
   users: AdminUser[];
@@ -20,6 +21,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
+  const { isAdmin } = useAdminValidation();
 
   // Filtrar usuários com base no termo de busca
   const filteredUsers = users.filter(user => 
@@ -38,173 +40,72 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     .filter(user => user.role === 'user')
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
 
-  // Função refatorada para promover usuário com validações completas
-  const promoteUserToBeta = async (userId: string, userName: string) => {
-    setLoadingStates(prev => ({ ...prev, [userId]: true }));
-    
-    console.log(`[BETA-REFACTOR] 🚀 Iniciando promoção: ${userName} (${userId})`);
-    
-    try {
-      // ETAPA 1: Validação prévia do usuário
-      const { data: currentUser, error: fetchError } = await supabase
-        .from('profiles')
-        .select('id, nome, role, email')
-        .eq('id', userId)
-        .single();
-
-      if (fetchError) {
-        console.error('[BETA-REFACTOR] ❌ Erro ao buscar usuário:', fetchError);
-        throw new Error('Usuário não encontrado no sistema');
-      }
-
-      if (currentUser?.role === 'beta') {
-        console.warn('[BETA-REFACTOR] ⚠️ Usuário já é beta:', currentUser);
-        toast({
-          title: "⚠️ Usuário já é beta",
-          description: `${userName} já possui acesso às funcionalidades beta.`,
-        });
-        return;
-      }
-
-      console.log('[BETA-REFACTOR] 📋 Dados antes da promoção:', {
-        nome: currentUser.nome,
-        role: currentUser.role,
-        email: currentUser.email
-      });
-
-      // ETAPA 2: Atualização do role com log de auditoria
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ role: 'beta' })
-        .eq('id', userId);
-
-      if (updateError) {
-        console.error('[BETA-REFACTOR] ❌ Erro na atualização:', updateError);
-        throw new Error(updateError.message || 'Falha ao atualizar role do usuário');
-      }
-
-      // ETAPA 3: Log de auditoria de segurança
-      const { error: auditError } = await supabase
-        .from('security_audit_log')
-        .insert({
-          event_type: 'user_promoted_to_beta',
-          event_details: {
-            target_user_id: userId,
-            target_user_name: userName,
-            target_user_email: currentUser.email,
-            previous_role: currentUser.role,
-            new_role: 'beta',
-            promotion_timestamp: new Date().toISOString()
-          },
-          severity: 'high'
-        });
-
-      if (auditError) {
-        console.warn('[BETA-REFACTOR] ⚠️ Erro no log de auditoria:', auditError);
-      } else {
-        console.log('[BETA-REFACTOR] 📝 Log de auditoria salvo com sucesso');
-      }
-
-      console.log(`[BETA-REFACTOR] ✅ Promoção concluída: ${userName} → BETA`);
-
+  // Função segura para chamar a Edge Function de promoção/despromoção
+  const callPromoteBeta = async (userId: string, action: 'promote' | 'remove', userName: string) => {
+    // Validação de segurança no frontend
+    if (!isAdmin) {
       toast({
-        title: "✅ Promoção realizada!",
-        description: `${userName} agora tem acesso às funcionalidades beta.`,
-      });
-      
-      onRefresh();
-    } catch (error: any) {
-      console.error('[BETA-REFACTOR] ❌ Erro crítico na promoção:', error);
-      toast({
-        title: "❌ Erro na promoção",
-        description: error.message || 'Falha inesperada ao promover usuário',
+        title: "❌ Acesso negado",
+        description: "Apenas administradores podem gerenciar usuários beta.",
         variant: "destructive",
       });
-    } finally {
-      setLoadingStates(prev => ({ ...prev, [userId]: false }));
+      return;
     }
-  };
 
-  // Função refatorada para remover usuário com validações completas
-  const removeUserFromBeta = async (userId: string, userName: string) => {
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
-    console.log(`[BETA-REFACTOR] 🔄 Iniciando remoção: ${userName} (${userId})`);
+    console.log(`[BETA-SECURE] 🔐 Iniciando ${action}: ${userName} (${userId})`);
     
     try {
-      // ETAPA 1: Validação prévia do usuário
-      const { data: currentUser, error: fetchError } = await supabase
-        .from('profiles')
-        .select('id, nome, role, email')
-        .eq('id', userId)
-        .single();
-
-      if (fetchError) {
-        console.error('[BETA-REFACTOR] ❌ Erro ao buscar usuário:', fetchError);
-        throw new Error('Usuário não encontrado no sistema');
+      // Obter token de autenticação
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Sessão expirada. Faça login novamente.');
       }
 
-      if (currentUser?.role !== 'beta') {
-        console.warn('[BETA-REFACTOR] ⚠️ Usuário não é beta:', currentUser);
-        toast({
-          title: "⚠️ Usuário não é beta",
-          description: `${userName} não possui acesso beta atualmente.`,
-        });
-        return;
-      }
+      console.log('[BETA-SECURE] 🎫 Token obtido, chamando Edge Function...');
 
-      console.log('[BETA-REFACTOR] 📋 Dados antes da remoção:', {
-        nome: currentUser.nome,
-        role: currentUser.role,
-        email: currentUser.email
-      });
-
-      // ETAPA 2: Atualização do role com log de auditoria
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ role: 'user' })
-        .eq('id', userId);
-
-      if (updateError) {
-        console.error('[BETA-REFACTOR] ❌ Erro na atualização:', updateError);
-        throw new Error(updateError.message || 'Falha ao atualizar role do usuário');
-      }
-
-      // ETAPA 3: Log de auditoria de segurança
-      const { error: auditError } = await supabase
-        .from('security_audit_log')
-        .insert({
-          event_type: 'user_removed_from_beta',
-          event_details: {
-            target_user_id: userId,
-            target_user_name: userName,
-            target_user_email: currentUser.email,
-            previous_role: 'beta',
-            new_role: 'user',
-            removal_timestamp: new Date().toISOString()
+      // Chamar Edge Function
+      const response = await fetch(
+        `https://fuhdqxaiewdztzuxriho.supabase.co/functions/v1/promote-user-beta`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1aGRxeGFpZXdkenR6dXhyaWhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2OTQ1NjcsImV4cCI6MjA2NTI3MDU2N30.T3EAHi3ayX_5MG93jr2n6HVXe_CLsEUh_udCfi441mo'
           },
-          severity: 'high'
-        });
+          body: JSON.stringify({ userId, action })
+        }
+      );
 
-      if (auditError) {
-        console.warn('[BETA-REFACTOR] ⚠️ Erro no log de auditoria:', auditError);
-      } else {
-        console.log('[BETA-REFACTOR] 📝 Log de auditoria salvo com sucesso');
+      const json = await response.json();
+      
+      if (!response.ok) {
+        console.error('[BETA-SECURE] ❌ Erro da Edge Function:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: json
+        });
+        throw new Error(json?.error || `Erro ${response.status}: ${response.statusText}`);
       }
 
-      console.log(`[BETA-REFACTOR] ✅ Remoção concluída: ${userName} → USER`);
+      console.log('[BETA-SECURE] ✅ Sucesso:', json);
 
+      const actionText = action === 'promote' ? 'promovido para' : 'removido do';
       toast({
-        title: "✅ Remoção realizada!",
-        description: `${userName} não tem mais acesso às funcionalidades beta.`,
+        title: "✅ Operação realizada!",
+        description: json?.message || `${userName} foi ${actionText} beta com sucesso.`,
       });
       
+      // Atualizar lista
       onRefresh();
+      
     } catch (error: any) {
-      console.error('[BETA-REFACTOR] ❌ Erro crítico na remoção:', error);
+      console.error('[BETA-SECURE] ❌ Erro crítico:', error);
       toast({
-        title: "❌ Erro na remoção",
-        description: error.message || 'Falha inesperada ao remover usuário',
+        title: "❌ Erro na operação",
+        description: error.message || 'Falha inesperada na operação',
         variant: "destructive",
       });
     } finally {
@@ -228,70 +129,83 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
         </div>
         
         <div className="flex flex-col gap-2">
-          {isBeta ? (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={loadingStates[user.id]}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <UserX className="h-4 w-4 mr-1" />
-                  Remover Beta
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Remover do Programa Beta</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza que deseja remover <strong>{user.nome}</strong> do programa beta? 
-                    O usuário perderá acesso às funcionalidades beta.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => removeUserFromBeta(user.id, user.nome)}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    Remover do Beta
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={loadingStates[user.id]}
-                  className="text-purple-600 hover:text-purple-700"
-                >
-                  <UserCheck className="h-4 w-4 mr-1" />
-                  Promover Beta
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Promover para Beta</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza que deseja promover <strong>{user.nome}</strong> para usuário beta? 
-                    O usuário terá acesso às funcionalidades beta da plataforma.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => promoteUserToBeta(user.id, user.nome)}
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
-                    Promover para Beta
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+          {/* Só mostra botões se for admin */}
+          {isAdmin && (
+            <>
+              {isBeta ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={loadingStates[user.id]}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <UserX className="h-4 w-4 mr-1" />
+                      {loadingStates[user.id] ? 'Removendo...' : 'Remover Beta'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remover do Programa Beta</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja remover <strong>{user.nome}</strong> do programa beta? 
+                        O usuário perderá acesso às funcionalidades beta e webhooks serão atualizados.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => callPromoteBeta(user.id, 'remove', user.nome)}
+                        className="bg-red-600 hover:bg-red-700"
+                        disabled={loadingStates[user.id]}
+                      >
+                        Remover do Beta
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={loadingStates[user.id]}
+                      className="text-purple-600 hover:text-purple-700"
+                    >
+                      <UserCheck className="h-4 w-4 mr-1" />
+                      {loadingStates[user.id] ? 'Promovendo...' : 'Promover Beta'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Promover para Beta</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja promover <strong>{user.nome}</strong> para usuário beta? 
+                        O usuário terá acesso às funcionalidades beta e webhooks serão configurados.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => callPromoteBeta(user.id, 'promote', user.nome)}
+                        className="bg-purple-600 hover:bg-purple-700"
+                        disabled={loadingStates[user.id]}
+                      >
+                        Promover para Beta
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </>
+          )}
+          {/* Mostra status para não-admins */}
+          {!isAdmin && (
+            <Badge variant="secondary" className="text-xs">
+              {isBeta ? 'BETA' : 'USER'}
+            </Badge>
           )}
         </div>
       </div>
