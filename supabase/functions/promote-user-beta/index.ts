@@ -47,12 +47,17 @@ serve(async (req) => {
       );
     }
 
-    // Verify admin privileges
-    const { data: adminCheck, error: adminError } = await supabase
-      .rpc('is_admin', { user_id: user.id });
+    log('info', 'Usuário autenticado', { userId: user.id });
 
-    if (adminError || !adminCheck) {
-      log('error', 'Usuário não é admin', { userId: user.id, adminError });
+    // Verificar se é admin diretamente na query
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (adminError || !adminProfile || adminProfile.role !== 'admin') {
+      log('error', 'Usuário não é admin', { userId: user.id, adminProfile, adminError });
       
       // Log security violation
       await supabase.from('security_audit_log').insert({
@@ -70,6 +75,8 @@ serve(async (req) => {
         { status: 403, headers: corsHeaders }
       );
     }
+
+    log('info', 'Admin verificado com sucesso', { userId: user.id });
 
     // Parse request body
     const { userId, action } = await req.json();
