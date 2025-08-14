@@ -46,9 +46,10 @@ export const useAdmin = () => {
     }
 
     try {
-      // Check rate limit for admin status checks
-      const rateLimitOk = await checkRateLimit('admin_status_check', 50, 60);
+      // Check rate limit for admin status checks (increased limit for admin verification)
+      const rateLimitOk = await checkRateLimit('admin_status_check', 200, 60);
       if (!rateLimitOk) {
+        console.warn('Rate limit exceeded for admin status check');
         setIsAdmin(false);
         setIsLoading(false);
         return;
