@@ -89,9 +89,9 @@ serve(async (req) => {
       });
     }
 
-    // Determinar qual webhook usar baseado na ação e role atual
+    // Determinar qual webhook usar baseado na ação (não no role atual)
     let webhookUrl;
-    if (action === 'promote' || role === 'beta') {
+    if (action === 'promote') {
       webhookUrl = "https://webhookn8n.gera-leads.com/webhook/whatsapp-beta";
     } else {
       webhookUrl = Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
