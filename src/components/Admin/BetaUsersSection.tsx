@@ -38,37 +38,86 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     .filter(user => user.role === 'user')
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
 
-  // Função para promover usuário para beta - VERSÃO SIMPLES SEM EDGE FUNCTION
+  // Função refatorada para promover usuário com validações completas
   const promoteUserToBeta = async (userId: string, userName: string) => {
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
+    console.log(`[BETA-REFACTOR] 🚀 Iniciando promoção: ${userName} (${userId})`);
+    
     try {
-      console.log(`[BETA] Promovendo usuário ${userName} (${userId}) para beta`);
-      
-      // Atualizar role diretamente no banco - sem edge function
+      // ETAPA 1: Validação prévia do usuário
+      const { data: currentUser, error: fetchError } = await supabase
+        .from('profiles')
+        .select('id, nome, role, email')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) {
+        console.error('[BETA-REFACTOR] ❌ Erro ao buscar usuário:', fetchError);
+        throw new Error('Usuário não encontrado no sistema');
+      }
+
+      if (currentUser?.role === 'beta') {
+        console.warn('[BETA-REFACTOR] ⚠️ Usuário já é beta:', currentUser);
+        toast({
+          title: "⚠️ Usuário já é beta",
+          description: `${userName} já possui acesso às funcionalidades beta.`,
+        });
+        return;
+      }
+
+      console.log('[BETA-REFACTOR] 📋 Dados antes da promoção:', {
+        nome: currentUser.nome,
+        role: currentUser.role,
+        email: currentUser.email
+      });
+
+      // ETAPA 2: Atualização do role com log de auditoria
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ role: 'beta' })
         .eq('id', userId);
 
       if (updateError) {
-        console.error('[BETA] Erro ao promover usuário:', updateError);
-        throw new Error(updateError.message || 'Erro ao promover usuário');
+        console.error('[BETA-REFACTOR] ❌ Erro na atualização:', updateError);
+        throw new Error(updateError.message || 'Falha ao atualizar role do usuário');
       }
 
-      console.log(`[BETA] Usuário ${userName} promovido com sucesso`);
+      // ETAPA 3: Log de auditoria de segurança
+      const { error: auditError } = await supabase
+        .from('security_audit_log')
+        .insert({
+          event_type: 'user_promoted_to_beta',
+          event_details: {
+            target_user_id: userId,
+            target_user_name: userName,
+            target_user_email: currentUser.email,
+            previous_role: currentUser.role,
+            new_role: 'beta',
+            promotion_timestamp: new Date().toISOString()
+          },
+          severity: 'high'
+        });
+
+      if (auditError) {
+        console.warn('[BETA-REFACTOR] ⚠️ Erro no log de auditoria:', auditError);
+      } else {
+        console.log('[BETA-REFACTOR] 📝 Log de auditoria salvo com sucesso');
+      }
+
+      console.log(`[BETA-REFACTOR] ✅ Promoção concluída: ${userName} → BETA`);
 
       toast({
-        title: "Sucesso! 🎉",
-        description: `${userName} foi promovido a usuário beta`,
+        title: "✅ Promoção realizada!",
+        description: `${userName} agora tem acesso às funcionalidades beta.`,
       });
       
       onRefresh();
-    } catch (error) {
-      console.error('[BETA] Erro na promoção:', error);
+    } catch (error: any) {
+      console.error('[BETA-REFACTOR] ❌ Erro crítico na promoção:', error);
       toast({
-        title: "Erro",
-        description: `Falha ao promover usuário: ${error.message || 'Erro desconhecido'}`,
+        title: "❌ Erro na promoção",
+        description: error.message || 'Falha inesperada ao promover usuário',
         variant: "destructive",
       });
     } finally {
@@ -76,37 +125,86 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     }
   };
 
-  // Função para remover usuário do programa beta - VERSÃO SIMPLES SEM EDGE FUNCTION
+  // Função refatorada para remover usuário com validações completas
   const removeUserFromBeta = async (userId: string, userName: string) => {
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
     
+    console.log(`[BETA-REFACTOR] 🔄 Iniciando remoção: ${userName} (${userId})`);
+    
     try {
-      console.log(`[BETA] Removendo usuário ${userName} (${userId}) do beta`);
-      
-      // Atualizar role diretamente no banco - sem edge function
+      // ETAPA 1: Validação prévia do usuário
+      const { data: currentUser, error: fetchError } = await supabase
+        .from('profiles')
+        .select('id, nome, role, email')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) {
+        console.error('[BETA-REFACTOR] ❌ Erro ao buscar usuário:', fetchError);
+        throw new Error('Usuário não encontrado no sistema');
+      }
+
+      if (currentUser?.role !== 'beta') {
+        console.warn('[BETA-REFACTOR] ⚠️ Usuário não é beta:', currentUser);
+        toast({
+          title: "⚠️ Usuário não é beta",
+          description: `${userName} não possui acesso beta atualmente.`,
+        });
+        return;
+      }
+
+      console.log('[BETA-REFACTOR] 📋 Dados antes da remoção:', {
+        nome: currentUser.nome,
+        role: currentUser.role,
+        email: currentUser.email
+      });
+
+      // ETAPA 2: Atualização do role com log de auditoria
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ role: 'user' })
         .eq('id', userId);
 
       if (updateError) {
-        console.error('[BETA] Erro ao remover usuário do beta:', updateError);
-        throw new Error(updateError.message || 'Erro ao remover usuário do beta');
+        console.error('[BETA-REFACTOR] ❌ Erro na atualização:', updateError);
+        throw new Error(updateError.message || 'Falha ao atualizar role do usuário');
       }
 
-      console.log(`[BETA] Usuário ${userName} removido do beta`);
+      // ETAPA 3: Log de auditoria de segurança
+      const { error: auditError } = await supabase
+        .from('security_audit_log')
+        .insert({
+          event_type: 'user_removed_from_beta',
+          event_details: {
+            target_user_id: userId,
+            target_user_name: userName,
+            target_user_email: currentUser.email,
+            previous_role: 'beta',
+            new_role: 'user',
+            removal_timestamp: new Date().toISOString()
+          },
+          severity: 'high'
+        });
+
+      if (auditError) {
+        console.warn('[BETA-REFACTOR] ⚠️ Erro no log de auditoria:', auditError);
+      } else {
+        console.log('[BETA-REFACTOR] 📝 Log de auditoria salvo com sucesso');
+      }
+
+      console.log(`[BETA-REFACTOR] ✅ Remoção concluída: ${userName} → USER`);
 
       toast({
-        title: "Sucesso",
-        description: `${userName} foi removido do programa beta`,
+        title: "✅ Remoção realizada!",
+        description: `${userName} não tem mais acesso às funcionalidades beta.`,
       });
       
       onRefresh();
-    } catch (error) {
-      console.error('[BETA] Erro na remoção:', error);
+    } catch (error: any) {
+      console.error('[BETA-REFACTOR] ❌ Erro crítico na remoção:', error);
       toast({
-        title: "Erro",
-        description: `Falha ao remover usuário: ${error.message || 'Erro desconhecido'}`,
+        title: "❌ Erro na remoção",
+        description: error.message || 'Falha inesperada ao remover usuário',
         variant: "destructive",
       });
     } finally {
