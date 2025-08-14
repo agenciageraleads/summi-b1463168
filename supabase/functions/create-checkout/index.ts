@@ -34,12 +34,28 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    // Definir o price_id baseado no tipo de plano
+    // Verificar se já tem subscription ativa
+    if (customerId) {
+      const existingSubscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'active',
+        limit: 1
+      });
+      
+      if (existingSubscriptions.data.length > 0) {
+        throw new Error('User already has an active subscription');
+      }
+    }
+
+    // Definir price_id e trial_days baseado no tipo de plano
     let priceId;
+    let trialDays;
     if (planType === 'monthly') {
       priceId = 'price_1RZ8j9KyDqE0F1PtNvJzdK0F';
+      trialDays = 7;
     } else if (planType === 'annual') {
       priceId = 'price_1RZ8j9KyDqE0F1PtIlw9cx2C';
+      trialDays = 30;
     } else {
       throw new Error('Invalid plan type');
     }
@@ -55,8 +71,14 @@ serve(async (req) => {
       ],
       payment_method_collection: "always",
       mode: "subscription",
+      subscription_data: {
+        trial_period_days: trialDays,
+        metadata: {
+          supabase_user_id: user.id
+        }
+      },
       success_url: `${req.headers.get("origin")}/dashboard?success=true`,
-      cancel_url: `${req.headers.get("origin")}/dashboard?canceled=true`,
+      cancel_url: `${req.headers.get("origin")}/subscription?canceled=true`,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {

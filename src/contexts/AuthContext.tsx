@@ -154,20 +154,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return {};
       }
 
-      // Sincroniza assinatura (vai marcar como trialing ativo)
-      if (supabase.auth.getSession) {
-        setTimeout(async () => {
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData.session?.user) {
-            checkSubscription(sessionData.session.user.id);
-          }
-        }, 0);
-      }
-
       toast({
         title: 'Bem-vindo ao Summi! 🎉',
-        description: 'Seu teste grátis de 7 dias começou agora.',
+        description: 'Complete seu cadastro escolhendo um plano.',
       });
+
+      // Redirecionar para página de subscription para completar checkout
+      setTimeout(() => {
+        window.location.href = '/subscription';
+      }, 1500);
 
       return {};
     } catch (error) {

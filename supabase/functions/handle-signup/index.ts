@@ -1,6 +1,5 @@
-
-// ABOUTME: Função para criar usuário com trial de 7 dias no Stripe
-// ABOUTME: Lida com criação, trial inicial e bônus por indicação
+// ABOUTME: Função para criar usuário no Supabase sem subscription automática
+// ABOUTME: Apenas cria customer no Stripe, subscription será criada no checkout obrigatório
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
@@ -90,7 +89,7 @@ serve(async (req) => {
   );
 
   try {
-    logStep("Iniciando processo de signup com trial de 7 dias");
+    logStep("Iniciando processo de signup - criação de customer apenas");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY não configurada");
@@ -107,7 +106,6 @@ serve(async (req) => {
     // Verificar se há código de indicação válido e obter dados do referrer
     let referrerUserId = null;
     let referrerRole = null;
-    let trialDays = 7; // Trial padrão de 7 dias
     
     if (referralCode) {
       logStep("Verificando código de indicação", { referralCode });
@@ -121,7 +119,6 @@ serve(async (req) => {
       if (!referrerError && referrer) {
         referrerUserId = referrer.id;
         referrerRole = referrer.role;
-        trialDays = 7; // Mantém 7 dias mesmo com indicação
         logStep("Código de indicação válido encontrado", { referrerUserId, referrerRole });
       } else {
         logStep("Código de indicação inválido ou não encontrado", { error: referrerError });
@@ -168,7 +165,7 @@ serve(async (req) => {
         logStep("Erro ao atualizar perfil", { error: profileError });
       }
 
-      // Passo 3: Criar customer no Stripe
+      // Passo 3: Criar customer no Stripe (apenas customer, subscription será criada no checkout)
       logStep("Criando customer no Stripe");
       const customer = await stripe.customers.create({
         email,
@@ -179,49 +176,9 @@ serve(async (req) => {
         }
       });
 
-      logStep("Customer criado no Stripe", { customerId: customer.id });
+      logStep("Customer criado no Stripe, subscription será criada no checkout", { customerId: customer.id });
 
-      // Passo 4: Criar subscription de trial no Stripe com 30 dias
-      logStep(`Criando subscription de trial de ${trialDays} dias`);
-      const subscription = await stripe.subscriptions.create({
-        customer: customer.id,
-        items: [{
-          price: "price_1RZ8j9KyDqE0F1PtNvJzdK0F"
-        }],
-        trial_period_days: trialDays, // Sempre 7 dias por padrão
-        payment_behavior: 'default_incomplete',
-        metadata: {
-          supabase_user_id: userId,
-          referred_by: referrerUserId || 'none'
-        }
-      });
-
-      logStep("Subscription de trial criada", { subscriptionId: subscription.id });
-
-      // Calcular data de expiração do trial
-      const trialEndDate = new Date(subscription.trial_end! * 1000);
-
-      // Passo 5: Salvar dados na tabela subscribers
-      logStep("Salvando dados na tabela subscribers");
-      const { error: subscriberError } = await supabaseAdmin.from("subscribers").upsert({
-        email,
-        user_id: userId,
-        stripe_customer_id: customer.id,
-        stripe_subscription_id: subscription.id,
-        subscribed: true,
-        subscription_status: 'trialing',
-        stripe_price_id: "price_1RZ8j9KyDqE0F1PtNvJzdK0F",
-        subscription_end: trialEndDate.toISOString(),
-        trial_ends_at: trialEndDate.toISOString(),
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'email' });
-
-      if (subscriberError) {
-        logStep("Erro ao salvar subscriber", { error: subscriberError });
-        throw new Error(`Erro ao salvar dados de assinatura: ${subscriberError.message}`);
-      }
-
-      // Passo 6: Se houve indicação, recompensar o referrer com bonus baseado no role
+      // Passo 4: Se houve indicação, recompensar o referrer com bonus baseado no role
       if (referrerUserId) {
         logStep("Aplicando recompensa para o referrer", { referrerRole });
         
@@ -232,7 +189,7 @@ serve(async (req) => {
         await extendUserTrial(supabaseAdmin, stripe, referrerUserId, bonusDays);
       }
 
-      logStep("Conta criada com sucesso");
+      logStep("Conta criada com sucesso - usuário deve ir para checkout");
 
       return new Response(JSON.stringify({
         success: true,

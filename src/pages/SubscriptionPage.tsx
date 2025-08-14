@@ -115,7 +115,7 @@ const SubscriptionPage = () => {
                   <span className="text-summi-gray-500 ml-2">por mês</span>
                 </div>
                 <CardDescription className="mt-2">
-                  Flexibilidade com pagamento mensal
+                  Flexibilidade com pagamento mensal + 7 dias grátis
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -168,7 +168,7 @@ const SubscriptionPage = () => {
                   33% de desconto • R$ 238,80/ano
                 </div>
                 <CardDescription className="mt-2">
-                  Melhor custo-benefício
+                  Melhor custo-benefício + 30 dias grátis
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -212,10 +212,10 @@ const SubscriptionPage = () => {
             <CardContent className="pt-6">
               <div className="text-center">
                 <h3 className="font-semibold text-summi-gray-900 mb-2">
-                  Teste Grátis por 7 Dias
+                  🎉 Complete seu cadastro
                 </h3>
                 <p className="text-sm text-summi-gray-600">
-                  Experimente todas as funcionalidades da Summi sem compromisso. 
+                  Adicione seu cartão e ganhe <strong>7 dias grátis</strong> no plano mensal ou <strong>30 dias grátis</strong> no plano anual. 
                   Cancele quando quiser, sem taxas.
                 </p>
               </div>

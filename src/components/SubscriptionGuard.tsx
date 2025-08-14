@@ -19,6 +19,7 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }
     );
   }
 
+  // Bloquear acesso se não tem subscription ativa ou em trial
   if (!subscription.subscribed) {
     return <Navigate to="/subscription" replace />;
   }
