@@ -168,8 +168,9 @@ serve(async (req) => {
 
     console.log('[FETCH-WHATSAPP-GROUPS] ⚙️ Configurações Evolution API validadas');
 
-    // Construir URL da Evolution API
-    const evolutionUrl = `${evolutionApiUrl}/group/fetchAllGroups/${profile.instance_name}`;
+    // Construir URL da Evolution API (normalizar barras)
+    const baseUrl = evolutionApiUrl.endsWith('/') ? evolutionApiUrl.slice(0, -1) : evolutionApiUrl;
+    const evolutionUrl = `${baseUrl}/group/fetchAllGroups/${profile.instance_name}`;
     console.log('[FETCH-WHATSAPP-GROUPS] 🌐 URL da Evolution API:', evolutionUrl);
 
     // Fazer requisição para Evolution API
