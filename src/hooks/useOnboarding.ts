@@ -18,7 +18,7 @@ interface OnboardingStep {
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: 'Bem-vindo ao ConectaMentor IA! 🎉',
+    title: 'Bem-vindo à Summi! 🎉',
     description: 'Vamos configurar sua conta em 3 passos simples para começar a monitorar mensagens importantes do WhatsApp.',
     icon: '👋'
   },
