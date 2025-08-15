@@ -62,7 +62,7 @@ serve(async (req) => {
     }
 
     // Verificar se é admin (para exclusão de outros usuários) ou usuário excluindo própria conta
-    const { data: isAdminData } = await supabaseAdmin.rpc('verify_admin_access', { user_id: user.id });
+    const { data: isAdminData } = await supabaseAdmin.rpc('is_admin', { user_id: user.id });
     const isAdmin = !!isAdminData;
     const userId = user.id;
     const finalTargetUserId = requestBody.target_user_id || userId;
