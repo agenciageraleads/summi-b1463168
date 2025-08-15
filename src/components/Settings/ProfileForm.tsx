@@ -204,7 +204,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
               id="temas_importantes"
               value={formData.temas_importantes}
               onChange={(e) => handleInputChange('temas_importantes', e.target.value)}
-              placeholder="Ex: orçamentos, material elétrico, comprar..."
+              placeholder="Ex: orçamentos, proposta, comprar..."
               className="min-h-[80px]"
             />
           </div>
