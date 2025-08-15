@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import Stripe from "https://esm.sh/stripe@14.21.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -133,6 +134,68 @@ serve(async (req) => {
       } catch (evolutionError) {
         console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao deletar instância Evolution:`, evolutionError.message);
       }
+    }
+
+    // 1.5º) Cancelar assinatura no Stripe (se existir)
+    console.log(`[DELETE-ACCOUNT] 💳 Verificando e cancelando assinatura no Stripe...`);
+    
+    try {
+      const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+      
+      if (!stripeSecretKey) {
+        console.warn('[DELETE-ACCOUNT] ⚠️ Stripe não configurado, pulando cancelamento de assinatura');
+      } else {
+        const stripe = new Stripe(stripeSecretKey, { apiVersion: "2023-10-16" });
+        
+        // Buscar cliente Stripe pelo email
+        const customers = await stripe.customers.list({ 
+          email: profile.email, 
+          limit: 1 
+        });
+        
+        if (customers.data.length > 0) {
+          const customerId = customers.data[0].id;
+          console.log(`[DELETE-ACCOUNT] 🔍 Cliente Stripe encontrado: ${customerId}`);
+          
+          // Buscar assinaturas ativas do cliente
+          const subscriptions = await stripe.subscriptions.list({
+            customer: customerId,
+            status: 'active',
+          });
+          
+          if (subscriptions.data.length > 0) {
+            console.log(`[DELETE-ACCOUNT] 📋 Encontradas ${subscriptions.data.length} assinatura(s) ativa(s)`);
+            
+            // Cancelar todas as assinaturas ativas
+            for (const subscription of subscriptions.data) {
+              try {
+                const canceledSub = await stripe.subscriptions.cancel(subscription.id);
+                console.log(`[DELETE-ACCOUNT] ✅ Assinatura cancelada: ${subscription.id} (status: ${canceledSub.status})`);
+                
+                // Log de auditoria para cancelamento
+                console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - STRIPE_SUBSCRIPTION_CANCELED - User: ${finalTargetUserId} - Subscription: ${subscription.id} - Canceled by: ${userId} (admin: ${isAdmin})`);
+              } catch (subError) {
+                console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao cancelar assinatura ${subscription.id}:`, subError.message);
+              }
+            }
+          } else {
+            console.log(`[DELETE-ACCOUNT] ℹ️ Nenhuma assinatura ativa encontrada para o cliente`);
+          }
+          
+          // Opcional: Deletar o cliente do Stripe também
+          try {
+            await stripe.customers.del(customerId);
+            console.log(`[DELETE-ACCOUNT] ✅ Cliente Stripe deletado: ${customerId}`);
+          } catch (customerError) {
+            console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao deletar cliente Stripe:`, customerError.message);
+          }
+        } else {
+          console.log(`[DELETE-ACCOUNT] ℹ️ Nenhum cliente Stripe encontrado para o email: ${profile.email}`);
+        }
+      }
+    } catch (stripeError) {
+      console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao processar Stripe:`, stripeError.message);
+      // Não falhar a operação por causa do Stripe - apenas registrar o erro
     }
 
     // 2º) Deletar dados relacionados no Supabase
