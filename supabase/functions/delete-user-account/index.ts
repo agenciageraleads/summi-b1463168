@@ -31,8 +31,20 @@ serve(async (req) => {
       });
     }
 
-    // Extrair dados da requisição 
-    const requestBody = await req.json();
+    // Extrair dados da requisição (se houver)
+    let requestBody: any = {};
+    try {
+      const contentType = req.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const text = await req.text();
+        if (text && text.trim() !== '') {
+          requestBody = JSON.parse(text);
+        }
+      }
+    } catch (error) {
+      console.log('[DELETE-ACCOUNT] ℹ️ No JSON body provided, using default values');
+    }
+    
     const targetUserId = requestBody.target_user_id;
 
     const supabaseAdmin = createClient(
