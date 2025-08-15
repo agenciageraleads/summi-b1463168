@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,13 @@ interface WhatsAppGroup {
   isMonitored: boolean;
 }
 
+interface CachedGroup {
+  group_id: string;
+  group_name: string;
+  participants_count: number;
+  last_updated: string;
+}
+
 // Componente para monitoramento de grupos WhatsApp - BETA FEATURE
 export const GroupsMonitoring: React.FC = () => {
   const { user } = useAuth();
@@ -27,20 +34,105 @@ export const GroupsMonitoring: React.FC = () => {
   const [groups, setGroups] = useState<WhatsAppGroup[]>([]);
   const [monitoredGroups, setMonitoredGroups] = useState<WhatsAppGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCache, setIsLoadingCache] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [isAddingGroups, setIsAddingGroups] = useState(false);
+  const [cacheTimestamp, setCacheTimestamp] = useState<Date | null>(null);
+
+  // Cache management functions
+  const getCacheKey = useCallback(() => {
+    return `whatsapp_groups_${user?.id}_${profile?.instance_name}`;
+  }, [user?.id, profile?.instance_name]);
+
+  // Load groups from cache first, then from server if cache is old
+  const loadGroupsWithCache = useCallback(async () => {
+    if (!user || !profile?.instance_name) return;
+
+    setIsLoadingCache(true);
+    try {
+      // Try to load from cache first
+      const { data: cachedGroups } = await supabase
+        .from('whatsapp_groups_cache')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('last_updated', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // 5 minutos de cache
+
+      if (cachedGroups && cachedGroups.length > 0) {
+        console.log(`[GroupsMonitoring] Cache encontrado: ${cachedGroups.length} grupos`);
+        const formattedGroups = cachedGroups.map(cached => ({
+          id: cached.group_id,
+          name: cached.group_name,
+          participants: cached.participants_count,
+          isMonitored: false
+        }));
+        setGroups(formattedGroups);
+        setCacheTimestamp(new Date(cachedGroups[0].last_updated));
+        return true; // Cache found and loaded
+      }
+    } catch (error) {
+      console.error('[GroupsMonitoring] Erro ao carregar cache:', error);
+    } finally {
+      setIsLoadingCache(false);
+    }
+    return false; // No cache found
+  }, [user, profile?.instance_name]);
+
+  // Save groups to cache
+  const saveGroupsToCache = useCallback(async (groupsToCache: WhatsAppGroup[]) => {
+    if (!user) return;
+
+    try {
+      // Clear old cache
+      await supabase
+        .from('whatsapp_groups_cache')
+        .delete()
+        .eq('user_id', user.id);
+
+      // Save new cache
+      const cacheData = groupsToCache.map(group => ({
+        user_id: user.id,
+        group_id: group.id,
+        group_name: group.name,
+        participants_count: group.participants
+      }));
+
+      const { error } = await supabase
+        .from('whatsapp_groups_cache')
+        .insert(cacheData);
+
+      if (error) {
+        console.error('[GroupsMonitoring] Erro ao salvar cache:', error);
+      } else {
+        console.log(`[GroupsMonitoring] Cache salvo: ${cacheData.length} grupos`);
+        setCacheTimestamp(new Date());
+      }
+    } catch (error) {
+      console.error('[GroupsMonitoring] Erro ao salvar cache:', error);
+    }
+  }, [user]);
 
   // Buscar grupos automaticamente quando o componente carrega
   useEffect(() => {
     if (user && profile?.instance_name) {
-      fetchWhatsAppGroups();
-      fetchMonitoredGroups();
+      const initializeGroups = async () => {
+        const cacheLoaded = await loadGroupsWithCache();
+        
+        // Load monitored groups always
+        await fetchMonitoredGroups();
+        
+        // If no cache or cache is old, refresh from API
+        if (!cacheLoaded) {
+          await fetchWhatsAppGroups();
+        }
+      };
+      
+      initializeGroups();
     }
-  }, [user, profile?.instance_name]);
+  }, [user, profile?.instance_name, loadGroupsWithCache]);
 
-  // Buscar grupos do WhatsApp
-  const fetchWhatsAppGroups = async () => {
+  // Buscar grupos do WhatsApp (força refresh da API)
+  const fetchWhatsAppGroups = useCallback(async () => {
     if (!user || !profile?.instance_name) {
       toast({
         title: "Aviso",
@@ -64,11 +156,16 @@ export const GroupsMonitoring: React.FC = () => {
       if (error) throw error;
 
       if (data.success) {
-        setGroups(data.groups || []);
-        console.log(`[GroupsMonitoring] ${data.groups?.length || 0} grupos encontrados`);
+        const newGroups = data.groups || [];
+        setGroups(newGroups);
+        
+        // Save to cache
+        await saveGroupsToCache(newGroups);
+        
+        console.log(`[GroupsMonitoring] ${newGroups.length} grupos encontrados e salvos em cache`);
         toast({
           title: "Grupos atualizados",
-          description: `${data.groups?.length || 0} grupos encontrados`,
+          description: `${newGroups.length} grupos encontrados`,
         });
       } else {
         throw new Error(data.error || 'Erro ao buscar grupos');
@@ -83,10 +180,10 @@ export const GroupsMonitoring: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, profile, toast, saveGroupsToCache]);
 
   // Buscar grupos monitorados do usuário
-  const fetchMonitoredGroups = async () => {
+  const fetchMonitoredGroups = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -105,6 +202,7 @@ export const GroupsMonitoring: React.FC = () => {
       }));
 
       setMonitoredGroups(monitored);
+      console.log(`[GroupsMonitoring] ${monitored.length} grupos monitorados carregados`);
     } catch (error) {
       console.error('Erro ao buscar grupos monitorados:', error);
       toast({
@@ -113,7 +211,7 @@ export const GroupsMonitoring: React.FC = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [user, toast]);
 
   // Adicionar grupos ao monitoramento (um por vez)
   const addToMonitoring = async () => {
@@ -225,14 +323,25 @@ export const GroupsMonitoring: React.FC = () => {
     }
   };
 
-  // Filtrar grupos com base na busca
-  const filteredGroups = groups.filter(group =>
-    group.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filtrar grupos com base na busca (memoized for performance)
+  const filteredGroups = useMemo(() => 
+    groups.filter(group =>
+      group.name.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [groups, searchTerm]
   );
 
-  const filteredMonitoredGroups = monitoredGroups.filter(group =>
-    group.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMonitoredGroups = useMemo(() => 
+    monitoredGroups.filter(group =>
+      group.name.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [monitoredGroups, searchTerm]
   );
+
+  // Cache status information
+  const cacheInfo = useMemo(() => {
+    if (!cacheTimestamp) return null;
+    const age = Math.floor((Date.now() - cacheTimestamp.getTime()) / 1000 / 60); // minutes
+    return { age, isOld: age > 5 };
+  }, [cacheTimestamp]);
 
   return (
     <div className="space-y-6">
@@ -250,10 +359,16 @@ export const GroupsMonitoring: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchWhatsAppGroups} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Atualizar Grupos
+          <Button onClick={fetchWhatsAppGroups} disabled={isLoading || isLoadingCache}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isLoadingCache) ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Atualizando...' : isLoadingCache ? 'Carregando...' : 'Atualizar Grupos'}
           </Button>
+          {cacheInfo && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md text-sm">
+              <span className={`h-2 w-2 rounded-full ${cacheInfo.isOld ? 'bg-orange-500' : 'bg-green-500'}`} />
+              Cache: {cacheInfo.age}min atrás
+            </div>
+          )}
           {selectedGroups.length > 0 && (
             <Button 
               onClick={addToMonitoring} 
