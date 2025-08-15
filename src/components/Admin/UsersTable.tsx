@@ -1,11 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AdminUser } from '@/hooks/useAdmin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2, WifiOff, RotateCcw } from 'lucide-react';
+import { Trash2, WifiOff, RotateCcw, Search } from 'lucide-react';
 
 interface UsersTableProps {
   users: AdminUser[];
@@ -21,6 +22,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({
   onRestartInstance
 }) => {
   const [loadingStates, setLoadingStates] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleAction = async (userId: string, action: string, actionFn: () => Promise<boolean>) => {
     setLoadingStates(prev => ({ ...prev, [userId]: action }));
@@ -51,15 +53,39 @@ export const UsersTable: React.FC<UsersTableProps> = ({
     return <Badge className="bg-gray-100 text-gray-800">Verificando...</Badge>;
   };
 
+  // Filtrar e ordenar usuários
+  const filteredAndSortedUsers = useMemo(() => {
+    return users
+      .filter(user => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          user.nome.toLowerCase().includes(searchLower) ||
+          (user.numero && user.numero.includes(searchTerm)) ||
+          (user.email && user.email.toLowerCase().includes(searchLower)) ||
+          user.id.toLowerCase().includes(searchLower)
+        );
+      })
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
+  }, [users, searchTerm]);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Gestão de Usuários</span>
           <span className="text-sm font-normal text-gray-600">
-            {users.length} usuários encontrados
+            {filteredAndSortedUsers.length} de {users.length} usuários
           </span>
         </CardTitle>
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Buscar por nome, número, email ou ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -77,7 +103,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {filteredAndSortedUsers.map((user) => (
                 <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">
                     <div>
@@ -227,6 +253,12 @@ export const UsersTable: React.FC<UsersTableProps> = ({
               ))}
             </tbody>
           </table>
+          
+          {filteredAndSortedUsers.length === 0 && users.length > 0 && (
+            <div className="text-center py-8 text-gray-500">
+              Nenhum usuário encontrado para "{searchTerm}"
+            </div>
+          )}
           
           {users.length === 0 && (
             <div className="text-center py-8 text-gray-500">
