@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { MessageCircle, Clock, AlertCircle, MessageSquare, RotateCcw } from 'lucide-react';
+import { MessageCircle, Clock, AlertCircle, MessageSquare, RotateCcw, Trash2, CheckCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useMessageAnalysis } from '@/hooks/useMessageAnalysis';
+import { useChats } from '@/hooks/useChats';
+import { useToast } from '@/hooks/use-toast';
 
 interface Chat {
   id: string;
@@ -24,73 +26,46 @@ interface Chat {
 export const ChatsList = () => {
   const { user } = useAuth();
   const { isAnalyzing, startAnalysis } = useMessageAnalysis();
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { chats, isLoading, fetchChats, deleteChat, deleteAllChats } = useChats();
+  const { toast } = useToast();
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
-  const fetchChats = async () => {
-    if (!user) return;
-
-    try {
-      console.log('[CHATS] Buscando TODOS os chats para usuário:', user.id);
-      
-      // Buscar TODOS os chats (removido o filtro de prioridade)
-      const { data, error } = await supabase
-        .from('chats')
-        .select('*')
-        .eq('id_usuario', user.id)
-        .order('modificado_em', { ascending: false })
-        .limit(20); // Aumentar limite já que vamos mostrar todos
-
-      if (error) {
-        console.error('[CHATS] Erro ao buscar chats:', error);
-        return;
-      }
-
-      console.log('[CHATS] Dados brutos retornados:', data);
-
-      // Transformar dados garantindo que conversa seja sempre um array
-      const transformedData = (data || []).map(chat => ({
-        ...chat,
-        conversa: Array.isArray(chat.conversa) ? chat.conversa : [],
-        prioridade: chat.prioridade || '0'
-      }));
-
-      // Ordenar: Com prioridade primeiro, depois por data
-      const sortedChats = transformedData.sort((a, b) => {
-        const priorityA = parseInt(a.prioridade);
-        const priorityB = parseInt(b.prioridade);
-        
-        // Se ambos têm prioridade, ordenar por prioridade
-        if (priorityA > 0 && priorityB > 0) {
-          const getOrder = (priority: number) => {
-            if (priority === 3) return 3; // Urgente
-            if (priority === 2) return 2; // Importante
-            return 1; // Não importante (0 ou 1)
-          };
-          
-          return getOrder(priorityB) - getOrder(priorityA);
-        }
-        
-        // Se apenas um tem prioridade, ele vem primeiro
-        if (priorityA > 0 && priorityB === 0) return -1;
-        if (priorityB > 0 && priorityA === 0) return 1;
-        
-        // Se nenhum tem prioridade, ordenar por data
-        return new Date(b.modificado_em).getTime() - new Date(a.modificado_em).getTime();
+  // Função para deletar uma conversa individual
+  const handleDeleteChat = async (chatId: string, chatName: string) => {
+    const success = await deleteChat(chatId);
+    if (success) {
+      toast({
+        title: "Conversa removida",
+        description: `A conversa com ${chatName} foi removida com sucesso.`,
       });
-
-      setChats(sortedChats);
-      console.log('[CHATS] Carregados', sortedChats.length, 'chats ordenados');
-    } catch (error) {
-      console.error('[CHATS] Erro inesperado:', error);
-    } finally {
-      setIsLoading(false);
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover a conversa. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
-  useEffect(() => {
-    fetchChats();
-  }, [user]);
+  // Função para deletar todas as conversas
+  const handleDeleteAllChats = async () => {
+    setIsDeletingAll(true);
+    const success = await deleteAllChats();
+    
+    if (success) {
+      toast({
+        title: "Todas as conversas foram removidas",
+        description: "Todas as suas conversas foram marcadas como resolvidas.",
+      });
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover as conversas. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+    setIsDeletingAll(false);
+  };
 
   // Função para chamar análise e recarregar após conclusão
   const handleAnalyzeMessages = () => {
@@ -185,22 +160,22 @@ export const ChatsList = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <MessageCircle className="w-5 h-5" />
-              <span>Mensagens Recentes</span>
-            </div>
-            <Button
-              onClick={handleAnalyzeMessages}
-              disabled={isAnalyzing}
-              size="sm"
-              variant="outline"
-              className="flex items-center space-x-2"
-            >
-              <RotateCcw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-              <span>{isAnalyzing ? 'Analisando...' : 'Analisar Mensagens'}</span>
-            </Button>
-          </CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <MessageCircle className="w-5 h-5" />
+            <span>Mensagens Recentes</span>
+          </div>
+          <Button
+            onClick={handleAnalyzeMessages}
+            disabled={isAnalyzing}
+            size="sm"
+            variant="outline"
+            className="flex items-center space-x-2"
+          >
+            <RotateCcw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
+            <span>{isAnalyzing ? 'Analisando...' : 'Analisar Mensagens'}</span>
+          </Button>
+        </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
@@ -223,16 +198,28 @@ export const ChatsList = () => {
             <MessageCircle className="w-5 h-5" />
             <span>Mensagens Recentes</span>
           </div>
-          <Button
-            onClick={handleAnalyzeMessages}
-            disabled={isAnalyzing}
-            size="sm"
-            variant="outline"
-            className="flex items-center space-x-2"
-          >
-            <RotateCcw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-            <span>{isAnalyzing ? 'Analisando...' : 'Analisar Mensagens'}</span>
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button
+              onClick={handleDeleteAllChats}
+              disabled={isDeletingAll || chats.length === 0}
+              size="sm"
+              variant="outline"
+              className="flex items-center space-x-2 text-green-600 hover:text-green-700"
+            >
+              <CheckCheck className={`w-4 h-4 ${isDeletingAll ? 'animate-spin' : ''}`} />
+              <span>{isDeletingAll ? 'Removendo...' : 'Marcar Todas como Resolvidas'}</span>
+            </Button>
+            <Button
+              onClick={handleAnalyzeMessages}
+              disabled={isAnalyzing}
+              size="sm"
+              variant="outline"
+              className="flex items-center space-x-2"
+            >
+              <RotateCcw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
+              <span>{isAnalyzing ? 'Analisando...' : 'Analisar Mensagens'}</span>
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -258,15 +245,26 @@ export const ChatsList = () => {
                         </div>
                       </Badge>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex items-center space-x-1 text-xs px-2 py-1 h-auto"
-                      onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
-                    >
-                      <MessageSquare className="w-3 h-3" />
-                      <span>Responder</span>
-                    </Button>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center space-x-1 text-xs px-2 py-1 h-auto text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteChat(chat.id, chat.nome)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Remover</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center space-x-1 text-xs px-2 py-1 h-auto"
+                        onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        <span>Responder</span>
+                      </Button>
+                    </div>
                   </div>
                   
                   {chat.contexto && (

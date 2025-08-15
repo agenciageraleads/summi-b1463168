@@ -81,6 +81,40 @@ export const useChats = () => {
     }
   };
 
+  const deleteChat = async (chatId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chats')
+        .delete()
+        .eq('id', chatId);
+
+      if (error) throw error;
+      await fetchChats(); // Refresh the list
+      return true;
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      return false;
+    }
+  };
+
+  const deleteAllChats = async () => {
+    if (!user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('chats')
+        .delete()
+        .eq('id_usuario', user.id);
+
+      if (error) throw error;
+      await fetchChats(); // Refresh the list
+      return true;
+    } catch (error) {
+      console.error('Error deleting all chats:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchChats();
   }, [user]);
@@ -90,6 +124,8 @@ export const useChats = () => {
     isLoading,
     fetchChats,
     createChat,
-    updateChat
+    updateChat,
+    deleteChat,
+    deleteAllChats
   };
 };
