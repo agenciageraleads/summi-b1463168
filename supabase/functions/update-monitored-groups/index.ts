@@ -88,16 +88,16 @@ serve(async (req) => {
     console.log('[UPDATE-MONITORED-GROUPS] Ação:', action, 'para grupo:', groupId, 'usuário:', userId);
 
     if (action === 'add') {
-      // Verificar se já não existe 3 grupos monitorados para este usuário
+      // Verificar se já não existe 10 grupos monitorados para este usuário
       const { count: currentCount } = await supabase
         .from('monitored_whatsapp_groups')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
 
-      if (currentCount && currentCount >= 3) {
+      if (currentCount && currentCount >= 10) {
         console.log('[UPDATE-MONITORED-GROUPS] Limite de grupos atingido para usuário:', userId, 'count:', currentCount);
         return new Response(
-          JSON.stringify({ error: 'Limite máximo de 3 grupos monitorados atingido' }),
+          JSON.stringify({ error: 'Limite máximo de 10 grupos monitorados atingido' }),
           {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
