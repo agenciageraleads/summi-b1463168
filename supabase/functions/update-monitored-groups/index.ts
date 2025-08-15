@@ -16,18 +16,7 @@ serve(async (req) => {
   try {
     console.log('[UPDATE-MONITORED-GROUPS] Função iniciada');
 
-    // Criar cliente Supabase
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        auth: {
-          persistSession: false,
-        },
-      }
-    )
-
-    // Verificar autenticação
+    // Verificar autenticação primeiro
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -39,9 +28,25 @@ serve(async (req) => {
       )
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
+    // Criar cliente Supabase com o token do usuário
+    const token = authHeader.replace('Bearer ', '');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        auth: {
+          persistSession: false,
+        },
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
     )
+
+    // Verificar se o usuário está autenticado
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
 
     if (userError || !user) {
       console.error('[UPDATE-MONITORED-GROUPS] Erro de autenticação:', userError)
@@ -53,6 +58,8 @@ serve(async (req) => {
         }
       )
     }
+
+    console.log('[UPDATE-MONITORED-GROUPS] Usuário autenticado:', user.id);
 
     const { userId, groupId, groupName, action } = await req.json()
     
