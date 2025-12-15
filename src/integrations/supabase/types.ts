@@ -363,7 +363,7 @@ export type Database = {
           event_details: Json | null
           event_type: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           session_id: string | null
           severity: string | null
           user_agent: string | null
@@ -374,7 +374,7 @@ export type Database = {
           event_details?: Json | null
           event_type: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           session_id?: string | null
           severity?: string | null
           user_agent?: string | null
@@ -385,7 +385,7 @@ export type Database = {
           event_details?: Json | null
           event_type?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           session_id?: string | null
           severity?: string | null
           user_agent?: string | null
@@ -526,22 +526,13 @@ export type Database = {
         }
         Returns: boolean
       }
-      generate_referral_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_referral_code: { Args: never; Returns: string }
       generate_secure_instance_name: {
         Args: { user_nome: string; user_numero: string }
         Returns: string
       }
-      is_admin: {
-        Args: { user_id?: string }
-        Returns: boolean
-      }
-      sync_profile_emails: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      is_admin: { Args: { user_id?: string }; Returns: boolean }
+      sync_profile_emails: { Args: never; Returns: undefined }
       validate_brazilian_phone: {
         Args: { phone_number: string }
         Returns: boolean
