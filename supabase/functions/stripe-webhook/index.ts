@@ -1,3 +1,5 @@
+// ABOUTME: Webhook do Stripe para processar eventos de checkout, assinatura e pagamentos
+// ABOUTME: Cria perfil automaticamente se não existir, garantindo resiliência no fluxo
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
@@ -12,6 +14,68 @@ const corsHeaders = {
 const logWebhookEvent = (eventType: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[STRIPE-WEBHOOK] ${eventType}${detailsStr}`);
+};
+
+// Função auxiliar para garantir que o perfil existe
+const ensureProfileExists = async (supabaseClient: any, userId: string, email: string, customerName?: string) => {
+  logWebhookEvent("Verificando se perfil existe", { userId, email });
+  
+  const { data: existingProfile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+  
+  if (profileError) {
+    logWebhookEvent("Erro ao verificar perfil", { error: profileError });
+    return false;
+  }
+  
+  if (!existingProfile) {
+    logWebhookEvent("Perfil não encontrado, criando automaticamente", { userId, email });
+    
+    const { error: createError } = await supabaseClient
+      .from('profiles')
+      .insert({
+        id: userId,
+        nome: customerName || email.split('@')[0],
+        email: email
+      });
+    
+    if (createError) {
+      logWebhookEvent("Erro ao criar perfil automaticamente", { error: createError });
+      return false;
+    }
+    
+    logWebhookEvent("Perfil criado automaticamente com sucesso");
+  }
+  
+  return true;
+};
+
+// Função para buscar userId por email (tenta profiles, depois auth.users)
+const findUserIdByEmail = async (supabaseClient: any, email: string) => {
+  // Tentar primeiro na tabela profiles
+  const { data: profileData, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+  
+  if (!profileError && profileData) {
+    return profileData.id;
+  }
+  
+  // Se não encontrou em profiles, buscar em auth.users via admin
+  const { data: usersData, error: usersError } = await supabaseClient.auth.admin.listUsers();
+  
+  if (usersError) {
+    logWebhookEvent("Erro ao buscar usuários", { error: usersError });
+    return null;
+  }
+  
+  const user = usersData.users.find((u: any) => u.email === email);
+  return user?.id || null;
 };
 
 serve(async (req) => {
@@ -68,23 +132,28 @@ serve(async (req) => {
           if (customer.email) {
             logWebhookEvent("Atualizando dados do cliente", { email: customer.email });
             
-            // Buscar usuário no Supabase por email
-            const { data: userData, error: userError } = await supabaseClient
-              .from('profiles')
-              .select('id')
-              .eq('email', customer.email)
-              .single();
+            // Buscar userId - tenta profiles e auth.users
+            let userId = await findUserIdByEmail(supabaseClient, customer.email);
+            
+            // Se ainda não encontrou e temos metadata do customer, usar o supabase_user_id
+            if (!userId && customer.metadata?.supabase_user_id) {
+              userId = customer.metadata.supabase_user_id;
+              logWebhookEvent("Usando userId do metadata do Stripe", { userId });
+            }
 
-            if (userError) {
+            if (!userId) {
               logWebhookEvent("Usuário não encontrado no banco", { email: customer.email });
               break;
             }
+
+            // Garantir que o perfil existe
+            await ensureProfileExists(supabaseClient, userId, customer.email, customer.name || undefined);
 
             // Buscar a assinatura criada (pode estar 'active' ou 'trialing')
             const subscriptions = await stripe.subscriptions.list({
               customer: customerId,
               status: "all",
-              limit: 1, // A mais recente é a que acabou de ser criada
+              limit: 1,
             });
 
             const subscription = subscriptions.data.find(s => s.status === 'active' || s.status === 'trialing');
@@ -93,11 +162,12 @@ serve(async (req) => {
               const priceId = subscription.items.data[0].price.id;
               
               await supabaseClient.from("subscribers").upsert({
-                user_id: userData.id,
+                user_id: userId,
                 email: customer.email,
                 stripe_customer_id: customerId,
                 stripe_subscription_id: subscription.id,
                 stripe_price_id: priceId,
+                subscribed: true,
                 subscription_status: subscription.status,
                 subscription_start: new Date(subscription.start_date * 1000).toISOString(),
                 subscription_end: new Date(subscription.current_period_end * 1000).toISOString(),
@@ -125,27 +195,31 @@ serve(async (req) => {
         const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
         
         if (customer.email) {
-          // Buscar usuário no Supabase por email
-          const { data: userData, error: userError } = await supabaseClient
-            .from('profiles')
-            .select('id')
-            .eq('email', customer.email)
-            .single();
+          // Buscar userId
+          let userId = await findUserIdByEmail(supabaseClient, customer.email);
+          
+          if (!userId && customer.metadata?.supabase_user_id) {
+            userId = customer.metadata.supabase_user_id;
+          }
 
-          if (userError) {
+          if (!userId) {
             logWebhookEvent("Usuário não encontrado no banco", { email: customer.email });
             break;
           }
 
-          const isActive = subscription.status === 'active';
+          // Garantir que o perfil existe
+          await ensureProfileExists(supabaseClient, userId, customer.email, customer.name || undefined);
+
+          const isActive = subscription.status === 'active' || subscription.status === 'trialing';
           const priceId = isActive ? subscription.items.data[0].price.id : null;
           
           await supabaseClient.from("subscribers").upsert({
-            user_id: userData.id,
+            user_id: userId,
             email: customer.email,
             stripe_customer_id: customerId,
             stripe_subscription_id: subscription.id,
             stripe_price_id: priceId,
+            subscribed: isActive,
             subscription_status: subscription.status,
             subscription_end: isActive ? new Date(subscription.current_period_end * 1000).toISOString() : null,
             updated_at: new Date().toISOString(),
@@ -168,17 +242,20 @@ serve(async (req) => {
           const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
           
           if (customer.email) {
-            // Buscar usuário no Supabase por email
-            const { data: userData, error: userError } = await supabaseClient
-              .from('profiles')
-              .select('id')
-              .eq('email', customer.email)
-              .single();
+            // Buscar userId
+            let userId = await findUserIdByEmail(supabaseClient, customer.email);
+            
+            if (!userId && customer.metadata?.supabase_user_id) {
+              userId = customer.metadata.supabase_user_id;
+            }
 
-            if (userError) {
+            if (!userId) {
               logWebhookEvent("Usuário não encontrado no banco", { email: customer.email });
               break;
             }
+
+            // Garantir que o perfil existe
+            await ensureProfileExists(supabaseClient, userId, customer.email, customer.name || undefined);
 
             // Atualizar a data de renovação
             const subscription = await stripe.subscriptions.retrieve(
@@ -186,8 +263,9 @@ serve(async (req) => {
             );
             
             await supabaseClient.from("subscribers").upsert({
-              user_id: userData.id,
+              user_id: userId,
               email: customer.email,
+              subscribed: true,
               subscription_end: new Date(subscription.current_period_end * 1000).toISOString(),
               updated_at: new Date().toISOString(),
             }, { onConflict: 'email' });

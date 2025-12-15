@@ -1,5 +1,5 @@
 // ABOUTME: Função para criar usuário no Supabase sem subscription automática
-// ABOUTME: Apenas cria customer no Stripe, subscription será criada no checkout obrigatório
+// ABOUTME: Cria perfil via UPSERT (não depende apenas do trigger), customer no Stripe, e recompensa referrer
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
@@ -26,10 +26,15 @@ const extendUserTrial = async (supabaseAdmin: any, stripe: Stripe, userId: strin
       .from('subscribers')
       .select('stripe_subscription_id, trial_ends_at')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
     
-    if (subError || !subscriber) {
+    if (subError) {
       logStep("Erro ao buscar subscriber para extensão", { error: subError });
+      return;
+    }
+
+    if (!subscriber) {
+      logStep("Subscriber não encontrado para extensão de trial", { userId });
       return;
     }
     
@@ -114,7 +119,7 @@ serve(async (req) => {
         .from('profiles')
         .select('id, role')
         .eq('referral_code', referralCode.toUpperCase())
-        .single();
+        .maybeSingle();
       
       if (!referrerError && referrer) {
         referrerUserId = referrer.id;
@@ -144,25 +149,30 @@ serve(async (req) => {
     logStep("Usuário criado com sucesso", { userId });
 
     try {
-      // Passo 2: Atualizar perfil com aceitação dos termos e referência
-      logStep("Atualizando perfil com termos aceitos e referência");
+      // Passo 2: UPSERT do perfil - garante que o perfil existe mesmo se trigger falhar
+      logStep("Criando/atualizando perfil via UPSERT");
       
-      const profileUpdateData: any = {
+      const profileData: any = {
+        id: userId,
+        nome: name,
+        email: email,
         terms_accepted_at: new Date().toISOString(),
-        terms_version: 'v2.0' // Versão atualizada dos termos
+        terms_version: 'v2.0'
       };
 
       if (referrerUserId) {
-        profileUpdateData.referred_by_user_id = referrerUserId;
+        profileData.referred_by_user_id = referrerUserId;
       }
 
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .update(profileUpdateData)
-        .eq('id', userId);
+        .upsert(profileData, { onConflict: 'id' });
 
       if (profileError) {
-        logStep("Erro ao atualizar perfil", { error: profileError });
+        logStep("Erro ao criar/atualizar perfil", { error: profileError });
+        // Não falha o signup, perfil pode ser criado depois
+      } else {
+        logStep("Perfil criado/atualizado com sucesso");
       }
 
       // Passo 3: Criar customer no Stripe (apenas customer, subscription será criada no checkout)
@@ -176,13 +186,32 @@ serve(async (req) => {
         }
       });
 
-      logStep("Customer criado no Stripe, subscription será criada no checkout", { customerId: customer.id });
+      logStep("Customer criado no Stripe", { customerId: customer.id });
 
-      // Passo 4: Se houve indicação, recompensar o referrer com bonus baseado no role
+      // Passo 4: Criar registro na tabela subscribers (para referência)
+      const { error: subError } = await supabaseAdmin
+        .from('subscribers')
+        .upsert({
+          user_id: userId,
+          email: email,
+          stripe_customer_id: customer.id,
+          subscribed: false,
+          subscription_status: 'inactive',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'email' });
+
+      if (subError) {
+        logStep("Erro ao criar subscriber", { error: subError });
+        // Não falha o signup
+      } else {
+        logStep("Subscriber criado com sucesso");
+      }
+
+      // Passo 5: Se houve indicação, recompensar o referrer com bonus baseado no role
       if (referrerUserId) {
         logStep("Aplicando recompensa para o referrer", { referrerRole });
         
-        // CORREÇÃO: Usuários beta ganham o dobro de dias de bonus (6 dias ao invés de 3)
+        // Usuários beta ganham o dobro de dias de bonus (6 dias ao invés de 3)
         const bonusDays = referrerRole === 'beta' ? 6 : 3;
         logStep(`Aplicando ${bonusDays} dias de bonus para referrer ${referrerRole}`);
         
