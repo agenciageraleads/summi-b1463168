@@ -3,6 +3,7 @@
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { WhatsAppSection } from '@/components/Dashboard/WhatsAppSection';
 import { ChatsList } from '@/components/Dashboard/ChatsList';
+import { SubscriptionWarningBanner } from '@/components/Dashboard/SubscriptionWarningBanner';
 // import { SubscriptionStatus } from '@/components/SubscriptionStatus'; // OCULTO TEMPORARIAMENTE
 import { OnboardingTour } from '@/components/Onboarding/OnboardingTour';
 import { OnboardingHighlight } from '@/components/Onboarding/OnboardingHighlight';
@@ -24,6 +25,9 @@ const DashboardPage = () => {
             Gerencie suas conexões e monitore suas mensagens
           </p>
         </div>
+
+        {/* Aviso de cancelamento pendente */}
+        <SubscriptionWarningBanner />
 
         {/* Grid Principal Reorganizada */}
         <div className="space-y-6">
