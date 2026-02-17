@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useSubscription } from '@/hooks/useSubscription';
-import { Check, Crown, Calendar, CreditCard } from 'lucide-react';
+import { Check, Crown, Calendar, CreditCard, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const SubscriptionPage = () => {
@@ -115,8 +115,38 @@ const SubscriptionPage = () => {
           </CardContent>
         </Card>
 
-        {/* Status da Assinatura Atual */}
-        {subscription.subscribed && (
+        {/* Aviso de cancelamento pendente */}
+        {subscription.subscribed && subscription.cancel_at_period_end && (
+          <Card className="border-yellow-400 bg-yellow-50">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 text-yellow-700">
+                <AlertTriangle className="w-5 h-5" />
+                <span>Assinatura será cancelada</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-yellow-800">
+                Sua assinatura foi cancelada e será encerrada em{' '}
+                <strong>
+                  {subscription.subscription_end
+                    ? new Date(subscription.subscription_end).toLocaleDateString('pt-BR')
+                    : '—'}
+                </strong>
+                . Até lá, você continua com acesso completo.
+              </p>
+              <Button
+                onClick={handleManageSubscription}
+                className="w-full bg-summi-green hover:bg-summi-green/90 text-white"
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                Reativar Assinatura
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Status da Assinatura Atual - só mostra se ativa e NÃO cancelada */}
+        {subscription.subscribed && !subscription.cancel_at_period_end && (
           <Card className="border-summi-green bg-summi-green/5">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-summi-green">

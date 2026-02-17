@@ -8,6 +8,7 @@ export interface Subscription {
   plan_type: string | null;
   stripe_price_id: string | null;
   subscription_end: string | null;
+  cancel_at_period_end: boolean;
 }
 
 export const useSubscription = () => {
@@ -15,7 +16,8 @@ export const useSubscription = () => {
     subscribed: false,
     plan_type: null,
     stripe_price_id: null,
-    subscription_end: null
+    subscription_end: null,
+    cancel_at_period_end: false
   });
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
@@ -44,7 +46,8 @@ export const useSubscription = () => {
         subscribed: data.subscribed || false,
         plan_type: data.plan_type || null,
         stripe_price_id: data.stripe_price_id || null,
-        subscription_end: data.subscription_end || null
+        subscription_end: data.subscription_end || null,
+        cancel_at_period_end: data.cancel_at_period_end || false
       });
     } catch (error) {
       console.error('Erro ao verificar assinatura:', error);
