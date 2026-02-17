@@ -1,0 +1,2 @@
+# Summi worker package
+

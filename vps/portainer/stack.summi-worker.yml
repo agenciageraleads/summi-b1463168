@@ -1,0 +1,38 @@
+services:
+  summi-worker-api:
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      SUMMI_SENDER_INSTANCE: ${SUMMI_SENDER_INSTANCE:-Summi}
+      BUSINESS_HOURS_START: ${BUSINESS_HOURS_START:-8}
+      BUSINESS_HOURS_END: ${BUSINESS_HOURS_END:-18}
+      IGNORE_REMOTE_JID: ${IGNORE_REMOTE_JID:-556293984600}
+      ENABLE_HOURLY_JOB: "false"
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-}
+
+  summi-worker-scheduler:
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    restart: unless-stopped
+    command: ["python", "-m", "summi_worker.scheduler"]
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      SUMMI_SENDER_INSTANCE: ${SUMMI_SENDER_INSTANCE:-Summi}
+      BUSINESS_HOURS_START: ${BUSINESS_HOURS_START:-8}
+      BUSINESS_HOURS_END: ${BUSINESS_HOURS_END:-18}
+      IGNORE_REMOTE_JID: ${IGNORE_REMOTE_JID:-556293984600}
+      ENABLE_HOURLY_JOB: "true"
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-}
+

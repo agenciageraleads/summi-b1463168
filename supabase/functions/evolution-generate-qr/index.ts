@@ -118,10 +118,11 @@ serve(async (req) => {
         throw new Error("User phone number not found in profile");
       }
 
-      // Determinar webhook baseado no role do usuário
-      const webhookUrl = profile.role === 'beta' 
-        ? "https://webhookn8n.gera-leads.com/webhook/whatsapp-beta"
-        : Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
+      // Determinar webhook baseado no role do usuário.
+      // Mantem compatibilidade com envs antigas do n8n, mas permite apontar para o worker na VPS.
+      const webhookUrl = profile.role === 'beta'
+        ? (Deno.env.get("WEBHOOK_ANALISA_MENSAGENS") ?? Deno.env.get("WEBHOOK_N8N_ANALISA_MENSAGENS"))
+        : (Deno.env.get("WEBHOOK_RECEBE_MENSAGEM") ?? Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM"));
       
       logStep("Webhook selecionado baseado no role", { role: profile.role, webhookUrl });
       

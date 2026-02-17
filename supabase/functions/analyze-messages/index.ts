@@ -31,15 +31,15 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Buscar webhook URL
-    const webhookUrl = Deno.env.get('WEBHOOK_N8N_ANALISA_MENSAGENS');
-    console.log(`[ANALYZE] Webhook URL: ${webhookUrl ? 'CONFIGURADO' : 'NÃO CONFIGURADO'}`);
+    // Destino da analise: VPS worker. Mantemos compatibilidade com a env antiga do n8n.
+    const workerUrl = Deno.env.get('SUMMI_WORKER_ANALYZE_URL') ?? Deno.env.get('WEBHOOK_N8N_ANALISA_MENSAGENS');
+    console.log(`[ANALYZE] Destino: ${workerUrl ? 'CONFIGURADO' : 'NÃO CONFIGURADO'}`);
     
-    if (!webhookUrl) {
-      console.error('[ANALYZE] WEBHOOK_N8N_ANALISA_MENSAGENS não configurado');
+    if (!workerUrl) {
+      console.error('[ANALYZE] SUMMI_WORKER_ANALYZE_URL/WEBHOOK_N8N_ANALISA_MENSAGENS não configurado');
       return new Response(
         JSON.stringify({ 
-          error: 'Webhook não configurado',
+          error: 'Destino de analise nao configurado',
           success: false 
         }),
         {
@@ -74,13 +74,17 @@ serve(async (req: Request): Promise<Response> => {
       id_usuario: userId
     };
 
-    console.log(`[ANALYZE] Enviando para webhook:`, webhookPayload);
+    console.log(`[ANALYZE] Enviando para destino:`, webhookPayload);
 
-    // Chamar o webhook
-    const webhookResponse = await fetch(webhookUrl, {
+    // Encaminhar o Authorization do usuario (quando existir), para permitir validacao no worker.
+    const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
+
+    // Chamar o worker (ou webhook legado)
+    const webhookResponse = await fetch(workerUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(authHeader ? { 'Authorization': authHeader } : {}),
       },
       body: JSON.stringify(webhookPayload),
     });

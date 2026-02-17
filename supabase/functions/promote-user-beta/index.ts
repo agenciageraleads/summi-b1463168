@@ -176,9 +176,12 @@ serve(async (req) => {
         const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
 
         if (evolutionApiUrl && evolutionApiKey) {
-          const webhookUrl = newRole === 'beta' 
-            ? Deno.env.get('WEBHOOK_N8N_ANALISA_MENSAGENS')
-            : Deno.env.get('WEBHOOK_N8N_RECEBE_MENSAGEM');
+          // Mantem compatibilidade com envs antigas do n8n:
+          // - beta: pode apontar para um endpoint que faz ingestao + analise
+          // - user: pode apontar para um endpoint so de ingestao
+          const webhookUrl = newRole === 'beta'
+            ? (Deno.env.get('WEBHOOK_ANALISA_MENSAGENS') ?? Deno.env.get('WEBHOOK_N8N_ANALISA_MENSAGENS'))
+            : (Deno.env.get('WEBHOOK_RECEBE_MENSAGEM') ?? Deno.env.get('WEBHOOK_N8N_RECEBE_MENSAGEM'));
 
           const response = await fetch(`${evolutionApiUrl}/webhook/set/${targetUser.instance_name}`, {
             method: 'POST',
