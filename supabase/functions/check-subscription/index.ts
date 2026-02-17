@@ -139,18 +139,20 @@ serve(async (req) => {
     let subscriptionEnd = null;
     let stripePriceId = null;
     let hasPaymentMethod = hasCustomerDefaultPm;
+    let cancelAtPeriodEnd = false;
 
     if (activeOrTrialingSubscription) {
       const subscription = activeOrTrialingSubscription;
       subscriptionStatus = subscription.status; // 'active' ou 'trialing'
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
       stripePriceId = subscription.items.data[0].price.id;
+      cancelAtPeriodEnd = subscription.cancel_at_period_end || false;
       // Verifica PM da assinatura (string ou objeto)
       const subDefaultPm = (subscription as any).default_payment_method;
       const subDefaultPmId = typeof subDefaultPm === 'string' ? subDefaultPm : subDefaultPm?.id;
       hasPaymentMethod = hasPaymentMethod || !!subDefaultPmId;
 
-      logStep("Active or trialing subscription found", { subscriptionId: subscription.id, status: subscriptionStatus, endDate: subscriptionEnd, priceId: stripePriceId, hasPaymentMethod });
+      logStep("Active or trialing subscription found", { subscriptionId: subscription.id, status: subscriptionStatus, endDate: subscriptionEnd, priceId: stripePriceId, hasPaymentMethod, cancelAtPeriodEnd });
       
       // Determinar tipo do plano baseado no Price ID
       if (stripePriceId === "price_1RZ8j9KyDqE0F1PtNvJzdK0F") {
@@ -176,13 +178,14 @@ serve(async (req) => {
 
     const subscribedStrict = (subscriptionStatus === 'active') || (subscriptionStatus === 'trialing');
 
-    logStep("Updated database with subscription info", { subscribed: subscribedStrict, status: subscriptionStatus, planType, stripePriceId, hasPaymentMethod });
+    logStep("Updated database with subscription info", { subscribed: subscribedStrict, status: subscriptionStatus, planType, stripePriceId, hasPaymentMethod, cancelAtPeriodEnd });
     return new Response(JSON.stringify({
       subscribed: subscribedStrict,
       status: subscriptionStatus,
       plan_type: planType,
       stripe_price_id: stripePriceId,
-      subscription_end: subscriptionEnd
+      subscription_end: subscriptionEnd,
+      cancel_at_period_end: cancelAtPeriodEnd
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
