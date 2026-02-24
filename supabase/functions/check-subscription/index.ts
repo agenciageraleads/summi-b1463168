@@ -132,7 +132,7 @@ serve(async (req) => {
       limit: 10, // Aumenta o limite para garantir que encontramos a assinatura correta entre as mais recentes
     });
 
-    const activeOrTrialingSubscription = subscriptions.data.find(sub => sub.status === 'active' || sub.status === 'trialing');
+    const activeOrTrialingSubscription = subscriptions.data.find((sub: any) => sub.status === 'active' || sub.status === 'trialing');
     
     let subscriptionStatus = 'inactive';
     let planType = null;

@@ -153,13 +153,13 @@ serve(async (req) => {
           nome: profile.nome,
           instanceName: profile.instance_name,
           status: 'error',
-          error: error.message
+          error: (error as Error).message
         });
 
         auditLog("INSTANCE_CHECK_ERROR", {
           userId: profile.id,
           instanceName: profile.instance_name,
-          error: error.message
+          error: (error as Error).message
         });
       }
     }
@@ -185,7 +185,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    auditLog("FUNCTION_ERROR", { error: error.message });
+    auditLog("FUNCTION_ERROR", { error: (error as Error).message });
     
     return new Response(JSON.stringify({ 
       success: false, 

@@ -113,8 +113,8 @@ serve(async (req) => {
       // Usar o método assíncrono para compatibilidade com Deno
       event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
     } catch (err) {
-      logWebhookEvent("Erro na verificação da assinatura", { error: err.message });
-      return new Response(`Webhook signature verification failed: ${err.message}`, { status: 400 });
+      logWebhookEvent("Erro na verificação da assinatura", { error: (err as Error).message });
+      return new Response(`Webhook signature verification failed: ${(err as Error).message}`, { status: 400 });
     }
 
     logWebhookEvent("Evento recebido", { type: event.type, id: event.id });
@@ -156,7 +156,7 @@ serve(async (req) => {
               limit: 1,
             });
 
-            const subscription = subscriptions.data.find(s => s.status === 'active' || s.status === 'trialing');
+            const subscription = subscriptions.data.find((s: any) => s.status === 'active' || s.status === 'trialing');
 
             if (subscription) {
               const priceId = subscription.items.data[0].price.id;
