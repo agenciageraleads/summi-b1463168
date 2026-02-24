@@ -128,7 +128,7 @@ serve(async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         error: 'Erro interno do servidor',
         success: false,
-        details: error.message
+        details: (error as Error).message
       }),
       {
         status: 500,

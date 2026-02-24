@@ -100,7 +100,7 @@ serve(async (req) => {
         instanceExists = false;
       }
     } catch (error) {
-      logStep("Error during instance status check, assuming non-existent", { error: error.message });
+      logStep("Error during instance status check, assuming non-existent", { error: (error as Error).message });
       instanceExists = false;
     }
 

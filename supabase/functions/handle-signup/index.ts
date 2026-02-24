@@ -226,7 +226,7 @@ serve(async (req) => {
           ? `Conta criada com sucesso! Quem te indicou também ganhou ${referrerRole === 'beta' ? '6' : '3'} dias extras.`
           : `Conta criada com sucesso!`,
         user: authData.user,
-        session: authData.session
+        session: (authData as any).session
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,

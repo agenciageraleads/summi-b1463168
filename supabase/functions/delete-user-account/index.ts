@@ -144,7 +144,7 @@ serve(async (req) => {
           }
         }
       } catch (evolutionError) {
-        console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao deletar instância Evolution:`, evolutionError.message);
+        console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao deletar instância Evolution:`, (evolutionError as Error).message);
       }
     }
 
@@ -187,7 +187,7 @@ serve(async (req) => {
                 // Log de auditoria para cancelamento
                 console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - STRIPE_SUBSCRIPTION_CANCELED - User: ${finalTargetUserId} - Subscription: ${subscription.id} - Canceled by: ${userId} (admin: ${isAdmin})`);
               } catch (subError) {
-                console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao cancelar assinatura ${subscription.id}:`, subError.message);
+                console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao cancelar assinatura ${subscription.id}:`, (subError as Error).message);
               }
             }
           } else {
@@ -199,14 +199,14 @@ serve(async (req) => {
             await stripe.customers.del(customerId);
             console.log(`[DELETE-ACCOUNT] ✅ Cliente Stripe deletado: ${customerId}`);
           } catch (customerError) {
-            console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao deletar cliente Stripe:`, customerError.message);
+            console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao deletar cliente Stripe:`, (customerError as Error).message);
           }
         } else {
           console.log(`[DELETE-ACCOUNT] ℹ️ Nenhum cliente Stripe encontrado para o email: ${profile.email}`);
         }
       }
     } catch (stripeError) {
-      console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao processar Stripe:`, stripeError.message);
+      console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao processar Stripe:`, (stripeError as Error).message);
       // Não falhar a operação por causa do Stripe - apenas registrar o erro
     }
 
@@ -236,7 +236,7 @@ serve(async (req) => {
           console.log(`[DELETE-ACCOUNT] ✅ Dados limpos da tabela: ${table}`);
         }
       } catch (error) {
-        console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao processar tabela ${table}:`, error.message);
+        console.warn(`[DELETE-ACCOUNT] ⚠️ Erro ao processar tabela ${table}:`, (error as Error).message);
       }
     }
 

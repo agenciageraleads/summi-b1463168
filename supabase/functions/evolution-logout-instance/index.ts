@@ -125,7 +125,7 @@ serve(async (req) => {
         }
       }
     } catch (logoutError) {
-      logStep("Logout request failed", { error: logoutError.message });
+      logStep("Logout request failed", { error: (logoutError as Error).message });
       // Consideramos falha apenas se houve erro de rede/conexão
     }
 

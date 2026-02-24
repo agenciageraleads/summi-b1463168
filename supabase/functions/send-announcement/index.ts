@@ -168,7 +168,7 @@ serve(async (req) => {
             user_id: userProfile.id,
             delivery_method: 'email',
             status: 'failed',
-            error_message: error.message
+            error_message: (error as Error).message
           });
           
           failedCount++;
@@ -198,7 +198,7 @@ serve(async (req) => {
             user_id: userProfile.id,
             delivery_method: 'whatsapp',
             status: 'failed',
-            error_message: error.message
+            error_message: (error as Error).message
           });
           
           failedCount++;

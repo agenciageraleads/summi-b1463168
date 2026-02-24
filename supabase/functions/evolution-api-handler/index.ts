@@ -148,7 +148,7 @@ const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, baseDela
       console.log(`[EVOLUTION-HANDLER] ✅ Tentativa ${attempt} bem-sucedida`);
       return result;
     } catch (error) {
-      console.log(`[EVOLUTION-HANDLER] ❌ Tentativa ${attempt} falhou:`, error.message);
+      console.log(`[EVOLUTION-HANDLER] ❌ Tentativa ${attempt} falhou:`, (error as Error).message);
       
       if (attempt === maxRetries) {
         console.log(`[EVOLUTION-HANDLER] ❌ Todas as ${maxRetries} tentativas falharam`);
@@ -216,7 +216,7 @@ const restartInstance = async (instanceName: string, evolutionApiUrl: string, ev
     }
   } catch (error) {
     console.error(`[RESTART-INSTANCE] ❌ Erro na requisição:`, error);
-    return { success: false, error: `Erro na requisição: ${error.message}` };
+    return { success: false, error: `Erro na requisição: ${(error as Error).message}` };
   }
 };
 
@@ -298,7 +298,7 @@ const generateQRCodeOnly = async (instanceName: string, evolutionApiUrl: string,
     console.error(`[QR-GENERATOR] ❌ Erro na requisição:`, error);
     return {
       success: false,
-      error: `Erro na requisição: ${error.message}`
+      error: `Erro na requisição: ${(error as Error).message}`
     };
   }
 };
@@ -359,7 +359,7 @@ const generatePairingCodeOnly = async (instanceName: string, phoneNumber: string
     console.error(`[PAIRING-GENERATOR] ❌ Erro na requisição:`, error);
     return {
       success: false,
-      error: `Erro na requisição: ${error.message}`
+      error: `Erro na requisição: ${(error as Error).message}`
     };
   }
 };
@@ -389,7 +389,7 @@ const deleteInstance = async (instanceName: string, evolutionApiUrl: string, evo
     }
   } catch (error) {
     console.error(`[DELETE-INSTANCE] ❌ Erro na requisição:`, error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 };
 
@@ -483,7 +483,7 @@ const createInstanceWithPairingSupport = async (instanceName: string, phoneNumbe
     }
   } catch (error) {
     console.error(`[CREATE-INSTANCE] ❌ Erro na requisição:`, error);
-    return { success: false, error: `Erro na requisição: ${error.message}` };
+    return { success: false, error: `Erro na requisição: ${(error as Error).message}` };
   }
 };
 
@@ -581,7 +581,7 @@ const handleConnectingStatus = async (instanceName: string, phoneNumber: string,
     console.error(`[HANDLE-CONNECTING] ❌ Erro na recriação:`, error);
     return {
       success: false,
-      error: `Erro na recriação: ${error.message}`,
+      error: `Erro na recriação: ${(error as Error).message}`,
       method: 'recreation'
     };
   }
@@ -1032,7 +1032,7 @@ serve(async (req) => {
 
         // Lógica normal para outros estados
         let qrCode = null;
-        let pairingCode = null;
+        let pairingCode: string | null = null;
 
         // Gerar QR Code separadamente (sem parâmetros)
         console.log(`[EVOLUTION-HANDLER] 🎯 Gerando QR Code...`);
@@ -1180,7 +1180,7 @@ serve(async (req) => {
           console.error(`[EVOLUTION-HANDLER] Erro ao desconectar:`, error);
           return new Response(JSON.stringify({ 
             success: false, 
-            error: `Erro ao desconectar: ${error.message}` 
+            error: `Erro ao desconectar: ${(error as Error).message}` 
           }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -1222,7 +1222,7 @@ serve(async (req) => {
           console.error(`[EVOLUTION-HANDLER] Erro ao deletar instância:`, error);
           return new Response(JSON.stringify({ 
             success: false, 
-            error: `Erro ao deletar instância: ${error.message}` 
+            error: `Erro ao deletar instância: ${(error as Error).message}` 
           }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -1258,7 +1258,7 @@ serve(async (req) => {
           console.error(`[EVOLUTION-HANDLER] Erro ao reiniciar instância:`, error);
           return new Response(JSON.stringify({ 
             success: false, 
-            error: `Erro ao reiniciar instância: ${error.message}` 
+            error: `Erro ao reiniciar instância: ${(error as Error).message}` 
           }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }

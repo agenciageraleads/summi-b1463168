@@ -119,7 +119,7 @@ serve(async (req) => {
       }
 
       // Define o calendário principal como padrão se não houver nenhum
-      const primaryCalendar = calendars.find(c => c.primary)
+      const primaryCalendar = calendars.find((c: any) => c.primary)
       if (primaryCalendar) {
         await supabase
           .from('profiles')
@@ -154,13 +154,13 @@ serve(async (req) => {
         <body>
           <script>
             if (window.opener) {
-              window.opener.postMessage({ type: 'GOOGLE_CALENDAR_ERROR', error: '${error.message}' }, '*');
+              window.opener.postMessage({ type: 'GOOGLE_CALENDAR_ERROR', error: '${(error as Error).message}' }, '*');
               window.close();
             } else {
               window.location.href = '/configuracoes?google_calendar=error';
             }
           </script>
-          <p>Erro na autorização: ${error.message}</p>
+          <p>Erro na autorização: ${(error as Error).message}</p>
         </body>
       </html>`,
       { headers: { 'Content-Type': 'text/html' }, status: 500 }

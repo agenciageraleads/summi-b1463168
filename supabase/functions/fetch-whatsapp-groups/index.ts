@@ -237,7 +237,7 @@ serve(async (req) => {
     });
 
     // Formatar os dados dos grupos para o frontend
-    const formattedGroups = groupsArray.map((group, index) => {
+    const formattedGroups = groupsArray.map((group: any, index: number) => {
       console.log('[FETCH-WHATSAPP-GROUPS] 🔄 Formatando grupo', index, ':', {
         id: group.id || group.remoteJid,
         subject: group.subject,
