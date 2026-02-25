@@ -90,6 +90,25 @@ class SupabaseRest:
             raise SupabaseError(f"insert failed: {resp.status_code} {resp.text}")
         return resp.json()
 
+    def delete(
+        self,
+        table: str,
+        filters: List[Tuple[str, str]],
+    ) -> int:
+        params: Dict[str, str] = {}
+        for k, v in filters:
+            params[k] = v
+
+        url = f"{self._url}/rest/v1/{table}?{urlencode(params, doseq=True)}"
+        resp = requests.delete(
+            url,
+            headers={**self._headers(), "Prefer": "return=minimal"},
+            timeout=30,
+        )
+        if not resp.ok:
+            raise SupabaseError(f"delete failed: {resp.status_code} {resp.text}")
+        return 1
+
     def upsert(
         self,
         table: str,
@@ -124,6 +143,10 @@ def to_postgrest_filter_neq(column: str, value: str) -> Tuple[str, str]:
 
 def to_postgrest_filter_gte(column: str, value: str) -> Tuple[str, str]:
     return (column, f"gte.{value}")
+
+
+def to_postgrest_filter_lt(column: str, value: str) -> Tuple[str, str]:
+    return (column, f"lt.{value}")
 
 
 def to_postgrest_filter_is(column: str, value: str) -> Tuple[str, str]:

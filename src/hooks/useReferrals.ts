@@ -9,6 +9,7 @@ export interface ReferralData {
   referralCode: string;
   referralLink: string;
   referredByUserId: string | null;
+  bonusPerReferralDays: number;
   totalReferrals: number;
   referralsList: Array<{
     id: string;
@@ -38,7 +39,7 @@ export const useReferrals = () => {
       // Buscar dados do perfil do usuário
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('referral_code, referred_by_user_id')
+        .select('referral_code, referred_by_user_id, role')
         .eq('id', user.id)
         .single();
 
@@ -66,6 +67,7 @@ export const useReferrals = () => {
         referralCode: profile.referral_code || '',
         referralLink: shortReferralLink,
         referredByUserId: profile.referred_by_user_id,
+        bonusPerReferralDays: profile.role === 'beta' ? 6 : 3,
         totalReferrals: referrals?.length || 0,
         referralsList: referrals || []
       };

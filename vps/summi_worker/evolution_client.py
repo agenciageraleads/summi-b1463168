@@ -27,10 +27,50 @@ class EvolutionClient:
     def _headers(self) -> Dict[str, str]:
         return {"apikey": self._key, "Content-Type": "application/json"}
 
-    def send_text(self, instance: str, remote_jid: str, text: str) -> None:
+    def _try_json_post(self, paths: list[str], payloads: list[Dict[str, Any]], timeout: int = 30) -> Dict[str, Any]:
+        last = None
+        for path in paths:
+            url = f"{self._url}{path}"
+            for payload in payloads:
+                try:
+                    resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=timeout)
+                except Exception as exc:
+                    last = f"{url} request_error={exc}"
+                    continue
+                if resp.ok:
+                    try:
+                        return resp.json()
+                    except Exception:
+                        return {"raw_text": resp.text}
+                last = f"{url} {resp.status_code} {resp.text}"
+        raise EvolutionError(f"request failed: {last}")
+
+    def _try_json_get(self, paths: list[str], query_params: list[Dict[str, Any]], timeout: int = 30) -> Dict[str, Any]:
+        last = None
+        for path in paths:
+            url = f"{self._url}{path}"
+            for params in query_params:
+                try:
+                    resp = requests.get(url, headers={"apikey": self._key}, params=params, timeout=timeout)
+                except Exception as exc:
+                    last = f"{url} request_error={exc}"
+                    continue
+                if resp.ok:
+                    try:
+                        return resp.json()
+                    except Exception:
+                        return {"raw_text": resp.text}
+                last = f"{url} {resp.status_code} {resp.text}"
+        raise EvolutionError(f"request failed: {last}")
+
+    def send_text(self, instance: str, remote_jid: str, text: str, quoted_message_id: str | None = None) -> None:
         # Tentativa 1 (comum): /message/sendText/{instance}
         url = f"{self._url}/message/sendText/{instance}"
         payload = {"number": remote_jid, "text": text}
+        if quoted_message_id:
+            # Best-effort: diferentes builds da Evolution aceitam formatos distintos.
+            payload["options_message"] = {"quoted": {"messageQuoted": {"messageId": quoted_message_id}}}
+            payload["options"] = {"quoted": {"messageId": quoted_message_id}}
         resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
         if resp.ok:
             return
@@ -60,3 +100,65 @@ class EvolutionClient:
 
         raise EvolutionError(f"send_audio failed: {resp.status_code} {resp.text} / {resp2.status_code} {resp2.text}")
 
+    def get_media_base64(self, instance: str, message_id: str) -> str:
+        """
+        Best-effort para Evolution 2.x (endpoint varia por build).
+        """
+        errors: list[str] = []
+        data: Dict[str, Any] | None = None
+        try:
+            data = self._try_json_post(
+                paths=[
+                    f"/chat/getBase64FromMediaMessage/{instance}",
+                    f"/chat/get-base64-from-media-message/{instance}",
+                    f"/chat/get-media-base64/{instance}",
+                    f"/message/getBase64FromMediaMessage/{instance}",
+                ],
+                payloads=[
+                    {"messageId": message_id},
+                    {"id": message_id},
+                    {"message": {"key": {"id": message_id}}},
+                    {"key": {"id": message_id}},
+                ],
+                timeout=60,
+            )
+        except EvolutionError as exc:
+            errors.append(str(exc))
+
+        if data is None:
+            try:
+                data = self._try_json_get(
+                    paths=[
+                        f"/chat/getBase64FromMediaMessage/{instance}",
+                        f"/message/getBase64FromMediaMessage/{instance}",
+                        f"/chat/get-media-base64/{instance}",
+                    ],
+                    query_params=[
+                        {"messageId": message_id},
+                        {"id": message_id},
+                    ],
+                    timeout=60,
+                )
+            except EvolutionError as exc:
+                errors.append(str(exc))
+
+        if data is None:
+            raise EvolutionError(" | ".join(errors))
+
+        for path in (
+            ("data", "base64"),
+            ("base64",),
+            ("data", "message", "base64"),
+        ):
+            cur: Any = data
+            ok = True
+            for k in path:
+                if isinstance(cur, dict) and k in cur:
+                    cur = cur[k]
+                else:
+                    ok = False
+                    break
+            if ok and isinstance(cur, str) and cur.strip():
+                return cur.strip()
+
+        raise EvolutionError(f"media base64 not found in response: {str(data)[:500]}")

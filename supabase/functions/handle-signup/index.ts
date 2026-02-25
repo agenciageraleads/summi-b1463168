@@ -207,15 +207,10 @@ serve(async (req) => {
         logStep("Subscriber criado com sucesso");
       }
 
-      // Passo 5: Se houve indicação, recompensar o referrer com bonus baseado no role
+      // Passo 5: indicação fica registrada no perfil. A recompensa agora é aplicada
+      // no webhook do Stripe após a conversão (checkout concluído), para evitar abuso.
       if (referrerUserId) {
-        logStep("Aplicando recompensa para o referrer", { referrerRole });
-        
-        // Usuários beta ganham o dobro de dias de bonus (6 dias ao invés de 3)
-        const bonusDays = referrerRole === 'beta' ? 6 : 3;
-        logStep(`Aplicando ${bonusDays} dias de bonus para referrer ${referrerRole}`);
-        
-        await extendUserTrial(supabaseAdmin, stripe, referrerUserId, bonusDays);
+        logStep("Indicação registrada; recompensa será aplicada após checkout concluído", { referrerUserId, referrerRole });
       }
 
       logStep("Conta criada com sucesso - usuário deve ir para checkout");
@@ -223,7 +218,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         message: referrerUserId 
-          ? `Conta criada com sucesso! Quem te indicou também ganhou ${referrerRole === 'beta' ? '6' : '3'} dias extras.`
+          ? `Conta criada com sucesso! A recompensa da indicação será aplicada após a assinatura ser concluída.`
           : `Conta criada com sucesso!`,
         user: authData.user,
         session: (authData as any).session

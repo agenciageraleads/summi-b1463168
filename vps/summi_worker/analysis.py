@@ -24,6 +24,24 @@ def _format_keywords(csv: str | None) -> str:
     return ", ".join([p.strip() for p in csv.split(",") if p.strip()])
 
 
+def _trim_conversa_for_prompt(conversa: Any, max_chars: int = 18000) -> str:
+    """
+    Evita estourar contexto em chats longos. Mantemos o trecho final, que tende a ser
+    o mais relevante para priorizacao.
+    """
+    try:
+        raw = json.dumps(conversa, ensure_ascii=False)
+    except Exception:
+        raw = str(conversa)
+
+    if len(raw) <= max_chars:
+        return raw
+
+    # Mantem sufixo e marca truncamento de forma explicita para o modelo.
+    suffix = raw[-max_chars:]
+    return f"[CONVERSA_TRUNCADA_TOTAL={len(raw)}]\\n...{suffix}"
+
+
 def analyze_single_chat(
     openai: OpenAIClient,
     model: str,
@@ -39,7 +57,7 @@ def analyze_single_chat(
     blacklist: str | None,
 ) -> AnalyzedChat:
     # Conversa e um JSONB array no banco. Mantemos como string para o prompt.
-    conversa_text = json.dumps(conversa, ensure_ascii=False)
+    conversa_text = _trim_conversa_for_prompt(conversa)
 
     system = "Voce e um assistente de WhatsApp. Responda SOMENTE em JSON valido."
     user = (
@@ -150,4 +168,3 @@ def build_audio_script(
         "Retorne apenas o texto final."
     )
     return openai.chat_text(model=model, system=system, user=user, temperature=0.4)
-

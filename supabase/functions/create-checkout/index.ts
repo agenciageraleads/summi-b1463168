@@ -16,13 +16,46 @@ serve(async (req) => {
   }
 
   try {
-    const { planType } = await req.json();
+    const { planType, referralCode } = await req.json();
 
     if (planType !== 'monthly' && planType !== 'annual') {
       throw new Error('Invalid plan type');
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    let authUserId: string | null = null;
+    let referredByUserId: string | null = null;
+    const authHeader = req.headers.get("authorization");
+    if (authHeader?.toLowerCase().startsWith("bearer ")) {
+      const token = authHeader.split(" ", 2)[1];
+      const { data: authUser } = await supabaseAdmin.auth.getUser(token);
+      authUserId = authUser.user?.id ?? null;
+
+      if (authUserId) {
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("id,referred_by_user_id")
+          .eq("id", authUserId)
+          .maybeSingle();
+
+        referredByUserId = profile?.referred_by_user_id ?? null;
+      }
+    }
+
+    if (!referredByUserId && referralCode) {
+      const { data: referrer } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("referral_code", String(referralCode).toUpperCase())
+        .maybeSingle();
+      referredByUserId = referrer?.id ?? null;
+    }
 
     // Definir price_id e trial_days baseado no tipo de plano
     let priceId: string;
@@ -50,7 +83,16 @@ serve(async (req) => {
         trial_period_days: trialDays,
         metadata: {
           plan_type: planType,
+          ...(authUserId ? { supabase_user_id: authUserId } : {}),
+          ...(referredByUserId ? { referred_by_user_id: referredByUserId } : {}),
+          ...(referralCode ? { referral_code: String(referralCode).toUpperCase() } : {}),
         },
+      },
+      metadata: {
+        plan_type: planType,
+        ...(authUserId ? { supabase_user_id: authUserId } : {}),
+        ...(referredByUserId ? { referred_by_user_id: referredByUserId } : {}),
+        ...(referralCode ? { referral_code: String(referralCode).toUpperCase() } : {}),
       },
       phone_number_collection: {
         enabled: true,
@@ -62,8 +104,8 @@ serve(async (req) => {
           type: "text",
         },
       ],
-      success_url: `${req.headers.get("origin") || "https://summi.lovable.app"}/complete-signup?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin") || "https://summi.lovable.app"}/?canceled=true`,
+      success_url: `${req.headers.get("origin") || "https://summi.gera-leads.com"}/complete-signup?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.get("origin") || "https://summi.gera-leads.com"}/?canceled=true`,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {

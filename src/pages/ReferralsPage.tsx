@@ -55,7 +55,7 @@ const ReferralsPage = () => {
                 Convide amigos e ganhem juntos!
               </h2>
               <p className="text-blue-700 text-lg">
-                Seu amigo ganha <strong>+3 dias extras</strong> de teste gratuito e você também!
+                Seu amigo ganha <strong>+3 dias extras</strong> de teste gratuito e você ganha <strong>+{referralData.bonusPerReferralDays} dias</strong>!
               </p>
               <div className="flex items-center justify-center gap-6 text-sm text-blue-600">
                 <div className="flex items-center gap-2 bg-white/50 px-3 py-2 rounded-lg">
@@ -64,7 +64,7 @@ const ReferralsPage = () => {
                 </div>
                 <div className="flex items-center gap-2 bg-white/50 px-3 py-2 rounded-lg">
                   <Gift className="h-4 w-4" />
-                  <span>Você: +3 dias extras</span>
+                  <span>Você: +{referralData.bonusPerReferralDays} dias extras</span>
                 </div>
               </div>
             </div>
@@ -140,7 +140,7 @@ const ReferralsPage = () => {
             <CardContent>
               <div className="text-center">
                 <div className="text-4xl font-bold text-green-600 mb-2">
-                  +{referralData.totalReferrals * 3}
+                  +{referralData.totalReferrals * referralData.bonusPerReferralDays}
                 </div>
                 <div className="text-sm text-gray-600">
                   dias de teste gratuito

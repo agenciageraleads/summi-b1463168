@@ -8,6 +8,16 @@ def _now_utc_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+def _extract_from_path(payload: Dict[str, Any], path: tuple[str, ...]) -> Any:
+    cur: Any = payload
+    for k in path:
+        if isinstance(cur, dict) and k in cur:
+            cur = cur[k]
+        else:
+            return None
+    return cur
+
+
 def _extract_remote_jid(payload: Dict[str, Any]) -> Optional[str]:
     # Tentativas comuns (varia por versao/adapter)
     for path in (
@@ -32,6 +42,28 @@ def _extract_remote_jid(payload: Dict[str, Any]) -> Optional[str]:
             if "@" in jid:
                 jid = jid.split("@", 1)[0]
             return jid
+    return None
+
+
+def _extract_remote_jid_full(payload: Dict[str, Any]) -> Optional[str]:
+    for path in (
+        ("body", "data", "key", "remoteJid"),
+        ("body", "data", "remoteJid"),
+        ("data", "key", "remoteJid"),
+        ("data", "remoteJid"),
+        ("remoteJid",),
+        ("key", "remoteJid"),
+    ):
+        cur: Any = payload
+        ok = True
+        for k in path:
+            if isinstance(cur, dict) and k in cur:
+                cur = cur[k]
+            else:
+                ok = False
+                break
+        if ok and isinstance(cur, str) and cur.strip():
+            return cur.strip()
     return None
 
 
@@ -103,6 +135,105 @@ def _extract_text(payload: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _extract_message_id(payload: Dict[str, Any]) -> Optional[str]:
+    for path in (
+        ("body", "data", "key", "id"),
+        ("data", "key", "id"),
+        ("key", "id"),
+    ):
+        cur: Any = payload
+        ok = True
+        for k in path:
+            if isinstance(cur, dict) and k in cur:
+                cur = cur[k]
+            else:
+                ok = False
+                break
+        if ok and isinstance(cur, str) and cur.strip():
+            return cur.strip()
+    return None
+
+
+def _extract_message_timestamp(payload: Dict[str, Any]) -> Optional[Any]:
+    for path in (
+        ("body", "data", "messageTimestamp"),
+        ("data", "messageTimestamp"),
+        ("messageTimestamp",),
+    ):
+        cur: Any = payload
+        ok = True
+        for k in path:
+            if isinstance(cur, dict) and k in cur:
+                cur = cur[k]
+            else:
+                ok = False
+                break
+        if ok and cur is not None:
+            return cur
+    return None
+
+
+def _extract_participant(payload: Dict[str, Any]) -> Optional[str]:
+    for path in (
+        ("body", "data", "key", "participant"),
+        ("data", "key", "participant"),
+        ("key", "participant"),
+    ):
+        cur: Any = payload
+        ok = True
+        for k in path:
+            if isinstance(cur, dict) and k in cur:
+                cur = cur[k]
+            else:
+                ok = False
+                break
+        if ok and isinstance(cur, str) and cur.strip():
+            jid = cur.strip()
+            if "@" in jid:
+                jid = jid.split("@", 1)[0]
+            return jid
+    return None
+
+
+def _extract_message_type(payload: Dict[str, Any]) -> Optional[str]:
+    # Campo explicitamente enviado pela Evolution
+    for path in (
+        ("body", "data", "messageType"),
+        ("data", "messageType"),
+        ("messageType",),
+    ):
+        cur: Any = payload
+        ok = True
+        for k in path:
+            if isinstance(cur, dict) and k in cur:
+                cur = cur[k]
+            else:
+                ok = False
+                break
+        if ok and isinstance(cur, str) and cur.strip():
+            return cur.strip()
+
+    # Inferencia por shape do payload
+    for path in (
+        ("body", "data", "message"),
+        ("data", "message"),
+        ("message",),
+    ):
+        cur: Any = payload
+        ok = True
+        for k in path:
+            if isinstance(cur, dict) and k in cur:
+                cur = cur[k]
+            else:
+                ok = False
+                break
+        if ok and isinstance(cur, dict):
+            for key in ("audioMessage", "imageMessage", "reactionMessage", "extendedTextMessage", "conversation"):
+                if key in cur:
+                    return key
+    return None
+
+
 def _extract_event(payload: Dict[str, Any]) -> Optional[str]:
     for path in (
         ("body", "event"),
@@ -145,13 +276,30 @@ def normalize_message_event(payload: Dict[str, Any]) -> Dict[str, Any]:
     Retorna um registro "minimo" para ser armazenado em chats.conversa[].
     Mantemos um campo `raw` para debug, porque o schema do webhook varia.
     """
+    remote_jid_full = _extract_remote_jid_full(payload)
+    remote_jid = _extract_remote_jid(payload)
+    remote_jid_alt = (
+        _extract_from_path(payload, ("body", "data", "key", "remoteJidAlt"))
+        or _extract_from_path(payload, ("data", "key", "remoteJidAlt"))
+    )
+    is_group = bool(remote_jid_full and str(remote_jid_full).endswith("@g.us"))
+    chat_key = str(remote_jid_full) if is_group and remote_jid_full else str(remote_jid or "")
+    if remote_jid_full and str(remote_jid_full).endswith("@lid") and isinstance(remote_jid_alt, str) and remote_jid_alt:
+        chat_key = remote_jid_alt.split("@", 1)[0]
     return {
         "received_at": _now_utc_iso(),
         "event": _extract_event(payload),
         "instance_name": _extract_instance_name(payload),
-        "remote_jid": _extract_remote_jid(payload),
+        "remote_jid": remote_jid,
+        "remote_jid_full": remote_jid_full,
         "push_name": _extract_push_name(payload),
         "from_me": _extract_from_me(payload),
+        "message_id": _extract_message_id(payload),
+        "message_type": _extract_message_type(payload),
+        "message_timestamp": _extract_message_timestamp(payload),
+        "is_group": is_group,
+        "chat_key": chat_key,
+        "author_jid": _extract_participant(payload),
         "text": _extract_text(payload),
         "raw": payload,
     }

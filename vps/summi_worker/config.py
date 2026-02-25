@@ -47,6 +47,12 @@ class Settings:
 
     enable_hourly_job: bool
     low_priority_cleanup_days: int
+    redis_url: str | None
+    webhook_dedupe_ttl_seconds: int
+    enable_analysis_queue: bool
+    enable_summary_queue: bool
+    queue_analysis_name: str
+    queue_summary_name: str
 
 
 def load_settings() -> Settings:
@@ -67,5 +73,10 @@ def load_settings() -> Settings:
         ignore_remote_jid=os.getenv("IGNORE_REMOTE_JID", "556293984600"),
         enable_hourly_job=_bool("ENABLE_HOURLY_JOB", True),
         low_priority_cleanup_days=_int("LOW_PRIORITY_CLEANUP_DAYS", 0),
+        redis_url=os.getenv("REDIS_URL"),
+        webhook_dedupe_ttl_seconds=_int("WEBHOOK_DEDUPE_TTL_SECONDS", 600),
+        enable_analysis_queue=_bool("ENABLE_ANALYSIS_QUEUE", False),
+        enable_summary_queue=_bool("ENABLE_SUMMARY_QUEUE", False),
+        queue_analysis_name=os.getenv("QUEUE_ANALYSIS_NAME", "summi:queue:analysis"),
+        queue_summary_name=os.getenv("QUEUE_SUMMARY_NAME", "summi:queue:summary"),
     )
-
