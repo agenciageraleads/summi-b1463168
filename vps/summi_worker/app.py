@@ -235,6 +235,17 @@ def _decode_b64_media(media_b64: str) -> bytes:
     return base64.b64decode(raw)
 
 
+def _get_inline_media_base64(payload: Dict[str, Any]) -> Optional[str]:
+    value = (
+        _get_in(payload, "body", "data", "message", "base64")
+        or _get_in(payload, "data", "message", "base64")
+        or _get_in(payload, "message", "base64")
+    )
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
 @app.get("/health")
 def health() -> Dict[str, Any]:
     return {"ok": True}
@@ -390,16 +401,23 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             text_for_chat = _derive_message_content(payload, normalized)
 
         elif message_kind == "image":
-            if message_id:
+            media_b64 = _get_inline_media_base64(payload)
+            media_source = "inline" if media_b64 else "evolution"
+            if not media_b64 and message_id:
                 media_b64 = evolution.get_media_base64(instance_name, message_id)
+            if media_b64:
                 image_bytes = _decode_b64_media(media_b64)
                 image_desc = openai.describe_image_base64("gpt-4o-mini", image_bytes)
                 text_for_chat = _derive_message_content(payload, normalized, image_description=image_desc)
                 extra["image_described"] = True
+                extra["image_media_source"] = media_source
 
         elif message_kind == "audio":
-            if message_id:
+            media_b64 = _get_inline_media_base64(payload)
+            media_source = "inline" if media_b64 else "evolution"
+            if not media_b64 and message_id:
                 media_b64 = evolution.get_media_base64(instance_name, message_id)
+            if media_b64:
                 mp3_bytes = _decode_b64_media(media_b64)
                 transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
                 seconds_from_payload = _get_in(payload, "body", "data", "message", "audioMessage", "seconds")
@@ -422,6 +440,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         "audio_transcribed": bool(transcript.strip()),
                         "audio_summarized": should_summarize,
                         "audio_seconds": audio_seconds,
+                        "audio_media_source": media_source,
                     }
                 )
 
@@ -501,8 +520,22 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             message_text_for_chat=text_for_chat,
         )
 
+    analyze_ok = False
+    analyze_error: Optional[str] = None
     if analyze_after:
-        analyze_user_chats(settings, supabase, openai, user_id=user_id)
+        try:
+            analyze_user_chats(settings, supabase, openai, user_id=user_id)
+            analyze_ok = True
+        except Exception as exc:
+            analyze_error = str(exc)[:300]
+            logger.exception(
+                "evolution_webhook.analyze_error instance=%s user_id=%s remote_jid=%s message_id=%s error=%s",
+                instance_name,
+                user_id,
+                remote_jid,
+                normalized.get("message_id"),
+                exc,
+            )
 
     logger.info(
         "evolution_webhook.stored chat_id=%s user_id=%s instance=%s remote_jid=%s message_id=%s analyzed=%s",
@@ -511,15 +544,16 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
         instance_name,
         remote_jid,
         normalized.get("message_id"),
-        analyze_after,
+        analyze_ok if analyze_after else False,
     )
     return {
         "ok": True,
         "stored": bool(chat_id),
         "chat_id": chat_id,
-        "analyzed": analyze_after,
+        "analyzed": analyze_ok,
         "message_kind": message_kind,
         "outbound": outbound,
+        **({"analyze_error": analyze_error} if analyze_error else {}),
         **extra,
     }
 

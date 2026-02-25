@@ -45,6 +45,24 @@ class EvolutionClient:
                 last = f"{url} {resp.status_code} {resp.text}"
         raise EvolutionError(f"request failed: {last}")
 
+    def _try_json_get(self, paths: list[str], query_params: list[Dict[str, Any]], timeout: int = 30) -> Dict[str, Any]:
+        last = None
+        for path in paths:
+            url = f"{self._url}{path}"
+            for params in query_params:
+                try:
+                    resp = requests.get(url, headers={"apikey": self._key}, params=params, timeout=timeout)
+                except Exception as exc:
+                    last = f"{url} request_error={exc}"
+                    continue
+                if resp.ok:
+                    try:
+                        return resp.json()
+                    except Exception:
+                        return {"raw_text": resp.text}
+                last = f"{url} {resp.status_code} {resp.text}"
+        raise EvolutionError(f"request failed: {last}")
+
     def send_text(self, instance: str, remote_jid: str, text: str) -> None:
         # Tentativa 1 (comum): /message/sendText/{instance}
         url = f"{self._url}/message/sendText/{instance}"
@@ -82,21 +100,46 @@ class EvolutionClient:
         """
         Best-effort para Evolution 2.x (endpoint varia por build).
         """
-        data = self._try_json_post(
-            paths=[
-                f"/chat/getBase64FromMediaMessage/{instance}",
-                f"/chat/get-base64-from-media-message/{instance}",
-                f"/chat/get-media-base64/{instance}",
-                f"/message/getBase64FromMediaMessage/{instance}",
-            ],
-            payloads=[
-                {"messageId": message_id},
-                {"id": message_id},
-                {"message": {"key": {"id": message_id}}},
-                {"key": {"id": message_id}},
-            ],
-            timeout=60,
-        )
+        errors: list[str] = []
+        data: Dict[str, Any] | None = None
+        try:
+            data = self._try_json_post(
+                paths=[
+                    f"/chat/getBase64FromMediaMessage/{instance}",
+                    f"/chat/get-base64-from-media-message/{instance}",
+                    f"/chat/get-media-base64/{instance}",
+                    f"/message/getBase64FromMediaMessage/{instance}",
+                ],
+                payloads=[
+                    {"messageId": message_id},
+                    {"id": message_id},
+                    {"message": {"key": {"id": message_id}}},
+                    {"key": {"id": message_id}},
+                ],
+                timeout=60,
+            )
+        except EvolutionError as exc:
+            errors.append(str(exc))
+
+        if data is None:
+            try:
+                data = self._try_json_get(
+                    paths=[
+                        f"/chat/getBase64FromMediaMessage/{instance}",
+                        f"/message/getBase64FromMediaMessage/{instance}",
+                        f"/chat/get-media-base64/{instance}",
+                    ],
+                    query_params=[
+                        {"messageId": message_id},
+                        {"id": message_id},
+                    ],
+                    timeout=60,
+                )
+            except EvolutionError as exc:
+                errors.append(str(exc))
+
+        if data is None:
+            raise EvolutionError(" | ".join(errors))
 
         for path in (
             ("data", "base64"),
