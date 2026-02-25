@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  summi-frontend:
+    image: ghcr.io/agenciageraleads/summi-b1463168-frontend:latest
+    networks:
+      - Portainer
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - traefik.enable=1
+        - traefik.http.routers.summi-frontend.rule=Host(`${SUMMI_FRONTEND_HOST}`)
+        - traefik.http.routers.summi-frontend.entrypoints=websecure
+        - traefik.http.routers.summi-frontend.priority=1
+        - traefik.http.routers.summi-frontend.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.summi-frontend.service=summi-frontend
+        - traefik.http.services.summi-frontend.loadbalancer.server.port=80
+        - traefik.http.services.summi-frontend.loadbalancer.passHostHeader=true
+
+  summi-worker-api:
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - SUMMI_SENDER_INSTANCE=${SUMMI_SENDER_INSTANCE}
+      - BUSINESS_HOURS_START=${BUSINESS_HOURS_START}
+      - BUSINESS_HOURS_END=${BUSINESS_HOURS_END}
+      - IGNORE_REMOTE_JID=${IGNORE_REMOTE_JID}
+      - ENABLE_HOURLY_JOB=false
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN}
+    networks:
+      - Portainer
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - traefik.enable=1
+        - traefik.http.routers.summi-worker.rule=Host(`${SUMMI_WORKER_HOST}`)
+        - traefik.http.routers.summi-worker.entrypoints=websecure
+        - traefik.http.routers.summi-worker.priority=1
+        - traefik.http.routers.summi-worker.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.summi-worker.service=summi-worker
+        - traefik.http.services.summi-worker.loadbalancer.server.port=8080
+        - traefik.http.services.summi-worker.loadbalancer.passHostHeader=true
+
+  summi-worker-scheduler:
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    command: ["python", "-m", "summi_worker.scheduler"]
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - SUMMI_SENDER_INSTANCE=${SUMMI_SENDER_INSTANCE}
+      - BUSINESS_HOURS_START=${BUSINESS_HOURS_START}
+      - BUSINESS_HOURS_END=${BUSINESS_HOURS_END}
+      - IGNORE_REMOTE_JID=${IGNORE_REMOTE_JID}
+      - ENABLE_HOURLY_JOB=true
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN}
+    networks:
+      - Portainer
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+networks:
+  Portainer:
+    external: true
+    name: Portainer
+

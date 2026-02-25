@@ -68,3 +68,12 @@ No Supabase (env vars das Edge Functions):
 - `WEBHOOK_ANALISA_MENSAGENS`: aponte para `https://<sua-vps>/webhooks/evolution-analyze`
 
 Mantive fallback para as envs antigas (`WEBHOOK_N8N_*`) para nao quebrar deploy.
+
+## Portainer (stack unica)
+Use a stack completa em:
+- `/app/vps/portainer/stack.summi-complete.yml` (no repo: `vps/portainer/stack.summi-complete.yml`)
+
+Ela sobe:
+- frontend (Traefik host `${SUMMI_FRONTEND_HOST}`)
+- worker API (Traefik host `${SUMMI_WORKER_HOST}`)
+- worker scheduler (sem exposicao publica)
