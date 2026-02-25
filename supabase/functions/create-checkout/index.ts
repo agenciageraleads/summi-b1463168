@@ -62,8 +62,8 @@ serve(async (req) => {
           type: "text",
         },
       ],
-      success_url: `${req.headers.get("origin") || "https://summi.lovable.app"}/complete-signup?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin") || "https://summi.lovable.app"}/?canceled=true`,
+      success_url: `${req.headers.get("origin") || "https://summi.gera-leads.com"}/complete-signup?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.get("origin") || "https://summi.gera-leads.com"}/?canceled=true`,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
