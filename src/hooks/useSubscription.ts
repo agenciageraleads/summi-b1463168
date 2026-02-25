@@ -1,3 +1,5 @@
+// ABOUTME: Hook para gerenciar assinatura e checkout do Stripe.
+// ABOUTME: createCheckout funciona SEM autenticação (Stripe-First). checkSubscription e manageSubscription exigem login.
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,10 +24,10 @@ export const useSubscription = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
 
-  // Função para verificar assinatura no Stripe
+  // Verificar assinatura no Stripe (requer login)
   const checkSubscription = async () => {
     if (!user) return;
-    
+
     try {
       setIsLoading(true);
       const { data: sessionData } = await supabase.auth.getSession();
@@ -56,30 +58,26 @@ export const useSubscription = () => {
     }
   };
 
-  // Função para criar checkout do Stripe
+  // Criar checkout do Stripe — funciona SEM login (Stripe-First)
   const createCheckout = async (planType: 'monthly' | 'annual') => {
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) throw new Error('Usuário não autenticado');
-
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { planType },
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
       });
 
       if (error) throw error;
-      
-      // Abrir Stripe checkout em nova aba
-      window.open(data.url, '_blank');
+
+      // Redirecionar para o Stripe Checkout (mesma aba)
+      if (data?.url) {
+        window.location.href = data.url;
+      }
     } catch (error) {
       console.error('Erro ao criar checkout:', error);
       throw error;
     }
   };
 
-  // Função para gerenciar assinatura via portal do cliente
+  // Gerenciar assinatura via portal do cliente (requer login)
   const manageSubscription = async () => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -92,8 +90,7 @@ export const useSubscription = () => {
       });
 
       if (error) throw error;
-      
-      // Abrir portal do cliente em nova aba
+
       window.open(data.url, '_blank');
     } catch (error) {
       console.error('Erro ao abrir portal do cliente:', error);
@@ -104,6 +101,8 @@ export const useSubscription = () => {
   useEffect(() => {
     if (user) {
       checkSubscription();
+    } else {
+      setIsLoading(false);
     }
   }, [user]);
 

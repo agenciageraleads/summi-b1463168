@@ -40,7 +40,13 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.create-checkout]
-verify_jwt = true
+verify_jwt = false
+
+[functions.verify-checkout-session]
+verify_jwt = false
+
+[functions.complete-signup]
+verify_jwt = false
 
 [functions.customer-portal]
 verify_jwt = true

@@ -1050,7 +1050,7 @@ serve(async (req) => {
         const pairingResult = await generatePairingCodeOnly(targetInstanceName, profile.numero, cleanApiUrl, evolutionApiKey);
         
         if (pairingResult.success) {
-          pairingCode = pairingResult.pairingCode;
+          pairingCode = pairingResult.pairingCode ?? null;
           console.log(`[EVOLUTION-HANDLER] ✅ Pairing code gerado: ${pairingCode}`);
         } else {
           console.error(`[EVOLUTION-HANDLER] ❌ Erro ao gerar pairing code:`, pairingResult.error);
@@ -1069,7 +1069,7 @@ serve(async (req) => {
             );
             
             if (restartResult.success) {
-              pairingCode = restartResult.pairingCode;
+              pairingCode = restartResult.pairingCode ?? null;
               if (restartResult.qrCode) qrCode = restartResult.qrCode;
               console.log(`[EVOLUTION-HANDLER] ✅ Códigos gerados após correção: ${pairingCode}`);
             }
