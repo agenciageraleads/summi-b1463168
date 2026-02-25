@@ -142,6 +142,8 @@ def run_hourly_job(
 
     sent = 0
     skipped_hours = 0
+    analyzed_users = 0
+    analyze_errors = 0
     for sub in subs:
         user_id = sub.get("user_id")
         if not user_id:
@@ -155,6 +157,14 @@ def run_hourly_job(
         if not _within_business_hours(settings, profile, now_local):
             skipped_hours += 1
             continue
+
+        # Paridade com n8n: analisa conversas novas/editadas antes de montar o Summi da Hora.
+        try:
+            analyze_user_chats(settings, supabase, openai, user_id=user_id)
+            analyzed_users += 1
+        except Exception:
+            # Nao aborta o job inteiro por erro em um usuario.
+            analyze_errors += 1
 
         # Puxa chats ja analisados com prioridade 2/3 e contexto nao nulo
         chats = supabase.select(
@@ -205,4 +215,6 @@ def run_hourly_job(
         "subscribers": len(subs),
         "sent": sent,
         "skipped_outside_business_hours": skipped_hours,
+        "analyzed_users_before_summary": analyzed_users,
+        "analyze_errors": analyze_errors,
     }
