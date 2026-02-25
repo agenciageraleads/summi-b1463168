@@ -109,6 +109,9 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
 
     payload = await request.json()
     normalized = normalize_message_event(payload)
+    event_name = (normalized.get("event") or "").lower()
+    if event_name and event_name != "messages.upsert":
+        return {"ok": True, "stored": False, "reason": "ignored_event", "event": event_name}
 
     remote_jid = normalized.get("remote_jid")
     instance_name = normalized.get("instance_name")
