@@ -3,6 +3,12 @@ version: "3.8"
 services:
   summi-frontend:
     image: ghcr.io/agenciageraleads/summi-b1463168-frontend:latest
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - Portainer
     deploy:
@@ -23,6 +29,12 @@ services:
 
   summi-worker-api:
     image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -83,4 +95,3 @@ networks:
   Portainer:
     external: true
     name: Portainer
-
