@@ -93,6 +93,18 @@ class OpenAIClient:
             return "audio.m4a", "audio/mp4"
         return default_filename, "application/octet-stream"
 
+    def _detect_image_mime(self, image_bytes: bytes, default_mime: str = "image/jpeg") -> str:
+        head = image_bytes[:32]
+        if head.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if head.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if head.startswith(b"GIF87a") or head.startswith(b"GIF89a"):
+            return "image/gif"
+        if head.startswith(b"RIFF") and b"WEBP" in head[:16]:
+            return "image/webp"
+        return default_mime
+
     def transcribe_mp3(self, mp3_bytes: bytes, filename: str = "audio.mp3") -> Tuple[str, Optional[float]]:
         """
         Retorna (texto, duracao_segundos?) usando /audio/transcriptions.
@@ -116,6 +128,7 @@ class OpenAIClient:
         return text, duration_num
 
     def describe_image_base64(self, model: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
+        mime_type = self._detect_image_mime(image_bytes, default_mime=mime_type)
         b64 = base64.b64encode(image_bytes).decode("ascii")
         data_url = f"data:{mime_type};base64,{b64}"
         url = "https://api.openai.com/v1/chat/completions"
