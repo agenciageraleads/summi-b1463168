@@ -1,11 +1,33 @@
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap } from "lucide-react";
+import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useToast } from "@/hooks/use-toast";
+
 const LandingPage = () => {
+  const { createCheckout } = useSubscription();
+  const { toast } = useToast();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const handleCheckout = async (planType: 'monthly' | 'annual') => {
+    try {
+      setLoadingPlan(planType);
+      await createCheckout(planType);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível iniciar o checkout. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
   return <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
       {/* Navigation */}
       <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
@@ -35,16 +57,19 @@ const LandingPage = () => {
 
             {/* CTA Buttons */}
             <div className="flex items-center space-x-4">
-              <Link to="/login">
-                <Button variant="ghost" className="text-gray-600 hover:text-green-600">
+              <Link to="/register">
+                <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg">
                   Entrar
                 </Button>
               </Link>
-              <Link to="/register">
-                <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg">
-                  Conectar Agora
-                </Button>
-              </Link>
+              <Button 
+                onClick={() => handleCheckout('monthly')}
+                disabled={loadingPlan !== null}
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg"
+              >
+                {loadingPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Conectar Agora
+              </Button>
             </div>
           </div>
         </div>
@@ -67,12 +92,16 @@ const LandingPage = () => {
             <p className="text-xl text-gray-600 mb-8 leading-relaxed text-center">A Summi transcreve e resume seus áudios, analisa e prioriza suas conversas para que você não perca nenhuma oportunidade.</p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 my-0">
-              <Link to="/register">
-                <Button size="lg" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl px-8 py-4 text-lg">
-                  Conectar Agora
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
+              <Button 
+                size="lg" 
+                onClick={() => handleCheckout('monthly')}
+                disabled={loadingPlan !== null}
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl px-8 py-4 text-lg"
+              >
+                {loadingPlan === 'monthly' ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                Conectar Agora
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
             </div>
 
             <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-500 mb-6">
@@ -292,11 +321,14 @@ Cancele quando quiser.</CardDescription>
                   </div>
                 </div>
                 
-                <Link to="/register" className="block">
-                  <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 text-lg">
-                    Conectar Agora
-                  </Button>
-                </Link>
+                <Button 
+                  onClick={() => handleCheckout('monthly')}
+                  disabled={loadingPlan !== null}
+                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 text-lg"
+                >
+                  {loadingPlan === 'monthly' ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                  Conectar Agora
+                </Button>
               </CardContent>
             </Card>
 
@@ -372,12 +404,15 @@ Cancele quando quiser.</CardDescription>
                   </div>
                 </div>
                 
-                <Link to="/register" className="block">
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg shadow-lg transform hover:scale-[1.02] transition-all">
-                    Conectar com Desconto
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </Button>
-                </Link>
+                <Button 
+                  onClick={() => handleCheckout('annual')}
+                  disabled={loadingPlan !== null}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg shadow-lg transform hover:scale-[1.02] transition-all"
+                >
+                  {loadingPlan === 'annual' ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                  Conectar com Desconto
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -487,12 +522,16 @@ Cancele quando quiser.</CardDescription>
             <p className="text-gray-600 mb-6">
               Ainda tem dúvidas? Entre em contato conosco!
             </p>
-            <Link to="/register">
-              <Button size="lg" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white">
-                Conectar Agora
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </Link>
+            <Button 
+              size="lg" 
+              onClick={() => handleCheckout('monthly')}
+              disabled={loadingPlan !== null}
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+            >
+              {loadingPlan ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+              Conectar Agora
+              <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
           </div>
         </div>
       </section>
@@ -527,7 +566,7 @@ Cancele quando quiser.</CardDescription>
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#como-funciona" className="hover:text-white transition-colors">Como Funciona</a></li>
                 <li><a href="#recursos" className="hover:text-white transition-colors">Recursos</a></li>
-                <li><Link to="/register" className="hover:text-white transition-colors">Conectar Agora</Link></li>
+                <li><a href="#precos" className="hover:text-white transition-colors cursor-pointer">Conectar Agora</a></li>
               </ul>
             </div>
 

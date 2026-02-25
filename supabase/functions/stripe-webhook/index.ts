@@ -1,5 +1,5 @@
-// ABOUTME: Webhook do Stripe para processar eventos de checkout, assinatura e pagamentos
-// ABOUTME: Cria perfil automaticamente se não existir, garantindo resiliência no fluxo
+// ABOUTME: Webhook do Stripe para processar eventos de checkout, assinatura e pagamentos.
+// ABOUTME: No fluxo Stripe-First, cria conta Supabase Auth + perfil automaticamente no checkout.session.completed.
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
@@ -10,72 +10,90 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Função para log detalhado dos eventos do webhook
 const logWebhookEvent = (eventType: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[STRIPE-WEBHOOK] ${eventType}${detailsStr}`);
 };
 
 // Função auxiliar para garantir que o perfil existe
-const ensureProfileExists = async (supabaseClient: any, userId: string, email: string, customerName?: string) => {
+const ensureProfileExists = async (supabaseClient: any, userId: string, email: string, customerName?: string, phone?: string) => {
   logWebhookEvent("Verificando se perfil existe", { userId, email });
-  
+
   const { data: existingProfile, error: profileError } = await supabaseClient
     .from('profiles')
     .select('id')
     .eq('id', userId)
     .maybeSingle();
-  
+
   if (profileError) {
     logWebhookEvent("Erro ao verificar perfil", { error: profileError });
     return false;
   }
-  
+
   if (!existingProfile) {
     logWebhookEvent("Perfil não encontrado, criando automaticamente", { userId, email });
-    
+
     const { error: createError } = await supabaseClient
       .from('profiles')
       .insert({
         id: userId,
         nome: customerName || email.split('@')[0],
-        email: email
+        email: email,
+        numero: phone || null,
       });
-    
+
     if (createError) {
       logWebhookEvent("Erro ao criar perfil automaticamente", { error: createError });
       return false;
     }
-    
+
     logWebhookEvent("Perfil criado automaticamente com sucesso");
+  } else if (phone || customerName) {
+    // Atualizar perfil existente com dados do Stripe se necessário
+    const updateData: Record<string, string> = {};
+    if (phone) updateData.numero = phone;
+    if (customerName) updateData.nome = customerName;
+
+    await supabaseClient
+      .from('profiles')
+      .update(updateData)
+      .eq('id', userId);
   }
-  
+
   return true;
 };
 
-// Função para buscar userId por email (tenta profiles, depois auth.users)
+// Função para buscar userId por email
 const findUserIdByEmail = async (supabaseClient: any, email: string) => {
-  // Tentar primeiro na tabela profiles
   const { data: profileData, error: profileError } = await supabaseClient
     .from('profiles')
     .select('id')
     .eq('email', email)
     .maybeSingle();
-  
+
   if (!profileError && profileData) {
     return profileData.id;
   }
-  
-  // Se não encontrou em profiles, buscar em auth.users via admin
+
   const { data: usersData, error: usersError } = await supabaseClient.auth.admin.listUsers();
-  
+
   if (usersError) {
     logWebhookEvent("Erro ao buscar usuários", { error: usersError });
     return null;
   }
-  
+
   const user = usersData.users.find((u: any) => u.email === email);
   return user?.id || null;
+};
+
+// Gera senha temporária aleatória
+const generateTempPassword = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+  let password = '';
+  for (let i = 0; i < 24; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
 };
 
 serve(async (req) => {
@@ -86,18 +104,16 @@ serve(async (req) => {
   try {
     logWebhookEvent("Webhook iniciado");
 
-    // Configurar Stripe e Supabase
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
-      apiVersion: "2023-10-16" 
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2023-10-16"
     });
-    
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
-    // Verificar assinatura do webhook usando método assíncrono
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SIGNING_SECRET");
@@ -107,10 +123,9 @@ serve(async (req) => {
     }
 
     logWebhookEvent("Verificando assinatura do webhook");
-    
+
     let event: Stripe.Event;
     try {
-      // Usar o método assíncrono para compatibilidade com Deno
       event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
     } catch (err) {
       logWebhookEvent("Erro na verificação da assinatura", { error: (err as Error).message });
@@ -119,37 +134,72 @@ serve(async (req) => {
 
     logWebhookEvent("Evento recebido", { type: event.type, id: event.id });
 
-    // Processar diferentes tipos de eventos
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         logWebhookEvent("Processando checkout concluído", { sessionId: session.id });
-        
-        if (session.mode === "subscription" && session.customer) {
-          const customerId = typeof session.customer === 'string' ? session.customer : session.customer.id;
-          const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
-          
-          if (customer.email) {
-            logWebhookEvent("Atualizando dados do cliente", { email: customer.email });
-            
-            // Buscar userId - tenta profiles e auth.users
-            let userId = await findUserIdByEmail(supabaseClient, customer.email);
-            
-            // Se ainda não encontrou e temos metadata do customer, usar o supabase_user_id
-            if (!userId && customer.metadata?.supabase_user_id) {
-              userId = customer.metadata.supabase_user_id;
-              logWebhookEvent("Usando userId do metadata do Stripe", { userId });
-            }
 
-            if (!userId) {
-              logWebhookEvent("Usuário não encontrado no banco", { email: customer.email });
+        if (session.mode === "subscription") {
+          const email = session.customer_details?.email || session.customer_email;
+          const phone = session.customer_details?.phone || session.phone_number_collection?.toString() || null;
+          
+          // Extrair nome do custom_fields
+          let customerName: string | null = null;
+          if (session.custom_fields && session.custom_fields.length > 0) {
+            const nameField = session.custom_fields.find((f: any) => f.key === 'full_name');
+            if (nameField && nameField.text) {
+              customerName = nameField.text.value;
+            }
+          }
+
+          if (!email) {
+            logWebhookEvent("Email não encontrado na sessão de checkout");
+            break;
+          }
+
+          logWebhookEvent("Dados do checkout", { email, customerName, phone });
+
+          // ===== STRIPE-FIRST: Criar conta Supabase se não existir =====
+          let userId = await findUserIdByEmail(supabaseClient, email);
+
+          if (!userId) {
+            logWebhookEvent("Usuário não existe, criando conta via Admin API...", { email });
+            
+            const tempPassword = generateTempPassword();
+            
+            const { data: newUser, error: createUserError } = await supabaseClient.auth.admin.createUser({
+              email: email,
+              password: tempPassword,
+              email_confirm: true, // Confirmar email automaticamente (pagou = email válido)
+              user_metadata: {
+                nome: customerName || email.split('@')[0],
+                numero: phone,
+                stripe_checkout: true,
+                needs_password_setup: true,
+              },
+            });
+
+            if (createUserError) {
+              logWebhookEvent("Erro ao criar usuário", { error: createUserError });
               break;
             }
 
-            // Garantir que o perfil existe
-            await ensureProfileExists(supabaseClient, userId, customer.email, customer.name || undefined);
+            userId = newUser.user.id;
+            logWebhookEvent("Usuário criado com sucesso", { userId });
+          }
 
-            // Buscar a assinatura criada (pode estar 'active' ou 'trialing')
+          // Garantir que o perfil existe com dados do Stripe
+          await ensureProfileExists(supabaseClient, userId, email, customerName || undefined, phone || undefined);
+
+          // Buscar assinatura do Stripe
+          const customerId = typeof session.customer === 'string' ? session.customer : (session.customer as any)?.id;
+
+          if (customerId) {
+            // Atualizar metadata do customer no Stripe com o supabase_user_id
+            await stripe.customers.update(customerId, {
+              metadata: { supabase_user_id: userId },
+            });
+
             const subscriptions = await stripe.subscriptions.list({
               customer: customerId,
               status: "all",
@@ -160,10 +210,10 @@ serve(async (req) => {
 
             if (subscription) {
               const priceId = subscription.items.data[0].price.id;
-              
+
               await supabaseClient.from("subscribers").upsert({
                 user_id: userId,
-                email: customer.email,
+                email: email,
                 stripe_customer_id: customerId,
                 stripe_subscription_id: subscription.id,
                 stripe_price_id: priceId,
@@ -171,12 +221,11 @@ serve(async (req) => {
                 subscription_status: subscription.status,
                 subscription_start: new Date(subscription.start_date * 1000).toISOString(),
                 subscription_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
                 updated_at: new Date().toISOString(),
               }, { onConflict: 'email' });
-              
-              logWebhookEvent("Assinatura ativada com sucesso", { email: customer.email, priceId, status: subscription.status });
-            } else {
-              logWebhookEvent("Nenhuma assinatura ativa ou em teste encontrada após o checkout", { customerId });
+
+              logWebhookEvent("Assinatura ativada com sucesso", { email, priceId, status: subscription.status });
             }
           }
         }
@@ -186,18 +235,17 @@ serve(async (req) => {
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        logWebhookEvent("Processando atualização de assinatura", { 
-          subscriptionId: subscription.id, 
-          status: subscription.status 
+        logWebhookEvent("Processando atualização de assinatura", {
+          subscriptionId: subscription.id,
+          status: subscription.status
         });
-        
+
         const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
         const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
-        
+
         if (customer.email) {
-          // Buscar userId
           let userId = await findUserIdByEmail(supabaseClient, customer.email);
-          
+
           if (!userId && customer.metadata?.supabase_user_id) {
             userId = customer.metadata.supabase_user_id;
           }
@@ -207,12 +255,11 @@ serve(async (req) => {
             break;
           }
 
-          // Garantir que o perfil existe
           await ensureProfileExists(supabaseClient, userId, customer.email, customer.name || undefined);
 
           const isActive = subscription.status === 'active' || subscription.status === 'trialing';
           const priceId = isActive ? subscription.items.data[0].price.id : null;
-          
+
           await supabaseClient.from("subscribers").upsert({
             user_id: userId,
             email: customer.email,
@@ -224,10 +271,10 @@ serve(async (req) => {
             subscription_end: isActive ? new Date(subscription.current_period_end * 1000).toISOString() : null,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'email' });
-          
-          logWebhookEvent("Status da assinatura atualizado", { 
-            email: customer.email, 
-            status: subscription.status 
+
+          logWebhookEvent("Status da assinatura atualizado", {
+            email: customer.email,
+            status: subscription.status
           });
         }
         break;
@@ -236,15 +283,14 @@ serve(async (req) => {
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
         logWebhookEvent("Pagamento de fatura bem-sucedido", { invoiceId: invoice.id });
-        
+
         if (invoice.subscription && invoice.customer) {
           const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer.id;
           const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
-          
+
           if (customer.email) {
-            // Buscar userId
             let userId = await findUserIdByEmail(supabaseClient, customer.email);
-            
+
             if (!userId && customer.metadata?.supabase_user_id) {
               userId = customer.metadata.supabase_user_id;
             }
@@ -254,14 +300,12 @@ serve(async (req) => {
               break;
             }
 
-            // Garantir que o perfil existe
             await ensureProfileExists(supabaseClient, userId, customer.email, customer.name || undefined);
 
-            // Atualizar a data de renovação
             const subscription = await stripe.subscriptions.retrieve(
               typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id
             );
-            
+
             await supabaseClient.from("subscribers").upsert({
               user_id: userId,
               email: customer.email,
@@ -269,7 +313,7 @@ serve(async (req) => {
               subscription_end: new Date(subscription.current_period_end * 1000).toISOString(),
               updated_at: new Date().toISOString(),
             }, { onConflict: 'email' });
-            
+
             logWebhookEvent("Data de renovação atualizada", { email: customer.email });
           }
         }
@@ -288,7 +332,7 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logWebhookEvent("ERRO no webhook", { message: errorMessage });
-    
+
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
