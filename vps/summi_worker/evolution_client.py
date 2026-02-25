@@ -27,6 +27,24 @@ class EvolutionClient:
     def _headers(self) -> Dict[str, str]:
         return {"apikey": self._key, "Content-Type": "application/json"}
 
+    def _try_json_post(self, paths: list[str], payloads: list[Dict[str, Any]], timeout: int = 30) -> Dict[str, Any]:
+        last = None
+        for path in paths:
+            url = f"{self._url}{path}"
+            for payload in payloads:
+                try:
+                    resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=timeout)
+                except Exception as exc:
+                    last = f"{url} request_error={exc}"
+                    continue
+                if resp.ok:
+                    try:
+                        return resp.json()
+                    except Exception:
+                        return {"raw_text": resp.text}
+                last = f"{url} {resp.status_code} {resp.text}"
+        raise EvolutionError(f"request failed: {last}")
+
     def send_text(self, instance: str, remote_jid: str, text: str) -> None:
         # Tentativa 1 (comum): /message/sendText/{instance}
         url = f"{self._url}/message/sendText/{instance}"
@@ -60,3 +78,40 @@ class EvolutionClient:
 
         raise EvolutionError(f"send_audio failed: {resp.status_code} {resp.text} / {resp2.status_code} {resp2.text}")
 
+    def get_media_base64(self, instance: str, message_id: str) -> str:
+        """
+        Best-effort para Evolution 2.x (endpoint varia por build).
+        """
+        data = self._try_json_post(
+            paths=[
+                f"/chat/getBase64FromMediaMessage/{instance}",
+                f"/chat/get-base64-from-media-message/{instance}",
+                f"/chat/get-media-base64/{instance}",
+                f"/message/getBase64FromMediaMessage/{instance}",
+            ],
+            payloads=[
+                {"messageId": message_id},
+                {"id": message_id},
+                {"message": {"key": {"id": message_id}}},
+                {"key": {"id": message_id}},
+            ],
+            timeout=60,
+        )
+
+        for path in (
+            ("data", "base64"),
+            ("base64",),
+            ("data", "message", "base64"),
+        ):
+            cur: Any = data
+            ok = True
+            for k in path:
+                if isinstance(cur, dict) and k in cur:
+                    cur = cur[k]
+                else:
+                    ok = False
+                    break
+            if ok and isinstance(cur, str) and cur.strip():
+                return cur.strip()
+
+        raise EvolutionError(f"media base64 not found in response: {str(data)[:500]}")

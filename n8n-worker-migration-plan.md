@@ -351,9 +351,9 @@ Rollback:
 ## Execucao Imediata Recomendada (proxima sprint)
 
 ### Sprint A (alto impacto, baixo risco de regressao)
-- [ ] Portar dedupe por `messageId` (Redis)
-- [ ] Expandir normalizacao de payload (audio/imagem/reacao/grupo)
-- [ ] Adicionar logs estruturados por evento (`instance`, `messageId`, `type`, `path`)
+- [x] Portar dedupe por `messageId` (Redis) (opcional via `REDIS_URL`)
+- [x] Expandir normalizacao de payload (audio/imagem/reacao/grupo) (best-effort)
+- [x] Adicionar logs estruturados por evento (`instance`, `messageId`, `type`, `path`)
 - [x] Fazer scheduler rodar analise antes do resumo
 - [x] Aplicar limpeza de baixa prioridade no scheduler (por `id_usuario`, com flag de perfil)
 - [ ] Aplicar hardening Nginx + healthchecks (branch `codex/vps-migration`)
@@ -363,11 +363,16 @@ Verificacao:
 - confirmar persistencia + analise + ausencia de duplicidade
 
 ### Sprint B (paridade funcional do `whatsapp-beta`)
-- [ ] Transcricao de audio + resumo condicional
-- [ ] Descricao de imagem
-- [ ] Fluxo por reacao `⚡`
-- [ ] Regras `send_private_only` e preferencias de transcricao
+- [x] Transcricao de audio + resumo condicional (best-effort, validar endpoint de media Evolution)
+- [x] Descricao de imagem (best-effort, validar endpoint de media Evolution)
+- [x] Fluxo por reacao `⚡` (best-effort)
+- [x] Regras `send_private_only` e preferencias de transcricao (subset critico)
 - [ ] Persistencia compativel com legado (ou adaptador de leitura)
+
+Observacao de endurecimento da Sprint B:
+- Ainda falta validacao em payloads reais de audio/imagem/reacao na Evolution `2.3.7`
+- Endpoint de `get-media-base64` foi implementado com multiplas tentativas (best-effort)
+- Envio com quoted message (reply) ainda nao foi portado
 
 ## Decisoes de Arquitetura (atuais)
 - Nao cortar n8n antes de paridade do webhook principal

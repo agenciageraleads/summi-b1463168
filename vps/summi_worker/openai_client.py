@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 
@@ -75,3 +76,51 @@ class OpenAIClient:
             raise OpenAIError(f"tts failed: {resp.status_code} {resp.text}")
         return resp.content
 
+    def transcribe_mp3(self, mp3_bytes: bytes, filename: str = "audio.mp3") -> Tuple[str, Optional[float]]:
+        """
+        Retorna (texto, duracao_segundos?) usando /audio/transcriptions.
+        """
+        url = "https://api.openai.com/v1/audio/transcriptions"
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+        files = {"file": (filename, mp3_bytes, "audio/mpeg")}
+        data = {"model": "gpt-4o-mini-transcribe"}
+        resp = requests.post(url, headers=headers, data=data, files=files, timeout=180)
+        if not resp.ok:
+            raise OpenAIError(f"transcribe failed: {resp.status_code} {resp.text}")
+        payload = resp.json()
+        text = str(payload.get("text") or "").strip()
+        duration = payload.get("duration")
+        try:
+            duration_num = float(duration) if duration is not None else None
+        except Exception:
+            duration_num = None
+        return text, duration_num
+
+    def describe_image_base64(self, model: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
+        b64 = base64.b64encode(image_bytes).decode("ascii")
+        data_url = f"data:{mime_type};base64,{b64}"
+        url = "https://api.openai.com/v1/chat/completions"
+        payload = {
+            "model": model,
+            "temperature": 0.2,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Descreva a imagem de forma clara e objetiva, nada alem disso. "
+                                "A descricao sera usada por outra IA para classificar prioridade de conversa."
+                            ),
+                        },
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                }
+            ],
+        }
+        resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=120)
+        if not resp.ok:
+            raise OpenAIError(f"vision failed: {resp.status_code} {resp.text}")
+        data = resp.json()
+        return data["choices"][0]["message"].get("content", "").strip()

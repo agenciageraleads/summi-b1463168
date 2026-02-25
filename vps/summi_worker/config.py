@@ -47,6 +47,8 @@ class Settings:
 
     enable_hourly_job: bool
     low_priority_cleanup_days: int
+    redis_url: str | None
+    webhook_dedupe_ttl_seconds: int
 
 
 def load_settings() -> Settings:
@@ -67,5 +69,6 @@ def load_settings() -> Settings:
         ignore_remote_jid=os.getenv("IGNORE_REMOTE_JID", "556293984600"),
         enable_hourly_job=_bool("ENABLE_HOURLY_JOB", True),
         low_priority_cleanup_days=_int("LOW_PRIORITY_CLEANUP_DAYS", 0),
+        redis_url=os.getenv("REDIS_URL"),
+        webhook_dedupe_ttl_seconds=_int("WEBHOOK_DEDUPE_TTL_SECONDS", 600),
     )
-
