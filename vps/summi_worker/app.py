@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any, Dict, Optional
 
@@ -18,6 +19,9 @@ from .supabase_rest import SupabaseRest, to_postgrest_filter_eq
 load_dotenv()
 
 app = FastAPI(title="Summi Worker")
+logger = logging.getLogger("summi_worker")
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 def _settings() -> Settings:
@@ -109,15 +113,29 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
 
     payload = await request.json()
     normalized = normalize_message_event(payload)
+    logger.info(
+        "evolution_webhook.received path=%s event=%s instance=%s remote_jid=%s message_id=%s message_type=%s from_me=%s analyze_after=%s",
+        request.url.path,
+        normalized.get("event"),
+        normalized.get("instance_name"),
+        normalized.get("remote_jid"),
+        normalized.get("message_id"),
+        normalized.get("message_type"),
+        normalized.get("from_me"),
+        analyze_after,
+    )
     event_name = (normalized.get("event") or "").lower()
     if event_name and event_name != "messages.upsert":
+        logger.info("evolution_webhook.ignored reason=ignored_event event=%s", event_name)
         return {"ok": True, "stored": False, "reason": "ignored_event", "event": event_name}
 
     remote_jid = normalized.get("remote_jid")
     instance_name = normalized.get("instance_name")
     if not remote_jid:
+        logger.warning("evolution_webhook.ignored reason=missing_remote_jid")
         return {"ok": True, "stored": False, "reason": "missing_remote_jid"}
     if not instance_name:
+        logger.warning("evolution_webhook.ignored reason=missing_instance_name remote_jid=%s", remote_jid)
         return {"ok": True, "stored": False, "reason": "missing_instance_name"}
 
     # Mapear instance -> usuario (profiles.instance_name)
@@ -128,6 +146,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
         limit=1,
     )
     if not profiles:
+        logger.warning("evolution_webhook.ignored reason=profile_not_found_for_instance instance=%s", instance_name)
         return {"ok": True, "stored": False, "reason": "profile_not_found_for_instance"}
     user_id = profiles[0]["id"]
 
@@ -169,6 +188,16 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
 
     if analyze_after:
         analyze_user_chats(settings, supabase, openai, user_id=user_id)
+
+    logger.info(
+        "evolution_webhook.stored chat_id=%s user_id=%s instance=%s remote_jid=%s message_id=%s analyzed=%s",
+        chat_id,
+        user_id,
+        instance_name,
+        remote_jid,
+        normalized.get("message_id"),
+        analyze_after,
+    )
 
     return {"ok": True, "stored": True, "chat_id": chat_id, "analyzed": analyze_after}
 

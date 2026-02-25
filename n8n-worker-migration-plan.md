@@ -15,23 +15,31 @@ Migrar o Summi para stack propria (frontend + worker + Supabase + Evolution), ma
 - `g9axRbcJiXF9tgvb` `[Summi] Apaga Mensagens`
 
 ### Referencias a outros workflows (fora da lista inicial)
-- `5G93ntjXP0yhzxoU`:
-  - Referenciado como `settings.errorWorkflow` em:
-    - `CPLI2sYHIgQJqA5i`
-    - `XNPzajdDCyrcBpy9`
-    - `jmdPlc6U9RbwkLTh`
-    - `QXZ9xcw6joKKfPMZ`
-    - `ixDrnQN8dlvPMtV1`
-    - `zYomlQJ2uhw7qy76`
-  - Status no MCP: `Workflow not found`
-  - Acao: expor via MCP (ou enviar export) se quiser migrar/replicar tratamento de erro.
+- `5G93ntjXP0yhzxoU` (fornecido via JSON; nao listado no MCP):
+  - Tipo: `errorWorkflow` compartilhado
+  - Funcao:
+    - `Error Trigger` -> envia WhatsApp via Evolution para alertar erro de fluxo
+    - destino configurado: instance `lucasborges_5286`, numero `5562982435286`
+  - Impacto na migracao:
+    - nao bloqueia paridade funcional do Summi
+    - util como referencia para observabilidade/alertas no worker
 
-- `Uu4THVpPZQ86NzpY`:
-  - Referenciado em `executeWorkflow` como subworkflow de limpeza por:
+- `Uu4THVpPZQ86NzpY` (fornecido via JSON; nao listado no MCP):
+  - Tipo: subworkflow de limpeza por prioridade
+  - Referenciado em:
     - `jmdPlc6U9RbwkLTh` (`Apagar Mensagens com Prioridade Baixa1`)
     - `ixDrnQN8dlvPMtV1` (`Apagar Mensagens com Prioridade Baixa1`)
-  - Status no MCP: `Workflow not found`
-  - Acao: expor via MCP (ou confirmar se foi substituido pelo `g9axRbcJiXF9tgvb`).
+  - Funcao (intencao aparente):
+    - recebe `id_usuario`
+    - consulta perfil
+    - se "Apaga Mensagens Não Importantes Automaticamente?" = `sim`
+    - apaga chats de baixa prioridade (`prioridade < 2`)
+  - Achado importante (JSON fornecido):
+    - o `If1` aponta ambos os ramos para `getConversas`
+    - `getConversas` filtra apenas `prioridade < 2` (sem `id_usuario`)
+    - comportamento efetivo observado no desenho: risco de apagar conversas de baixa prioridade de todos os usuarios
+  - Acao na migracao:
+    - portar a intencao (segura) no worker: limpeza por `id_usuario` + `prioridade < 2`
 
 ### Dependencias internas (disponiveis)
 - `jmdPlc6U9RbwkLTh` -> `QXZ9xcw6joKKfPMZ` (analise de conversas)
@@ -181,7 +189,7 @@ Capacidades:
 - Deleta chats do usuario
 
 Observacao:
-- Este workflow nao e claramente o mesmo subworkflow `Uu4TH...` chamado pelos Summi da Hora (ID diferente). Pode ser rotina paralela.
+- Este workflow nao e o mesmo subworkflow `Uu4TH...` chamado pelos Summi da Hora (ID diferente). E uma rotina paralela de limpeza diaria.
 
 ## Matriz de Paridade (n8n x Worker Atual)
 
@@ -241,7 +249,7 @@ Legenda:
 - Selecao de chats prioridade 2/3: `OK`
 - Rodar analise antes do resumo (igual n8n): `OK` (implementado no branch `codex/vps-migration`)
 
-- Limpeza de mensagens baixa prioridade apos envio: `NAO`
+- Limpeza de mensagens baixa prioridade apos envio: `OK` (implementado no branch `codex/vps-migration`, com filtro por `id_usuario`)
 
 ### Observabilidade / Operacao
 - Health endpoint `/health`: `OK`
@@ -249,14 +257,13 @@ Legenda:
 - Logs suficientes para auditoria de evento por `messageId`: `PARCIAL`
 - DLQ / retries / poison message handling: `NAO`
 
-## Dependencias Externas Ainda Nao Expostas (preciso via MCP/export)
+## Dependencias Externas (ja recebidas por JSON)
 
+Recebidas e analisadas:
 1. `5G93ntjXP0yhzxoU` (error workflow compartilhado)
 2. `Uu4THVpPZQ86NzpY` (subworkflow de apagar mensagens por prioridade)
 
-Sem esses dois, o inventario fica funcionalmente quase completo, mas com lacuna de:
-- tratamento de erros centralizado no n8n
-- limpeza acionada pelos fluxos de Summi da Hora
+Inventario de dependencias do n8n agora esta funcionalmente completo para o escopo Summi.
 
 ## Plano de Acao da Migracao (executavel)
 
@@ -303,7 +310,7 @@ Objetivo:
 Escopo:
 1. Rodar `analyze_user_chats()` dentro do job horario antes de montar resumos
 2. Implementar limpeza de mensagens de baixa prioridade apos envio
-   - reproduzir logica do subworkflow `Uu4TH...` (quando obtido)
+   - reproduzir intencao do subworkflow `Uu4TH...` com seguranca (por `id_usuario`)
 3. Ajustar filtros de role/plano (beta/user/admin) conforme fluxos atuais
 4. Guardar trilha de execucao por usuario (log estruturado)
 
@@ -348,6 +355,7 @@ Rollback:
 - [ ] Expandir normalizacao de payload (audio/imagem/reacao/grupo)
 - [ ] Adicionar logs estruturados por evento (`instance`, `messageId`, `type`, `path`)
 - [x] Fazer scheduler rodar analise antes do resumo
+- [x] Aplicar limpeza de baixa prioridade no scheduler (por `id_usuario`, com flag de perfil)
 - [ ] Aplicar hardening Nginx + healthchecks (branch `codex/vps-migration`)
 
 Verificacao:

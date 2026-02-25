@@ -11,6 +11,7 @@ from .supabase_rest import (
     SupabaseRest,
     to_postgrest_filter_eq,
     to_postgrest_filter_gte,
+    to_postgrest_filter_lt,
     to_postgrest_filter_neq,
 )
 
@@ -144,6 +145,7 @@ def run_hourly_job(
     skipped_hours = 0
     analyzed_users = 0
     analyze_errors = 0
+    low_priority_deleted = 0
     for sub in subs:
         user_id = sub.get("user_id")
         if not user_id:
@@ -210,6 +212,27 @@ def run_hourly_job(
             mp3 = openai.tts_mp3(settings.openai_tts_model, settings.openai_tts_voice, audio_script)
             evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, mp3)
 
+        auto_delete_low = str(profile.get("Apaga Mensagens Não Importantes Automaticamente?", "")).strip().lower() == "sim"
+        if auto_delete_low:
+            low_chats = supabase.select(
+                "chats",
+                select="id",
+                filters=[
+                    to_postgrest_filter_eq("id_usuario", user_id),
+                    to_postgrest_filter_lt("prioridade", "2"),
+                ],
+                limit=1000,
+            )
+            if low_chats:
+                supabase.delete(
+                    "chats",
+                    filters=[
+                        to_postgrest_filter_eq("id_usuario", user_id),
+                        to_postgrest_filter_lt("prioridade", "2"),
+                    ],
+                )
+                low_priority_deleted += len(low_chats)
+
     return {
         "success": True,
         "subscribers": len(subs),
@@ -217,4 +240,5 @@ def run_hourly_job(
         "skipped_outside_business_hours": skipped_hours,
         "analyzed_users_before_summary": analyzed_users,
         "analyze_errors": analyze_errors,
+        "low_priority_deleted": low_priority_deleted,
     }
