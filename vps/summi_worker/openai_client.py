@@ -76,13 +76,32 @@ class OpenAIClient:
             raise OpenAIError(f"tts failed: {resp.status_code} {resp.text}")
         return resp.content
 
+    def _detect_audio_upload_meta(self, audio_bytes: bytes, default_filename: str = "audio.mp3") -> Tuple[str, str]:
+        """
+        Detecta formato por magic bytes para enviar o MIME/filename corretos ao endpoint de transcricao.
+        """
+        head = audio_bytes[:32]
+        if head.startswith(b"OggS"):
+            return "audio.ogg", "audio/ogg"
+        if head.startswith(b"ID3") or (len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0):
+            return "audio.mp3", "audio/mpeg"
+        if head.startswith(b"RIFF") and b"WAVE" in head:
+            return "audio.wav", "audio/wav"
+        if head.startswith(b"fLaC"):
+            return "audio.flac", "audio/flac"
+        if len(head) >= 12 and head[4:8] == b"ftyp":
+            return "audio.m4a", "audio/mp4"
+        return default_filename, "application/octet-stream"
+
     def transcribe_mp3(self, mp3_bytes: bytes, filename: str = "audio.mp3") -> Tuple[str, Optional[float]]:
         """
         Retorna (texto, duracao_segundos?) usando /audio/transcriptions.
+        Apesar do nome historico, detecta formato real (ogg/opus, mp3, wav, etc.).
         """
         url = "https://api.openai.com/v1/audio/transcriptions"
         headers = {"Authorization": f"Bearer {self._api_key}"}
-        files = {"file": (filename, mp3_bytes, "audio/mpeg")}
+        upload_filename, mime_type = self._detect_audio_upload_meta(mp3_bytes, default_filename=filename)
+        files = {"file": (upload_filename, mp3_bytes, mime_type)}
         data = {"model": "gpt-4o-mini-transcribe"}
         resp = requests.post(url, headers=headers, data=data, files=files, timeout=180)
         if not resp.ok:
