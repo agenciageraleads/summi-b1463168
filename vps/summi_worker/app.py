@@ -14,6 +14,7 @@ from .evolution_client import EvolutionClient, EvolutionError
 from .evolution_webhook import normalize_message_event
 from .openai_client import OpenAIClient, OpenAIError
 from .redis_dedupe import RedisDedupe
+from .redis_queue import RedisQueueClient
 from .summi_jobs import analyze_user_chats, run_hourly_job
 from .supabase_rest import SupabaseRest, to_postgrest_filter_eq
 
@@ -45,6 +46,16 @@ def _evolution(settings: Settings) -> EvolutionClient:
 
 def _redis_dedupe(settings: Settings) -> RedisDedupe:
     return RedisDedupe(settings.redis_url)
+
+
+def _redis_queue(settings: Settings) -> Optional[RedisQueueClient]:
+    if not settings.redis_url:
+        return None
+    try:
+        return RedisQueueClient.from_url(settings.redis_url)
+    except Exception:
+        logger.exception("redis_queue.init_failed")
+        return None
 
 
 def _get_in(obj: Dict[str, Any], *path: str) -> Any:
@@ -178,6 +189,7 @@ def _send_aux_message(
     instance_name: str,
     remote_jid_digits: str,
     text: str,
+    quoted_message_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     send_private_only = _profile_bool(profile, "send_private_only", False)
     destination = "conversation"
@@ -196,8 +208,14 @@ def _send_aux_message(
         return {"sent": False, "destination": destination}
 
     branded_text = f"{text.rstrip()}\n\n_⚡️ Summi - Sua Assistente Invisível_"
-    evolution.send_text(target_instance, target_number, branded_text)
-    return {"sent": True, "destination": destination, "target_instance": target_instance, "target_number": target_number}
+    evolution.send_text(target_instance, target_number, branded_text, quoted_message_id=quoted_message_id)
+    return {
+        "sent": True,
+        "destination": destination,
+        "target_instance": target_instance,
+        "target_number": target_number,
+        "quoted_message_id": quoted_message_id,
+    }
 
 
 def _detect_message_shape(payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
@@ -461,6 +479,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         instance_name=instance_name,
                         remote_jid_digits=remote_jid_digits,
                         text=text_for_chat,
+                        quoted_message_id=message_id or None,
                     )
 
         elif message_kind == "reaction":
@@ -489,6 +508,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         instance_name=instance_name,
                         remote_jid_digits=remote_jid_digits,
                         text=final_text.strip(),
+                        quoted_message_id=target_id,
                     )
                     extra["reaction_audio_transcribed"] = True
             # Reacoes nao entram no historico de conversa para analise
@@ -522,21 +542,48 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
         )
 
     analyze_ok = False
+    analysis_enqueued = False
     analyze_error: Optional[str] = None
     if analyze_after:
-        try:
-            analyze_user_chats(settings, supabase, openai, user_id=user_id)
-            analyze_ok = True
-        except Exception as exc:
-            analyze_error = str(exc)[:300]
-            logger.exception(
-                "evolution_webhook.analyze_error instance=%s user_id=%s remote_jid=%s message_id=%s error=%s",
-                instance_name,
-                user_id,
-                remote_jid,
-                normalized.get("message_id"),
-                exc,
-            )
+        queue = _redis_queue(settings)
+        if settings.enable_analysis_queue and queue is not None:
+            try:
+                queue.enqueue(
+                    settings.queue_analysis_name,
+                    {
+                        "type": "analyze_user",
+                        "user_id": user_id,
+                        "instance_name": instance_name,
+                        "remote_jid": remote_jid,
+                        "message_id": normalized.get("message_id"),
+                    },
+                )
+                analysis_enqueued = True
+            except Exception as exc:
+                analyze_error = f"analysis_queue_enqueue_failed: {str(exc)[:240]}"
+                logger.exception(
+                    "evolution_webhook.analyze_enqueue_error instance=%s user_id=%s remote_jid=%s message_id=%s error=%s",
+                    instance_name,
+                    user_id,
+                    remote_jid,
+                    normalized.get("message_id"),
+                    exc,
+                )
+
+        if not analysis_enqueued:
+            try:
+                analyze_user_chats(settings, supabase, openai, user_id=user_id)
+                analyze_ok = True
+            except Exception as exc:
+                analyze_error = str(exc)[:300]
+                logger.exception(
+                    "evolution_webhook.analyze_error instance=%s user_id=%s remote_jid=%s message_id=%s error=%s",
+                    instance_name,
+                    user_id,
+                    remote_jid,
+                    normalized.get("message_id"),
+                    exc,
+                )
 
     logger.info(
         "evolution_webhook.stored chat_id=%s user_id=%s instance=%s remote_jid=%s message_id=%s analyzed=%s",
@@ -554,6 +601,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
         "analyzed": analyze_ok,
         "message_kind": message_kind,
         "outbound": outbound,
+        **({"analysis_enqueued": True} if analysis_enqueued else {}),
         **({"analyze_error": analyze_error} if analyze_error else {}),
         **extra,
     }

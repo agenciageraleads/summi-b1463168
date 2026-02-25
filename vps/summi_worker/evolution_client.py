@@ -63,10 +63,14 @@ class EvolutionClient:
                 last = f"{url} {resp.status_code} {resp.text}"
         raise EvolutionError(f"request failed: {last}")
 
-    def send_text(self, instance: str, remote_jid: str, text: str) -> None:
+    def send_text(self, instance: str, remote_jid: str, text: str, quoted_message_id: str | None = None) -> None:
         # Tentativa 1 (comum): /message/sendText/{instance}
         url = f"{self._url}/message/sendText/{instance}"
         payload = {"number": remote_jid, "text": text}
+        if quoted_message_id:
+            # Best-effort: diferentes builds da Evolution aceitam formatos distintos.
+            payload["options_message"] = {"quoted": {"messageQuoted": {"messageId": quoted_message_id}}}
+            payload["options"] = {"quoted": {"messageId": quoted_message_id}}
         resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
         if resp.ok:
             return

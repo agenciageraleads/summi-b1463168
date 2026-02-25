@@ -59,10 +59,17 @@ export const useSubscription = () => {
   };
 
   // Criar checkout do Stripe — funciona SEM login (Stripe-First)
-  const createCheckout = async (planType: 'monthly' | 'annual') => {
+  const createCheckout = async (planType: 'monthly' | 'annual', referralCode?: string) => {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (sessionData.session?.access_token) {
+        headers.Authorization = `Bearer ${sessionData.session.access_token}`;
+      }
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { planType },
+        headers,
+        body: { planType, ...(referralCode ? { referralCode } : {}) },
       });
 
       if (error) throw error;

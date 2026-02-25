@@ -48,6 +48,10 @@ services:
       - IGNORE_REMOTE_JID=${IGNORE_REMOTE_JID}
       - REDIS_URL=${REDIS_URL:-}
       - WEBHOOK_DEDUPE_TTL_SECONDS=${WEBHOOK_DEDUPE_TTL_SECONDS:-600}
+      - ENABLE_ANALYSIS_QUEUE=${ENABLE_ANALYSIS_QUEUE:-false}
+      - ENABLE_SUMMARY_QUEUE=${ENABLE_SUMMARY_QUEUE:-false}
+      - QUEUE_ANALYSIS_NAME=${QUEUE_ANALYSIS_NAME:-summi:queue:analysis}
+      - QUEUE_SUMMARY_NAME=${QUEUE_SUMMARY_NAME:-summi:queue:summary}
       - ENABLE_HOURLY_JOB=false
       - INTERNAL_TOKEN=${INTERNAL_TOKEN}
     networks:
@@ -84,6 +88,10 @@ services:
       - IGNORE_REMOTE_JID=${IGNORE_REMOTE_JID}
       - REDIS_URL=${REDIS_URL:-}
       - WEBHOOK_DEDUPE_TTL_SECONDS=${WEBHOOK_DEDUPE_TTL_SECONDS:-600}
+      - ENABLE_ANALYSIS_QUEUE=${ENABLE_ANALYSIS_QUEUE:-false}
+      - ENABLE_SUMMARY_QUEUE=${ENABLE_SUMMARY_QUEUE:-false}
+      - QUEUE_ANALYSIS_NAME=${QUEUE_ANALYSIS_NAME:-summi:queue:analysis}
+      - QUEUE_SUMMARY_NAME=${QUEUE_SUMMARY_NAME:-summi:queue:summary}
       - ENABLE_HOURLY_JOB=true
       - INTERNAL_TOKEN=${INTERNAL_TOKEN}
     networks:
@@ -91,6 +99,68 @@ services:
     deploy:
       mode: replicated
       replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  summi-worker-queue-analysis:
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    command: ["python", "-m", "summi_worker.queue_worker", "analysis"]
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - SUMMI_SENDER_INSTANCE=${SUMMI_SENDER_INSTANCE}
+      - BUSINESS_HOURS_START=${BUSINESS_HOURS_START}
+      - BUSINESS_HOURS_END=${BUSINESS_HOURS_END}
+      - IGNORE_REMOTE_JID=${IGNORE_REMOTE_JID}
+      - REDIS_URL=${REDIS_URL:-}
+      - WEBHOOK_DEDUPE_TTL_SECONDS=${WEBHOOK_DEDUPE_TTL_SECONDS:-600}
+      - ENABLE_ANALYSIS_QUEUE=${ENABLE_ANALYSIS_QUEUE:-false}
+      - ENABLE_SUMMARY_QUEUE=${ENABLE_SUMMARY_QUEUE:-false}
+      - QUEUE_ANALYSIS_NAME=${QUEUE_ANALYSIS_NAME:-summi:queue:analysis}
+      - QUEUE_SUMMARY_NAME=${QUEUE_SUMMARY_NAME:-summi:queue:summary}
+      - ENABLE_HOURLY_JOB=false
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN}
+    networks:
+      - Portainer
+    deploy:
+      mode: replicated
+      replicas: 0
+      placement:
+        constraints:
+          - node.role == manager
+
+  summi-worker-queue-summary:
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    command: ["python", "-m", "summi_worker.queue_worker", "summary"]
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - SUMMI_SENDER_INSTANCE=${SUMMI_SENDER_INSTANCE}
+      - BUSINESS_HOURS_START=${BUSINESS_HOURS_START}
+      - BUSINESS_HOURS_END=${BUSINESS_HOURS_END}
+      - IGNORE_REMOTE_JID=${IGNORE_REMOTE_JID}
+      - REDIS_URL=${REDIS_URL:-}
+      - WEBHOOK_DEDUPE_TTL_SECONDS=${WEBHOOK_DEDUPE_TTL_SECONDS:-600}
+      - ENABLE_ANALYSIS_QUEUE=${ENABLE_ANALYSIS_QUEUE:-false}
+      - ENABLE_SUMMARY_QUEUE=${ENABLE_SUMMARY_QUEUE:-false}
+      - QUEUE_ANALYSIS_NAME=${QUEUE_ANALYSIS_NAME:-summi:queue:analysis}
+      - QUEUE_SUMMARY_NAME=${QUEUE_SUMMARY_NAME:-summi:queue:summary}
+      - ENABLE_HOURLY_JOB=false
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN}
+    networks:
+      - Portainer
+    deploy:
+      mode: replicated
+      replicas: 0
       placement:
         constraints:
           - node.role == manager

@@ -15,6 +15,17 @@ const logWebhookEvent = (eventType: string, details?: any) => {
   console.log(`[STRIPE-WEBHOOK] ${eventType}${detailsStr}`);
 };
 
+const intEnv = (name: string, fallback: number): number => {
+  const raw = Deno.env.get(name);
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const REFERRAL_REFERRED_BONUS_DAYS = intEnv("REFERRAL_REFERRED_BONUS_DAYS", 3);
+const REFERRAL_REFERRER_BONUS_DAYS = intEnv("REFERRAL_REFERRER_BONUS_DAYS", 3);
+const REFERRAL_REFERRER_BETA_BONUS_DAYS = intEnv("REFERRAL_REFERRER_BETA_BONUS_DAYS", 6);
+
 // Função auxiliar para garantir que o perfil existe
 const ensureProfileExists = async (supabaseClient: any, userId: string, email: string, customerName?: string, phone?: string) => {
   logWebhookEvent("Verificando se perfil existe", { userId, email });
@@ -96,6 +107,204 @@ const generateTempPassword = (): string => {
   return password;
 };
 
+const recordReferralRewardOnce = async (
+  supabaseClient: any,
+  rewardKey: string,
+  payload: {
+    referrer_user_id: string;
+    referred_user_id: string;
+    stripe_customer_id?: string | null;
+    stripe_subscription_id?: string | null;
+    reward_type: string;
+    reward_days: number;
+    source_event?: string | null;
+  }
+) => {
+  const { data: existing } = await supabaseClient
+    .from("referral_rewards")
+    .select("id,reward_key")
+    .eq("reward_key", rewardKey)
+    .maybeSingle();
+
+  if (existing) {
+    return { inserted: false, reason: "duplicate" };
+  }
+
+  const { error } = await supabaseClient
+    .from("referral_rewards")
+    .insert({
+      reward_key: rewardKey,
+      ...payload,
+      created_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    logWebhookEvent("Erro ao registrar reward de referral", { rewardKey, error });
+    return { inserted: false, reason: "insert_error", error };
+  }
+
+  return { inserted: true };
+};
+
+const extendTrialForUser = async (
+  supabaseClient: any,
+  stripe: Stripe,
+  userId: string,
+  daysToAdd: number,
+) => {
+  const { data: subscriber, error: subError } = await supabaseClient
+    .from("subscribers")
+    .select("stripe_subscription_id, trial_ends_at, subscription_status")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (subError || !subscriber) {
+    return { ok: false, reason: "subscriber_not_found", error: subError };
+  }
+
+  if (subscriber.subscription_status !== "trialing") {
+    return { ok: false, reason: "not_trialing", status: subscriber.subscription_status };
+  }
+
+  const currentTrialEnd = subscriber.trial_ends_at ? new Date(subscriber.trial_ends_at) : new Date();
+  const newTrialEnd = new Date(currentTrialEnd.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+
+  const { error: updateError } = await supabaseClient
+    .from("subscribers")
+    .update({
+      trial_ends_at: newTrialEnd.toISOString(),
+      subscription_end: newTrialEnd.toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+
+  if (updateError) {
+    return { ok: false, reason: "db_update_failed", error: updateError };
+  }
+
+  if (subscriber.stripe_subscription_id) {
+    try {
+      await stripe.subscriptions.update(subscriber.stripe_subscription_id, {
+        trial_end: Math.floor(newTrialEnd.getTime() / 1000),
+      });
+    } catch (stripeError) {
+      logWebhookEvent("Erro ao sincronizar trial com Stripe (continuando)", { userId, stripeError });
+    }
+  }
+
+  return { ok: true, newTrialEnd: newTrialEnd.toISOString(), stripeSubscriptionId: subscriber.stripe_subscription_id ?? null };
+};
+
+const applyReferralRewardsIfEligible = async (
+  supabaseClient: any,
+  stripe: Stripe,
+  args: {
+    session: Stripe.Checkout.Session;
+    userId: string;
+    customerId: string;
+    subscription: Stripe.Subscription;
+  }
+) => {
+  const { session, userId, customerId, subscription } = args;
+
+  const sessionMeta = (session.metadata || {}) as Record<string, string>;
+  const subMeta = ((subscription.metadata || {}) as Record<string, string>);
+
+  let referredByUserId =
+    subMeta.referred_by_user_id ||
+    sessionMeta.referred_by_user_id ||
+    null;
+
+  const referralCode = (subMeta.referral_code || sessionMeta.referral_code || "").trim().toUpperCase() || null;
+
+  const { data: referredProfile } = await supabaseClient
+    .from("profiles")
+    .select("id,referred_by_user_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!referredByUserId && referredProfile?.referred_by_user_id) {
+    referredByUserId = referredProfile.referred_by_user_id;
+  }
+
+  if (!referredByUserId && referralCode) {
+    const { data: referrerByCode } = await supabaseClient
+      .from("profiles")
+      .select("id")
+      .eq("referral_code", referralCode)
+      .maybeSingle();
+    if (referrerByCode?.id) {
+      referredByUserId = referrerByCode.id;
+    }
+  }
+
+  if (!referredByUserId || referredByUserId === userId) {
+    return { applied: false, reason: "no_valid_referrer" };
+  }
+
+  if (!referredProfile?.referred_by_user_id) {
+    await supabaseClient
+      .from("profiles")
+      .update({ referred_by_user_id: referredByUserId })
+      .eq("id", userId);
+  }
+
+  const { data: referrerProfile } = await supabaseClient
+    .from("profiles")
+    .select("id,role")
+    .eq("id", referredByUserId)
+    .maybeSingle();
+
+  const referrerRole = referrerProfile?.role || null;
+  const referrerBonusDays = referrerRole === "beta" ? REFERRAL_REFERRER_BETA_BONUS_DAYS : REFERRAL_REFERRER_BONUS_DAYS;
+  const referredBonusDays = REFERRAL_REFERRED_BONUS_DAYS;
+  const subId = subscription.id;
+
+  const results: Record<string, any> = {
+    applied: true,
+    referredByUserId,
+    referrerRole,
+    referredBonusDays,
+    referrerBonusDays,
+    referred: null,
+    referrer: null,
+  };
+
+  const rewardKeyReferred = `checkout:${session.id}:referred:${userId}`;
+  const referredReward = await recordReferralRewardOnce(supabaseClient, rewardKeyReferred, {
+    referrer_user_id: referredByUserId,
+    referred_user_id: userId,
+    stripe_customer_id: customerId,
+    stripe_subscription_id: subId,
+    reward_type: "referred_trial_bonus",
+    reward_days: referredBonusDays,
+    source_event: "checkout.session.completed",
+  });
+  if (referredReward.inserted) {
+    results.referred = await extendTrialForUser(supabaseClient, stripe, userId, referredBonusDays);
+  } else {
+    results.referred = { ok: false, reason: referredReward.reason };
+  }
+
+  const rewardKeyReferrer = `checkout:${session.id}:referrer:${referredByUserId}`;
+  const referrerReward = await recordReferralRewardOnce(supabaseClient, rewardKeyReferrer, {
+    referrer_user_id: referredByUserId,
+    referred_user_id: userId,
+    stripe_customer_id: customerId,
+    stripe_subscription_id: subId,
+    reward_type: "referrer_trial_bonus",
+    reward_days: referrerBonusDays,
+    source_event: "checkout.session.completed",
+  });
+  if (referrerReward.inserted) {
+    results.referrer = await extendTrialForUser(supabaseClient, stripe, referredByUserId, referrerBonusDays);
+  } else {
+    results.referrer = { ok: false, reason: referrerReward.reason };
+  }
+
+  return results;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -140,6 +349,7 @@ serve(async (req) => {
         logWebhookEvent("Processando checkout concluído", { sessionId: session.id });
 
         if (session.mode === "subscription") {
+          const sessionMeta = (session.metadata || {}) as Record<string, string>;
           const email = session.customer_details?.email || session.customer_email;
           const phone = session.customer_details?.phone || session.phone_number_collection?.toString() || null;
           
@@ -161,6 +371,9 @@ serve(async (req) => {
 
           // ===== STRIPE-FIRST: Criar conta Supabase se não existir =====
           let userId = await findUserIdByEmail(supabaseClient, email);
+          if (!userId && sessionMeta.supabase_user_id) {
+            userId = sessionMeta.supabase_user_id;
+          }
 
           if (!userId) {
             logWebhookEvent("Usuário não existe, criando conta via Admin API...", { email });
@@ -226,6 +439,26 @@ serve(async (req) => {
               }, { onConflict: 'email' });
 
               logWebhookEvent("Assinatura ativada com sucesso", { email, priceId, status: subscription.status });
+
+              try {
+                const referralRewardResult = await applyReferralRewardsIfEligible(supabaseClient, stripe, {
+                  session,
+                  userId,
+                  customerId,
+                  subscription,
+                });
+                logWebhookEvent("Resultado do referral no checkout", {
+                  sessionId: session.id,
+                  userId,
+                  referralRewardResult,
+                });
+              } catch (referralError) {
+                logWebhookEvent("Erro ao aplicar recompensa de referral", {
+                  sessionId: session.id,
+                  userId,
+                  error: String(referralError),
+                });
+              }
             }
           }
         }
