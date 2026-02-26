@@ -61,6 +61,9 @@ def _redis_queue(settings: Settings) -> Optional[RedisQueueClient]:
 def _get_in(obj: Dict[str, Any], *path: str) -> Any:
     cur: Any = obj
     for key in path:
+        # Faz unwrap de lista: Evolution envia data como array em alguns eventos
+        if isinstance(cur, list) and len(cur) > 0:
+            cur = cur[0]
         if isinstance(cur, dict) and key in cur:
             cur = cur[key]
         else:
@@ -502,28 +505,37 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             extra["reaction_target_message_id"] = target_id
 
             send_on_reaction = _profile_bool(profile, "send_on_reaction", False)
-            if from_me and send_on_reaction and _lightning_reaction(reaction_text) and target_id:
+            # Reacao com ⚡: transcreve o audio alvo independente de from_me,
+            # pois adapters diferentes podem enviar from_me=False para reacoes proprias.
+            # A condicao de seguranca e: send_on_reaction ativo + emoji ⚡ + target_id presente.
+            if send_on_reaction and _lightning_reaction(reaction_text) and target_id:
                 media_b64 = evolution.get_media_base64(instance_name, target_id)
-                mp3_bytes = _decode_b64_media(media_b64)
-                transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
-                final_text = transcript
-                resume_audio = _profile_bool(profile, "resume_audio", False)
-                segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
-                if resume_audio and (duration_seconds or 0) > segundos_para_resumir and transcript.strip():
-                    final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript)
-                    extra["reaction_audio_summarized"] = True
-                if final_text.strip():
-                    outbound = _send_aux_message(
-                        evolution=evolution,
-                        settings=settings,
-                        profile=profile,
-                        payload=payload,
-                        instance_name=instance_name,
-                        remote_jid_digits=remote_jid_digits,
-                        text=final_text.strip(),
-                        quoted_message_id=target_id,
+                if media_b64:
+                    mp3_bytes = _decode_b64_media(media_b64)
+                    transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
+                    final_text = transcript
+                    resume_audio = _profile_bool(profile, "resume_audio", False)
+                    segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
+                    if resume_audio and (duration_seconds or 0) > segundos_para_resumir and transcript.strip():
+                        final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript)
+                        extra["reaction_audio_summarized"] = True
+                    if final_text.strip():
+                        outbound = _send_aux_message(
+                            evolution=evolution,
+                            settings=settings,
+                            profile=profile,
+                            payload=payload,
+                            instance_name=instance_name,
+                            remote_jid_digits=remote_jid_digits,
+                            text=final_text.strip(),
+                            quoted_message_id=target_id,
+                        )
+                        extra["reaction_audio_transcribed"] = True
+                else:
+                    logger.warning(
+                        "evolution_webhook.reaction_no_media instance=%s target_id=%s",
+                        instance_name, target_id,
                     )
-                    extra["reaction_audio_transcribed"] = True
             # Reacoes nao entram no historico de conversa para analise
             text_for_chat = None
 

@@ -8,15 +8,21 @@ def _now_utc_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+def _unwrap(val: Any) -> Any:
+    # Se for lista, pega o primeiro item para buscar nas chaves comuns do array "data"
+    if isinstance(val, list) and len(val) > 0:
+        return val[0]
+    return val
+
 def _extract_from_path(payload: Dict[str, Any], path: tuple[str, ...]) -> Any:
     cur: Any = payload
     for k in path:
+        cur = _unwrap(cur)
         if isinstance(cur, dict) and k in cur:
             cur = cur[k]
         else:
             return None
     return cur
-
 
 def _extract_remote_jid(payload: Dict[str, Any]) -> Optional[str]:
     # Tentativas comuns (varia por versao/adapter)
@@ -31,6 +37,7 @@ def _extract_remote_jid(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -57,6 +64,7 @@ def _extract_remote_jid_full(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -77,6 +85,7 @@ def _extract_push_name(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -101,6 +110,7 @@ def _extract_instance_name(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -125,6 +135,7 @@ def _extract_text(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -144,6 +155,7 @@ def _extract_message_id(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -163,6 +175,7 @@ def _extract_message_timestamp(payload: Dict[str, Any]) -> Optional[Any]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -182,6 +195,7 @@ def _extract_participant(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -205,6 +219,7 @@ def _extract_message_type(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -222,6 +237,7 @@ def _extract_message_type(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
@@ -242,6 +258,7 @@ def _extract_event(payload: Dict[str, Any]) -> Optional[str]:
         cur: Any = payload
         ok = True
         for k in path:
+            cur = _unwrap(cur)
             if isinstance(cur, dict) and k in cur:
                 cur = cur[k]
             else:
