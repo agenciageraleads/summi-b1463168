@@ -57,13 +57,16 @@ def _redis_queue(settings: Settings) -> Optional[RedisQueueClient]:
         logger.exception("redis_queue.init_failed")
         return None
 
+def _unwrap(val: Any) -> Any:
+    if isinstance(val, list) and len(val) > 0:
+        return val[0]
+    return val
+
 
 def _get_in(obj: Dict[str, Any], *path: str) -> Any:
     cur: Any = obj
     for key in path:
-        # Faz unwrap de lista: Evolution envia data como array em alguns eventos
-        if isinstance(cur, list) and len(cur) > 0:
-            cur = cur[0]
+        cur = _unwrap(cur)
         if isinstance(cur, dict) and key in cur:
             cur = cur[key]
         else:
@@ -222,6 +225,7 @@ def _send_aux_message(
 
 
 def _detect_message_shape(payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    payload = _unwrap(payload) if isinstance(payload, list) else payload
     msg = _get_in(payload, "body", "data", "message") or _get_in(payload, "data", "message") or payload.get("message") or {}
     if not isinstance(msg, dict):
         msg = {}
@@ -398,12 +402,22 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             return {"ok": True, "stored": False, "reason": "duplicate", "message_id": message_id}
 
     # Mapear instance -> usuario (profiles.instance_name)
+    # Procuramos o perfil ignorando case para evitar falhas se a Evolution enviar LucasBorges vs lucasborges
     profiles = supabase.select(
         "profiles",
         select="*",
-        filters=[to_postgrest_filter_eq("instance_name", instance_name)],
+        filters=[to_postgrest_filter_eq("instance_name", instance_name.lower())],
         limit=1,
     )
+    if not profiles:
+        # Fallback para o case original se o lower falhar (caso o DB tenha algo misto)
+        profiles = supabase.select(
+            "profiles",
+            select="*",
+            filters=[to_postgrest_filter_eq("instance_name", instance_name)],
+            limit=1,
+        )
+
     if not profiles:
         logger.warning("evolution_webhook.ignored reason=profile_not_found_for_instance instance=%s", instance_name)
         return {"ok": True, "stored": False, "reason": "profile_not_found_for_instance"}
@@ -553,7 +567,9 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             text_for_chat = _derive_message_content(payload, normalized)
 
     chat_id: Optional[str] = None
-    should_store = (not from_me) and bool((text_for_chat or "").strip()) and message_kind in ("text", "audio", "image")
+    # Removida a trava (not from_me) para que o dashboard mostre o historico completo (minhas mensagens e do lead)
+    # e para permitir que reacoes em mensagens proprias (ex: áudio enviado por mim) funcionem (precisam estar no DB).
+    should_store = bool((text_for_chat or "").strip()) and message_kind in ("text", "audio", "image")
     if should_store and text_for_chat:
         chat_id = _upsert_chat_message(
             supabase,
