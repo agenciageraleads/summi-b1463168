@@ -170,7 +170,10 @@ serve(async (req) => {
 
     // Construir URL da Evolution API (normalizar barras)
     const baseUrl = evolutionApiUrl.endsWith('/') ? evolutionApiUrl.slice(0, -1) : evolutionApiUrl;
-    const evolutionUrl = `${baseUrl}/group/fetchAllGroups/${profile.instance_name}`;
+    // Evolution API v2 exige query param `getParticipants` (boolean).
+    // Usamos `false` para manter a chamada leve (não traz todos os membros),
+    // mas ainda recebemos `size` com a quantidade de participantes.
+    const evolutionUrl = `${baseUrl}/group/fetchAllGroups/${profile.instance_name}?getParticipants=false`;
     console.log('[FETCH-WHATSAPP-GROUPS] 🌐 URL da Evolution API:', evolutionUrl);
 
     // Fazer requisição para Evolution API
@@ -238,10 +241,19 @@ serve(async (req) => {
 
     // Formatar os dados dos grupos para o frontend
     const formattedGroups = groupsArray.map((group: any, index: number) => {
+      const participantCount =
+        typeof group?.size === 'number'
+          ? group.size
+          : Array.isArray(group?.participants)
+            ? group.participants.length
+            : typeof group?.participantCount === 'number'
+              ? group.participantCount
+              : 0;
+
       console.log('[FETCH-WHATSAPP-GROUPS] 🔄 Formatando grupo', index, ':', {
         id: group.id || group.remoteJid,
         subject: group.subject,
-        participantsCount: group.participants?.length || 0
+        participantsCount: participantCount
       });
 
       return {
@@ -249,8 +261,8 @@ serve(async (req) => {
         groupId: group.id || group.remoteJid || `group-${index}`,
         name: group.subject || 'Grupo sem nome',
         groupName: group.subject || 'Grupo sem nome',
-        participants: group.participants?.length || 0,
-        participantCount: group.participants?.length || 0,
+        participants: participantCount,
+        participantCount: participantCount,
       };
     });
 
