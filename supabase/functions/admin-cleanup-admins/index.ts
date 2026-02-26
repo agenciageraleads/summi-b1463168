@@ -79,13 +79,34 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    const inList = `(${allowlist.join(",")})`;
+    const { data: adminRows, error: adminRowsError } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin");
+
+    if (adminRowsError) {
+      return new Response(JSON.stringify({ error: "Falha ao listar admins", details: adminRowsError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const demoteIds = (adminRows ?? [])
+      .map((row: any) => row.id as string | undefined)
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => !allowlist.includes(id));
+
+    if (demoteIds.length === 0) {
+      return new Response(JSON.stringify({ success: true, demoted_count: 0, demoted_user_ids: [] }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: demoted, error: demoteError } = await supabaseAdmin
       .from("profiles")
       .update({ role: "user" })
-      .eq("role", "admin")
-      .not("id", "in", inList)
+      .in("id", demoteIds)
       .select("id, role");
 
     if (demoteError) {
@@ -127,4 +148,3 @@ serve(async (req) => {
     });
   }
 });
-
