@@ -350,10 +350,25 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
         normalized.get("from_me"),
         analyze_after,
     )
-    event_name = (normalized.get("event") or "").lower()
-    if event_name and event_name != "messages.upsert":
-        logger.info("evolution_webhook.ignored reason=ignored_event event=%s", event_name)
-        return {"ok": True, "stored": False, "reason": "ignored_event", "event": event_name}
+
+    # Evolution costuma enviar eventos em formatos diferentes ("MESSAGES_UPSERT" vs "messages.upsert").
+    # Normalizamos para um padrão com ponto e lowercase.
+    event_raw = str(normalized.get("event") or "").strip()
+    event_name = event_raw.lower()
+    event_norm = event_name.replace("_", ".")
+
+    # Detectar cedo o tipo da mensagem para ignorar updates de status (ruído).
+    message_kind, _msg = _detect_message_shape(payload)
+
+    allowed_events = {"messages.upsert", "messages.update"}
+    if event_norm and event_norm not in allowed_events:
+        logger.info("evolution_webhook.ignored reason=ignored_event event=%s", event_norm)
+        return {"ok": True, "stored": False, "reason": "ignored_event", "event": event_norm}
+
+    # `messages.update` é usado principalmente para reações. Outros updates geram muito ruído.
+    if event_norm == "messages.update" and message_kind != "reaction":
+        logger.info("evolution_webhook.ignored reason=ignored_update_event kind=%s", message_kind)
+        return {"ok": True, "stored": False, "reason": "ignored_update_event", "event": event_norm, "kind": message_kind}
 
     raw_remote_jid = str(_get_in(payload, "body", "data", "key", "remoteJid") or _get_in(payload, "data", "key", "remoteJid") or "")
     raw_remote_jid_alt = str(
@@ -409,8 +424,6 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
     from_me = bool(normalized.get("from_me") is True)
     author_name = str(normalized.get("push_name") or "Sem nome")
     remote_jid_digits = _digits(remote_jid)
-    message_kind, _msg = _detect_message_shape(payload)
-
     text_for_chat: Optional[str] = None
     outbound: Dict[str, Any] = {"sent": False}
     extra: Dict[str, Any] = {}
