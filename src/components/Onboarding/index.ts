@@ -1,4 +1,2 @@
-
-export { OnboardingTour } from './OnboardingTour';
-export { OnboardingHighlight } from './OnboardingHighlight';
-export { useOnboarding } from '@/hooks/useOnboarding';
+export { DriverJsOnboarding } from './DriverJsOnboarding';
+export { OnboardingFlow } from './OnboardingFlow';

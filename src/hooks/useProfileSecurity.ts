@@ -121,10 +121,15 @@ export const useProfileSecurity = () => {
           case 'temas_importantes':
           case 'temas_urgentes':
             if (typeof value === 'string') {
-              if (!validateInput(value, 500)) {
+              const trimmed = value.trim();
+              if (trimmed.length === 0) {
+                sanitizedUpdates[key] = null;
+                break;
+              }
+              if (!validateInput(trimmed, 500)) {
                 validationErrors.push(`${key} contém caracteres inválidos ou é muito longo`);
               } else {
-                sanitizedUpdates[key] = sanitizeInput(value);
+                sanitizedUpdates[key] = sanitizeInput(trimmed, 500);
               }
             }
             break;

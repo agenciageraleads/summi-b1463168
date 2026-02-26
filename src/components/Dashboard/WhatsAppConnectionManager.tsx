@@ -263,7 +263,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
               <p className="text-sm text-gray-700">Conecte seu dispositivo para começar</p>
             </div>
             {state.connectionState === 'needs_phone_number' ? (
-              <Button variant="outline" size="sm" onClick={() => navigate('/settings')} className="border-blue-300 text-blue-700 hover:bg-blue-50">
+              <Button variant="outline" size="sm" onClick={() => navigate('/settings?tab=connection')} className="border-blue-300 text-blue-700 hover:bg-blue-50">
                 <Settings className="w-4 h-4 mr-1" />
                 Configurar
               </Button>
