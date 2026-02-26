@@ -1,63 +1,44 @@
 
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
+import type { Profile } from '@/hooks/useProfile';
 import { useProfile } from '@/hooks/useProfile';
-import { ProfileForm } from '@/components/Settings/ProfileForm';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 import { SubscriptionStatus } from '@/components/SubscriptionStatus';
 import { WhatsAppConnectionManager } from '@/components/Dashboard/WhatsAppConnectionManager';
-import { useState, useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { PreferencesForm } from '@/components/Settings/PreferencesForm';
+import { ConnectionInfoForm } from '@/components/Settings/ConnectionInfoForm';
+import { ThemesForm } from '@/components/Settings/ThemesForm';
+import { PasswordResetCard } from '@/components/Settings/PasswordResetCard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const SettingsPage = () => {
-  const { profile, isLoading, updateProfile, refreshProfile } = useProfile();
+  const { profile, isLoading, updateProfile } = useProfile();
   const [isUpdating, setIsUpdating] = useState(false);
-  const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Listener global para mensagens do Google Calendar
+  const tabParam = searchParams.get('tab');
+  const isValidTab = (value: string | null): value is 'connection' | 'config' | 'account' =>
+    value === 'connection' || value === 'config' || value === 'account';
+  const activeTab = isValidTab(tabParam) ? tabParam : 'connection';
+
   useEffect(() => {
-    const handleGoogleCalendarMessage = async (event: MessageEvent) => {
-      if (event.data.type === 'GOOGLE_CALENDAR_SUCCESS') {
-        console.log('[SETTINGS_PAGE] Google Calendar success detected, refreshing profile...');
-        
-        // Pequeno delay para garantir que o backend processou tudo
-        setTimeout(async () => {
-          try {
-            await refreshProfile();
-            toast({
-              title: "Conectado!",
-              description: "Google Calendar conectado e dados atualizados automaticamente.",
-            });
-          } catch (error) {
-            console.error('[SETTINGS_PAGE] Error refreshing profile:', error);
-          }
-        }, 1000);
-      }
-    };
-
-    window.addEventListener('message', handleGoogleCalendarMessage);
-    
-    return () => {
-      window.removeEventListener('message', handleGoogleCalendarMessage);
-    };
-  }, [refreshProfile, toast]);
+    if (tabParam && !isValidTab(tabParam)) {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', 'connection');
+      setSearchParams(next, { replace: true });
+    }
+  }, [tabParam, searchParams, setSearchParams]);
 
   // Função para salvar as alterações do perfil
-  const handleSaveProfile = async (data: Partial<typeof profile>) => {
+  const handleSaveProfile = async (data: Partial<Profile>) => {
     setIsUpdating(true);
     try {
       await updateProfile(data);
     } finally {
       setIsUpdating(false);
-    }
-  };
-
-  // Função para refresh do perfil (passa para componentes filhos)
-  const handleRefreshProfile = async () => {
-    try {
-      await refreshProfile();
-    } catch (error) {
-      console.error('[SETTINGS_PAGE] Error in handleRefreshProfile:', error);
     }
   };
 
@@ -91,32 +72,45 @@ const SettingsPage = () => {
           </p>
         </div>
 
-        {/* Formulário de perfil */}
-        <ProfileForm 
-          profile={profile}
-          onSave={handleSaveProfile}
-          isUpdating={isUpdating}
-          onRefreshProfile={handleRefreshProfile}
-        />
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            const next = new URLSearchParams(searchParams);
+            next.set('tab', value);
+            setSearchParams(next, { replace: true });
+          }}
+          className="space-y-4"
+        >
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="connection">Conexão</TabsTrigger>
+            <TabsTrigger value="config">Configurações</TabsTrigger>
+            <TabsTrigger value="account">Conta</TabsTrigger>
+          </TabsList>
 
-        {/* Conexão WhatsApp */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Conexão WhatsApp</CardTitle>
-            <CardDescription>
-              Conecte seu WhatsApp para começar a receber resumos e transcrições
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <WhatsAppConnectionManager />
-          </CardContent>
-        </Card>
-        
-        {/* Status da assinatura */}
-        <SubscriptionStatus />
-        
-        {/* Exclusão de conta */}
-        <AccountDeletion />
+          <TabsContent value="connection" className="space-y-6">
+            <ConnectionInfoForm profile={profile} onSave={handleSaveProfile} isUpdating={isUpdating} />
+            <Card id="onboarding-settings-whatsapp">
+              <CardHeader>
+                <CardTitle>Status e conexão</CardTitle>
+                <CardDescription>Conecte ou desconecte seu WhatsApp.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <WhatsAppConnectionManager />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="config" className="space-y-6">
+            <ThemesForm profile={profile} onSave={handleSaveProfile} isUpdating={isUpdating} />
+            <PreferencesForm profile={profile} onSave={handleSaveProfile} isUpdating={isUpdating} />
+          </TabsContent>
+
+          <TabsContent value="account" className="space-y-6">
+            <PasswordResetCard />
+            <SubscriptionStatus />
+            <AccountDeletion />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

@@ -1,38 +1,39 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import type { Chat } from '@/hooks/useChats';
 import { MessageCircle, Clock, AlertCircle, MessageSquare, RotateCcw, Trash2, CheckCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useMessageAnalysis } from '@/hooks/useMessageAnalysis';
-import { useChats } from '@/hooks/useChats';
 import { useToast } from '@/hooks/use-toast';
 
-interface Chat {
-  id: string;
-  nome: string;
-  remote_jid: string;
-  prioridade: string;
-  conversa: any[];
-  modificado_em: string;
-  contexto?: string;
+interface ChatsListProps {
+  chats: Chat[];
+  isLoading: boolean;
+  isAnalyzing: boolean;
+  onAnalyzeMessages: () => void;
+  onDeleteChat: (chatId: string) => Promise<boolean>;
+  onDeleteAllChats: () => Promise<boolean>;
 }
 
-export const ChatsList = () => {
-  const { user } = useAuth();
-  const { isAnalyzing, startAnalysis } = useMessageAnalysis();
-  const { chats, isLoading, fetchChats, deleteChat, deleteAllChats } = useChats();
+export const ChatsList: React.FC<ChatsListProps> = ({
+  chats,
+  isLoading,
+  isAnalyzing,
+  onAnalyzeMessages,
+  onDeleteChat,
+  onDeleteAllChats,
+}) => {
   const { toast } = useToast();
   const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   // Função para deletar uma conversa individual
   const handleDeleteChat = async (chatId: string, chatName: string) => {
-    const success = await deleteChat(chatId);
+    const success = await onDeleteChat(chatId);
     if (success) {
       toast({
         title: "Conversa removida",
@@ -50,7 +51,7 @@ export const ChatsList = () => {
   // Função para deletar todas as conversas
   const handleDeleteAllChats = async () => {
     setIsDeletingAll(true);
-    const success = await deleteAllChats();
+    const success = await onDeleteAllChats();
     
     if (success) {
       toast({
@@ -67,12 +68,8 @@ export const ChatsList = () => {
     setIsDeletingAll(false);
   };
 
-  // Função para chamar análise e recarregar após conclusão
   const handleAnalyzeMessages = () => {
-    startAnalysis(() => {
-      // Callback executado após 60s - recarregar chats
-      fetchChats();
-    });
+    onAnalyzeMessages();
   };
 
   // Função para classificar prioridade baseada no valor numérico
@@ -139,12 +136,10 @@ export const ChatsList = () => {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <MessageCircle className="w-5 h-5" />
-              <span>Mensagens Recentes</span>
-            </div>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center space-x-2">
+            <MessageCircle className="w-5 h-5" />
+            <span>Conversas</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -159,30 +154,30 @@ export const ChatsList = () => {
   if (chats.length === 0) {
     return (
       <Card>
-        <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <MessageCircle className="w-5 h-5" />
-            <span>Mensagens Recentes</span>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="flex items-center space-x-2">
+              <MessageCircle className="w-5 h-5" />
+              <span>Conversas</span>
+            </CardTitle>
+            <Button
+              onClick={handleAnalyzeMessages}
+              disabled={isAnalyzing}
+              size="sm"
+              variant="outline"
+              className="flex items-center space-x-2"
+            >
+              <RotateCcw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
+              <span>{isAnalyzing ? 'Analisando...' : 'Analisar'}</span>
+            </Button>
           </div>
-          <Button
-            onClick={handleAnalyzeMessages}
-            disabled={isAnalyzing}
-            size="sm"
-            variant="outline"
-            className="flex items-center space-x-2"
-          >
-            <RotateCcw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-            <span>{isAnalyzing ? 'Analisando...' : 'Analisar Mensagens'}</span>
-          </Button>
-        </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
             <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500">Nenhuma mensagem encontrada</p>
+            <p className="text-gray-500">Nenhuma conversa encontrada</p>
             <p className="text-sm text-gray-400 mt-1">
-              Clique em "Analisar Mensagens" para classificar suas conversas
+              Clique em "Analisar" para classificar suas conversas
             </p>
           </div>
         </CardContent>
@@ -192,13 +187,14 @@ export const ChatsList = () => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5" />
-            <span>Mensagens Recentes</span>
-          </div>
-          <div className="flex items-center space-x-2">
+            <span>Conversas</span>
+            <Badge variant="secondary">{chats.length}</Badge>
+          </CardTitle>
+          <div className="flex items-center gap-2">
             <Button
               onClick={handleDeleteAllChats}
               disabled={isDeletingAll || chats.length === 0}
@@ -207,7 +203,7 @@ export const ChatsList = () => {
               className="flex items-center space-x-2 text-green-600 hover:text-green-700"
             >
               <CheckCheck className={`w-4 h-4 ${isDeletingAll ? 'animate-spin' : ''}`} />
-              <span>{isDeletingAll ? 'Removendo...' : 'Marcar Todas como Resolvidas'}</span>
+              <span className="hidden sm:inline">{isDeletingAll ? 'Removendo...' : 'Resolver tudo'}</span>
             </Button>
             <Button
               onClick={handleAnalyzeMessages}
@@ -217,14 +213,14 @@ export const ChatsList = () => {
               className="flex items-center space-x-2"
             >
               <RotateCcw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-              <span>{isAnalyzing ? 'Analisando...' : 'Analisar Mensagens'}</span>
+              <span>{isAnalyzing ? 'Analisando...' : 'Analisar'}</span>
             </Button>
           </div>
-        </CardTitle>
+        </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
-          <div className="space-y-3">
+        <ScrollArea className="h-[420px]">
+          <div className="space-y-2">
             {chats.map((chat) => {
               const priorityInfo = getPriorityInfo(chat.prioridade);
               const formattedNumber = formatPhoneNumber(chat.remote_jid);
@@ -233,56 +229,64 @@ export const ChatsList = () => {
               return (
                 <div
                   key={chat.id}
-                  className="p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-start justify-between gap-3 rounded-lg border p-2 hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-sm">{chat.nome}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-medium text-sm">{chat.nome}</span>
                       <Badge className={`text-xs ${priorityInfo.color}`}>
-                        <div className="flex items-center space-x-1">
+                        <span className="flex items-center gap-1">
                           {priorityInfo.icon}
-                          <span>{priorityInfo.label}</span>
-                        </div>
+                          {priorityInfo.label}
+                        </span>
                       </Badge>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center space-x-1 text-xs px-2 py-1 h-auto text-red-600 hover:text-red-700"
-                        onClick={() => handleDeleteChat(chat.id, chat.nome)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Remover</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center space-x-1 text-xs px-2 py-1 h-auto"
-                        onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
-                      >
-                        <MessageSquare className="w-3 h-3" />
-                        <span>Responder</span>
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {chat.contexto && (
-                    <div className="mb-2">
-                      <p className="text-xs text-gray-700 bg-gray-50 p-2 rounded border-l-2 border-gray-300 line-clamp-2">
+
+                    {chat.contexto && (
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
                         {chat.contexto}
                       </p>
+                    )}
+
+                    <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="truncate">{formattedNumber}</span>
+                      <span className="shrink-0">
+                        {formatDistanceToNow(new Date(chat.modificado_em), {
+                          addSuffix: true,
+                          locale: ptBR,
+                        })}
+                      </span>
                     </div>
-                  )}
-                  
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{formattedNumber}</span>
-                    <span>
-                      {formatDistanceToNow(new Date(chat.modificado_em), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </span>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteChat(chat.id, chat.nome)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Remover</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Responder</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               );

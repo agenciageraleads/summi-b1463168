@@ -92,7 +92,11 @@ export const useProfile = () => {
 
   // Usar a função segura para atualizações
   const updateProfile = async (updates: Partial<Profile>) => {
-    return await secureUpdateProfile(updates);
+    const result = await secureUpdateProfile(updates);
+    if (result && (result as any).success && (result as any).data) {
+      setProfile((result as any).data);
+    }
+    return result;
   };
 
   // Função para deletar a conta com confirmação adicional

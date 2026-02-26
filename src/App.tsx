@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
+import SalesLandingPage from "./pages/SalesLandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import CompleteSignupPage from "./pages/CompleteSignupPage";
@@ -19,14 +20,13 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SubscriptionGuard } from "./components/SubscriptionGuard";
-import WhatsAppConnectionPage from "./pages/WhatsAppConnectionPage";
-import WhatsAppConnectionV2Page from "./pages/WhatsAppConnectionV2Page";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminBetaUsersPage from "./pages/AdminBetaUsersPage";
 import AdminAnnouncementsPage from "./pages/AdminAnnouncementsPage";
 import ReferralPage from '@/pages/ReferralPage';
 import TermsPage from "./pages/TermsPage";
+import { OnboardingFlow } from "./components/Onboarding/OnboardingFlow";
 
 const queryClient = new QueryClient();
 
@@ -37,10 +37,12 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+              <BrowserRouter>
             <div className="min-h-screen">
+              <OnboardingFlow />
               <Routes>
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/landing" element={<SalesLandingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/complete-signup" element={<CompleteSignupPage />} />
@@ -57,15 +59,20 @@ function App() {
                 <Route path="/whatsapp" element={
                   <ProtectedRoute>
                     <SubscriptionGuard>
-                      <WhatsAppConnectionPage />
+                      <Navigate to="/settings?tab=connection" replace />
                     </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
                 <Route path="/whatsapp-v2" element={
                   <ProtectedRoute>
                     <SubscriptionGuard>
-                      <WhatsAppConnectionV2Page />
+                      <Navigate to="/settings?tab=connection" replace />
                     </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                <Route path="/whatsapp-connection" element={
+                  <ProtectedRoute>
+                    <Navigate to="/settings?tab=connection" replace />
                   </ProtectedRoute>
                 } />
                 <Route path="/settings" element={

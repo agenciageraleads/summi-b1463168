@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Summi — Configurações (Prototype)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-slate-50 text-slate-900">
+    <div class="min-h-screen">
+      <div class="mx-auto flex min-h-screen max-w-[1400px]">
+        <!-- Sidebar (mock) -->
+        <aside class="w-64 border-r bg-white">
+          <div class="flex items-center gap-2 border-b px-5 py-4">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 font-semibold text-white">S</div>
+            <div class="leading-tight">
+              <div class="font-semibold">Summi</div>
+              <div class="text-xs text-slate-500">Prototype</div>
+            </div>
+          </div>
+
+          <nav class="p-3">
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100" href="#">
+              <span class="text-sm">Dashboard</span>
+            </a>
+            <a class="mt-1 flex items-center gap-3 rounded-lg bg-emerald-600 px-3 py-2 text-white" href="#">
+              <span class="text-sm font-medium">Configurações</span>
+            </a>
+            <a class="mt-1 flex items-center gap-3 rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100" href="#">
+              <span class="text-sm">Indicações</span>
+            </a>
+            <a class="mt-1 flex items-center gap-3 rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100" href="#">
+              <span class="text-sm">Feedback</span>
+            </a>
+          </nav>
+
+          <div class="mt-auto border-t p-4">
+            <div class="flex items-center gap-3">
+              <div class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold">L</div>
+              <div class="min-w-0">
+                <div class="truncate text-sm font-medium">Lucas Borges</div>
+                <div class="truncate text-xs text-slate-500">lucasborges@gmail.com</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="flex-1">
+          <div class="px-8 py-7">
+            <div class="mb-6">
+              <h1 class="text-3xl font-bold tracking-tight">Configurações</h1>
+              <p class="mt-1 text-slate-600">Gerencie sua conexão, preferências e conta.</p>
+            </div>
+
+            <!-- Sub-tabs -->
+            <div class="mb-6">
+              <div
+                class="inline-flex w-full max-w-xl rounded-xl border bg-white p-1 shadow-sm"
+                role="tablist"
+                aria-label="Sub abas de configurações"
+              >
+                <button
+                  class="tab-btn flex-1 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="tab-connection"
+                  id="tab-connection-btn"
+                  data-tab="connection"
+                  type="button"
+                >
+                  Conexão
+                </button>
+                <button
+                  class="tab-btn flex-1 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="tab-config"
+                  id="tab-config-btn"
+                  data-tab="config"
+                  type="button"
+                >
+                  Configurações
+                </button>
+                <button
+                  class="tab-btn flex-1 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="tab-account"
+                  id="tab-account-btn"
+                  data-tab="account"
+                  type="button"
+                >
+                  Conta
+                </button>
+              </div>
+            </div>
+
+            <!-- Panels -->
+            <section class="space-y-6">
+              <!-- 1) Connection -->
+              <div id="tab-connection" role="tabpanel" aria-labelledby="tab-connection-btn" data-panel="connection">
+                <div class="space-y-6">
+                  <div class="rounded-xl border bg-white shadow-sm">
+                    <div class="border-b px-6 py-4">
+                      <div class="text-lg font-semibold">Seu WhatsApp</div>
+                      <div class="text-sm text-slate-600">
+                        Nome e número usados para identificar sua conta e conectar seu dispositivo.
+                      </div>
+                    </div>
+                    <div class="px-6 py-5">
+                      <div class="grid gap-4 md:grid-cols-2">
+                        <label class="block">
+                          <div class="mb-1 text-sm font-medium text-slate-700">Nome</div>
+                          <input
+                            class="w-full rounded-lg border px-3 py-2 text-sm outline-none ring-0 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                            value="Lucas Borges"
+                          />
+                        </label>
+                        <label class="block">
+                          <div class="mb-1 text-sm font-medium text-slate-700">Número</div>
+                          <input
+                            class="w-full rounded-lg border px-3 py-2 text-sm outline-none ring-0 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                            value="(62) 98243-5286"
+                          />
+                          <div class="mt-2 text-xs text-amber-700">
+                            Dica: se já estiver conectado, para alterar o número você desconecta primeiro.
+                          </div>
+                        </label>
+                      </div>
+
+                      <div class="mt-5 flex flex-col gap-3 rounded-xl border bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                              Conectado
+                            </span>
+                            <span class="text-sm font-medium">Status da conexão</span>
+                          </div>
+                          <div class="mt-1 text-sm text-slate-600">
+                            WhatsApp conectado e funcionando.
+                          </div>
+                        </div>
+                        <div class="flex gap-2">
+                          <button
+                            class="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                            type="button"
+                          >
+                            Ver QR / Código
+                          </button>
+                          <button
+                            class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                            type="button"
+                          >
+                            Desconectar
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 flex justify-end">
+                        <button
+                          class="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                          type="button"
+                        >
+                          Salvar alterações
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rounded-xl border bg-white shadow-sm">
+                    <div class="border-b px-6 py-4">
+                      <div class="text-lg font-semibold">Sugestão de UX</div>
+                      <div class="text-sm text-slate-600">
+                        Nesta aba você resolve “tudo que é conexão”: dados + status + conectar/desconectar.
+                      </div>
+                    </div>
+                    <div class="px-6 py-5 text-sm text-slate-600">
+                      Ao clicar no menu lateral em <span class="font-medium text-slate-900">Configurações</span>, o usuário vê
+                      estas 3 sub-abas e escolhe exatamente o que quer fazer, sem rolar.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2) Config -->
+              <div id="tab-config" role="tabpanel" aria-labelledby="tab-config-btn" data-panel="config" class="hidden">
+                <div class="space-y-6">
+                  <div class="rounded-xl border bg-white shadow-sm">
+                    <div class="border-b px-6 py-4">
+                      <div class="text-lg font-semibold">Temas de Interesse</div>
+                      <div class="text-sm text-slate-600">Palavras-chave para categorização automática.</div>
+                    </div>
+                    <div class="grid gap-4 px-6 py-5 md:grid-cols-2">
+                      <label class="block">
+                        <div class="mb-1 text-sm font-medium text-slate-700">Temas Urgentes</div>
+                        <textarea
+                          class="min-h-[120px] w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                        >urgente, preciso, me liga, passando mal...</textarea>
+                      </label>
+                      <label class="block">
+                        <div class="mb-1 text-sm font-medium text-slate-700">Temas Importantes</div>
+                        <textarea
+                          class="min-h-[120px] w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                        >orçamentos, proposta, comprar...</textarea>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="rounded-xl border bg-white shadow-sm">
+                    <div class="border-b px-6 py-4">
+                      <div class="text-lg font-semibold">Preferências</div>
+                      <div class="text-sm text-slate-600">Como a Summi processa e entrega seus resultados.</div>
+                    </div>
+                    <div class="px-6 py-5">
+                      <div class="grid gap-4 md:grid-cols-2">
+                        <!-- Switch -->
+                        <div class="flex items-center justify-between rounded-lg border px-4 py-3">
+                          <div>
+                            <div class="text-sm font-medium">Summi em Áudio</div>
+                            <div class="text-xs text-slate-500">Ativar função Summi em áudio.</div>
+                          </div>
+                          <label class="relative inline-flex cursor-pointer items-center">
+                            <input type="checkbox" class="peer sr-only" checked />
+                            <div class="h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-5"></div>
+                          </label>
+                        </div>
+
+                        <div class="flex items-center justify-between rounded-lg border px-4 py-3">
+                          <div>
+                            <div class="text-sm font-medium">Apenas Horário Comercial</div>
+                            <div class="text-xs text-slate-500">Processar mensagens apenas em horário comercial.</div>
+                          </div>
+                          <label class="relative inline-flex cursor-pointer items-center">
+                            <input type="checkbox" class="peer sr-only" checked />
+                            <div class="h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-5"></div>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rounded-xl border bg-white shadow-sm">
+                    <div class="border-b px-6 py-4">
+                      <div class="text-lg font-semibold">Configurações de Áudio</div>
+                      <div class="text-sm text-slate-600">Defina quando transcrever e quando resumir.</div>
+                    </div>
+                    <div class="space-y-3 px-6 py-5">
+                      <div class="flex items-center justify-between rounded-lg border px-4 py-3">
+                        <div>
+                          <div class="text-sm font-medium">⚡ Transcrever apenas ao reagir</div>
+                          <div class="text-xs text-slate-500">Transcrever áudios apenas quando reagir com ⚡.</div>
+                        </div>
+                        <label class="relative inline-flex cursor-pointer items-center">
+                          <input type="checkbox" class="peer sr-only" />
+                          <div class="h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-5"></div>
+                        </label>
+                      </div>
+
+                      <div class="grid gap-3 md:grid-cols-2">
+                        <div class="flex items-center justify-between rounded-lg border px-4 py-3">
+                          <div>
+                            <div class="text-sm font-medium">Transcrever áudios recebidos</div>
+                            <div class="text-xs text-slate-500">Converter áudios recebidos em texto automaticamente.</div>
+                          </div>
+                          <label class="relative inline-flex cursor-pointer items-center">
+                            <input type="checkbox" class="peer sr-only" checked />
+                            <div class="h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-5"></div>
+                          </label>
+                        </div>
+
+                        <div class="flex items-center justify-between rounded-lg border px-4 py-3">
+                          <div>
+                            <div class="text-sm font-medium">Transcrever áudios enviados</div>
+                            <div class="text-xs text-slate-500">Converter áudios enviados em texto automaticamente.</div>
+                          </div>
+                          <label class="relative inline-flex cursor-pointer items-center">
+                            <input type="checkbox" class="peer sr-only" checked />
+                            <div class="h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-5"></div>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div class="grid gap-3 md:grid-cols-2">
+                        <div class="flex items-center justify-between rounded-lg border px-4 py-3">
+                          <div>
+                            <div class="text-sm font-medium">Resumir áudios</div>
+                            <div class="text-xs text-slate-500">Gerar resumos automáticos dos áudios.</div>
+                          </div>
+                          <label class="relative inline-flex cursor-pointer items-center">
+                            <input type="checkbox" class="peer sr-only" />
+                            <div class="h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-5"></div>
+                          </label>
+                        </div>
+
+                        <label class="block rounded-lg border px-4 py-3">
+                          <div class="mb-1 text-sm font-medium text-slate-700">Segundos mínimos para resumir</div>
+                          <input
+                            type="number"
+                            min="10"
+                            max="300"
+                            class="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                            value="45"
+                          />
+                        </label>
+                      </div>
+
+                      <div class="flex items-center justify-between rounded-lg border px-4 py-3">
+                        <div>
+                          <div class="text-sm font-medium">Enviar apenas no privado</div>
+                          <div class="text-xs text-slate-500">
+                            Enviar transcrições/resumos apenas no chat privado.
+                          </div>
+                        </div>
+                        <label class="relative inline-flex cursor-pointer items-center">
+                          <input type="checkbox" class="peer sr-only" checked />
+                          <div class="h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-5"></div>
+                        </label>
+                      </div>
+
+                      <div class="mt-2 flex justify-end">
+                        <button
+                          class="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                          type="button"
+                        >
+                          Salvar configurações
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3) Account -->
+              <div id="tab-account" role="tabpanel" aria-labelledby="tab-account-btn" data-panel="account" class="hidden">
+                <div class="space-y-6">
+                  <div class="rounded-xl border bg-white shadow-sm">
+                    <div class="border-b px-6 py-4">
+                      <div class="text-lg font-semibold">Assinatura</div>
+                      <div class="text-sm text-slate-600">Seu plano, status e cobrança.</div>
+                    </div>
+                    <div class="px-6 py-5">
+                      <div class="flex flex-col gap-3 rounded-xl border bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                              Ativo
+                            </span>
+                            <span class="text-sm font-medium">Plano Mensal</span>
+                          </div>
+                          <div class="mt-1 text-sm text-slate-600">Próxima cobrança: 10/03/2026</div>
+                        </div>
+                        <button
+                          class="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                          type="button"
+                        >
+                          Gerenciar no Stripe
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rounded-xl border border-rose-200 bg-white shadow-sm">
+                    <div class="border-b border-rose-200 px-6 py-4">
+                      <div class="text-lg font-semibold text-rose-700">Zona de Perigo</div>
+                      <div class="text-sm text-slate-600">Ações irreversíveis.</div>
+                    </div>
+                    <div class="px-6 py-5">
+                      <div class="text-sm text-slate-700">
+                        Para deletar sua conta, digite <span class="font-semibold">DELETAR</span> e confirme.
+                      </div>
+                      <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                        <input
+                          class="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                          placeholder="DELETAR"
+                        />
+                        <button
+                          class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                          type="button"
+                        >
+                          Deletar conta
+                        </button>
+                      </div>
+                      <div class="mt-3 text-xs text-slate-500">
+                        (Prototype) No app real, isso chama a edge function de deleção.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
+      const panels = Array.from(document.querySelectorAll('[data-panel]'));
+
+      const setActive = (tab) => {
+        tabButtons.forEach((btn) => {
+          const isActive = btn.dataset.tab === tab;
+          btn.setAttribute('aria-selected', String(isActive));
+          btn.classList.toggle('bg-emerald-600', isActive);
+          btn.classList.toggle('text-white', isActive);
+          btn.classList.toggle('shadow-sm', isActive);
+          btn.classList.toggle('hover:bg-slate-50', !isActive);
+        });
+
+        panels.forEach((panel) => {
+          panel.classList.toggle('hidden', panel.dataset.panel !== tab);
+        });
+      };
+
+      tabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => setActive(btn.dataset.tab));
+      });
+
+      // default
+      setActive('connection');
+    </script>
+  </body>
+</html>
+
