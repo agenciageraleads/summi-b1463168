@@ -7,6 +7,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const parseAllowlist = (raw: string | undefined) => {
+  const out: string[] = [];
+  if (!raw) return out;
+  for (const item of raw.split(/[\s,]+/g)) {
+    const trimmed = item.trim();
+    if (trimmed) out.push(trimmed);
+  }
+  return Array.from(new Set(out));
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -49,6 +59,18 @@ serve(async (req) => {
         JSON.stringify({ error: 'Usuário não autenticado' }),
         {
           status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    // Se houver allowlist configurada, ela passa a ser a fonte de verdade para operações admin
+    const allowlist = parseAllowlist(Deno.env.get("ADMIN_ALLOWLIST"));
+    if (allowlist.length > 0 && !allowlist.includes(user.id)) {
+      return new Response(
+        JSON.stringify({ error: 'Acesso negado. Apenas administradores podem acessar esta funcionalidade.' }),
+        {
+          status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       )

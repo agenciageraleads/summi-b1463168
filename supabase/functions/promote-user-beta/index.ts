@@ -13,6 +13,16 @@ const log = (level: string, message: string, data?: any) => {
   console.log(`[${level.toUpperCase()}] ${message}`, data ? JSON.stringify(data, null, 2) : '');
 };
 
+const parseAllowlist = (raw: string | undefined) => {
+  const out: string[] = [];
+  if (!raw) return out;
+  for (const item of raw.split(/[\s,]+/g)) {
+    const trimmed = item.trim();
+    if (trimmed) out.push(trimmed);
+  }
+  return Array.from(new Set(out));
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -47,6 +57,18 @@ serve(async (req) => {
     }
 
     log('info', 'Usuário autenticado', { userId: user.id });
+
+    // Se houver allowlist configurada, ela passa a ser a fonte de verdade para operações admin
+    const allowlist = parseAllowlist(Deno.env.get("ADMIN_ALLOWLIST"));
+    if (allowlist.length > 0 && !allowlist.includes(user.id)) {
+      return new Response(
+        JSON.stringify({ error: 'Acesso negado: apenas administradores podem promover usuários' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        }
+      );
+    }
 
     // Check if requesting user is admin - DIRECT QUERY WITHOUT is_admin()
     const { data: adminProfile, error: adminError } = await supabaseClient

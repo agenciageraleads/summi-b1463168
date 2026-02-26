@@ -11,6 +11,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const parseAllowlist = (raw: string | undefined) => {
+  const out: string[] = [];
+  if (!raw) return out;
+  for (const item of raw.split(/[\s,]+/g)) {
+    const trimmed = item.trim();
+    if (trimmed) out.push(trimmed);
+  }
+  return Array.from(new Set(out));
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -74,9 +84,19 @@ serve(async (req) => {
       });
     }
 
-    // Verificar se é admin (para exclusão de outros usuários) ou usuário excluindo própria conta
-    const { data: isAdminData } = await supabaseAdmin.rpc('is_admin', { user_id: user.id });
-    const isAdmin = !!isAdminData;
+    // Verificar se é admin (para exclusão de outros usuários) ou usuário excluindo própria conta.
+    // Se houver allowlist configurada, ela passa a ser a fonte de verdade para operações admin.
+    const allowlist = parseAllowlist(Deno.env.get("ADMIN_ALLOWLIST"));
+    const allowlistConfigured = allowlist.length > 0;
+
+    let isAdmin = false;
+    if (allowlistConfigured) {
+      isAdmin = allowlist.includes(user.id);
+    } else {
+      const { data: isAdminData } = await supabaseAdmin.rpc('is_admin', { user_id: user.id });
+      isAdmin = !!isAdminData;
+    }
+
     const userId = user.id;
     const finalTargetUserId = requestBody.target_user_id || userId;
 
@@ -260,26 +280,22 @@ serve(async (req) => {
 
     console.log(`[DELETE-ACCOUNT] ✅ Perfil deletado: ${finalTargetUserId}`);
 
-    // 4º) Deletar usuário da auth (apenas se não for admin fazendo exclusão de outro usuário)
-    if (!isAdmin || finalTargetUserId === userId) {
-      console.log(`[DELETE-ACCOUNT] 🔐 Deletando usuário da autenticação...`);
-      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(finalTargetUserId);
-      
-      if (authDeleteError) {
-        console.error('[DELETE-ACCOUNT] ❌ Erro ao deletar usuário da auth:', authDeleteError.message);
-        return new Response(JSON.stringify({
-          success: false,
-          error: 'Erro ao deletar conta de autenticação'
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      console.log(`[DELETE-ACCOUNT] ✅ Usuário deletado da auth: ${finalTargetUserId}`);
-    } else {
-      console.log(`[DELETE-ACCOUNT] 🔒 Admin deletion - mantendo auth do usuário: ${finalTargetUserId}`);
+    // 4º) Deletar usuário da auth (exclusão permanente sempre remove o usuário de autenticação)
+    console.log(`[DELETE-ACCOUNT] 🔐 Deletando usuário da autenticação...`);
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(finalTargetUserId);
+    
+    if (authDeleteError) {
+      console.error('[DELETE-ACCOUNT] ❌ Erro ao deletar usuário da auth:', authDeleteError.message);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Erro ao deletar conta de autenticação'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
+
+    console.log(`[DELETE-ACCOUNT] ✅ Usuário deletado da auth: ${finalTargetUserId}`);
 
     // Log final de auditoria
     console.log(`[SECURITY-AUDIT] ${new Date().toISOString()} - DELETE_ACCOUNT_SUCCESS - User: ${userId} (admin: ${isAdmin}) deleted: ${finalTargetUserId} (${profile.email})`);

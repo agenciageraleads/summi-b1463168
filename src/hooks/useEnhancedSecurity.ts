@@ -137,7 +137,23 @@ export const useEnhancedSecurity = () => {
         return false;
       }
 
-      const isAdmin = profile.role === 'admin';
+      const roleIsAdmin = profile.role === 'admin';
+
+      // Se existir allowlist, exige que o usuário esteja nela (evita admins indevidos por role)
+      let allowlistConfigured = false;
+      let allowlistIsAdmin: boolean | null = null;
+      try {
+        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('admin-verify');
+        if (!verifyError && verifyData && typeof verifyData === 'object') {
+          allowlistConfigured = Boolean((verifyData as any).allowlist_configured);
+          const maybe = (verifyData as any).is_admin;
+          allowlistIsAdmin = typeof maybe === 'boolean' ? maybe : null;
+        }
+      } catch {
+        // ignore - fallback por role
+      }
+
+      const isAdmin = allowlistConfigured && allowlistIsAdmin !== null ? roleIsAdmin && allowlistIsAdmin : roleIsAdmin;
       
       if (!isAdmin) {
         await logSecurityEvent('unauthorized_access', {

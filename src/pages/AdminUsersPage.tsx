@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/Admin/AdminLayout';
 import { UsersTable } from '@/components/Admin/UsersTable';
 import { useAdmin } from '@/hooks/useAdmin';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ShieldAlert } from 'lucide-react';
 
 const AdminUsersPage = () => {
   const { 
@@ -13,7 +13,8 @@ const AdminUsersPage = () => {
     fetchUsers, 
     deleteUserAccount, 
     disconnectUser,
-    restartUserInstance
+    restartUserInstance,
+    cleanupExtraAdmins
   } = useAdmin();
 
   const handleRefresh = () => {
@@ -45,10 +46,16 @@ const AdminUsersPage = () => {
                 Gerencie contas de usuários, conexões e assinaturas
               </p>
             </div>
-            <Button onClick={handleRefresh} variant="outline">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={cleanupExtraAdmins} variant="outline" className="text-red-600 hover:text-red-700">
+                <ShieldAlert className="h-4 w-4 mr-2" />
+                Limpar Admins Extras
+              </Button>
+              <Button onClick={handleRefresh} variant="outline">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Atualizar
+              </Button>
+            </div>
           </div>
 
           <UsersTable

@@ -61,7 +61,23 @@ export const useAdminAccess = (): AdminAccessResult => {
         throw new Error('Perfil de usuário não encontrado');
       }
 
-      const isAdmin = profile.role === 'admin';
+      const roleIsAdmin = profile.role === 'admin';
+
+      // Se existir allowlist, exige que o usuário esteja nela (evita admins indevidos por role)
+      let allowlistConfigured = false;
+      let allowlistIsAdmin: boolean | null = null;
+      try {
+        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('admin-verify');
+        if (!verifyError && verifyData && typeof verifyData === 'object') {
+          allowlistConfigured = Boolean((verifyData as any).allowlist_configured);
+          const maybe = (verifyData as any).is_admin;
+          allowlistIsAdmin = typeof maybe === 'boolean' ? maybe : null;
+        }
+      } catch {
+        // Falha silenciosa: mantém fallback pelo role (compatibilidade)
+      }
+
+      const isAdmin = allowlistConfigured && allowlistIsAdmin !== null ? roleIsAdmin && allowlistIsAdmin : roleIsAdmin;
       
       console.log(`[ADMIN-ACCESS] ${isAdmin ? '✅' : '❌'} Validação admin:`, {
         isAdmin,

@@ -115,3 +115,9 @@ verify_jwt = true
 
 [functions.promote-user-beta]
 verify_jwt = true
+
+[functions.admin-verify]
+verify_jwt = true
+
+[functions.admin-cleanup-admins]
+verify_jwt = true

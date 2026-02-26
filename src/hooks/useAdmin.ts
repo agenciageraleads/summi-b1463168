@@ -442,6 +442,42 @@ export const useAdmin = () => {
     }
   };
 
+  // Rebaixar admins fora da allowlist (ADMIN_ALLOWLIST) - hardening rápido
+  const cleanupExtraAdmins = async () => {
+    const hasAccess = await validateAdminAccess('cleanup_extra_admins');
+    if (!hasAccess) {
+      toast({
+        title: "Acesso Negado",
+        description: "Você não tem permissão para executar esta ação",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-cleanup-admins');
+      if (error) throw error;
+
+      const demotedCount = typeof data?.demoted_count === 'number' ? data.demoted_count : 0;
+
+      toast({
+        title: "Limpeza concluída",
+        description: demotedCount > 0 ? `${demotedCount} admin(s) rebaixado(s) para user` : "Nenhum admin extra encontrado",
+      });
+
+      await fetchUsers();
+      return true;
+    } catch (error) {
+      console.error('[Admin] Erro ao limpar admins:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível executar a limpeza de admins. Verifique se a allowlist está configurada.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   useEffect(() => {
     checkAdminStatus();
   }, [user]);
@@ -463,5 +499,6 @@ export const useAdmin = () => {
     deleteUserAccount,
     disconnectUser,
     restartUserInstance, // Nova função para reiniciar instância
+    cleanupExtraAdmins,
   };
 };
