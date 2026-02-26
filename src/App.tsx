@@ -70,9 +70,7 @@ function App() {
                 } />
                 <Route path="/settings" element={
                   <ProtectedRoute>
-                    <SubscriptionGuard>
-                      <SettingsPage />
-                    </SubscriptionGuard>
+                    <SettingsPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/subscription" element={
