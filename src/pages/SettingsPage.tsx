@@ -4,8 +4,10 @@ import { useProfile } from '@/hooks/useProfile';
 import { ProfileForm } from '@/components/Settings/ProfileForm';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 import { SubscriptionStatus } from '@/components/SubscriptionStatus';
+import { WhatsAppConnectionManager } from '@/components/Dashboard/WhatsAppConnectionManager';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const SettingsPage = () => {
   const { profile, isLoading, updateProfile, refreshProfile } = useProfile();
@@ -96,6 +98,19 @@ const SettingsPage = () => {
           isUpdating={isUpdating}
           onRefreshProfile={handleRefreshProfile}
         />
+
+        {/* Conexão WhatsApp */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Conexão WhatsApp</CardTitle>
+            <CardDescription>
+              Conecte seu WhatsApp para começar a receber resumos e transcrições
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <WhatsAppConnectionManager />
+          </CardContent>
+        </Card>
         
         {/* Status da assinatura */}
         <SubscriptionStatus />
