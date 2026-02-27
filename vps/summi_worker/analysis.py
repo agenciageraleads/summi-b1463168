@@ -142,7 +142,7 @@ def build_summary_text(
 
     corpo_mensagens = []
     for it in filtrados:
-        emoji = "🔴" if it.prioridade == "3" else "🟡"
+        emoji = "🚨" if it.prioridade == "3" else "🔥"
         
         telefone_limpo = "".join([c for c in it.telefone if c.isdigit()])
         if not telefone_limpo.startswith("55"):
