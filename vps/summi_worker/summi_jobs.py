@@ -119,6 +119,20 @@ def analyze_user_chats(
         )
         analyzed.append(analyzed_chat)
 
+    # Incrementar métricas permanentes no perfil do usuário
+    if analyzed:
+        inc_priorizadas = sum(1 for a in analyzed if a.prioridade in ("2", "3"))
+        inc_mensagens = len(analyzed)
+        try:
+            supabase.rpc("increment_profile_metrics", {
+                "target_user_id": user_id,
+                "inc_audio_segundos": 0,
+                "inc_mensagens_analisadas": inc_mensagens,
+                "inc_conversas_priorizadas": inc_priorizadas,
+            })
+        except Exception:
+            pass  # Não aborta o fluxo por falha em métricas
+
     return {"success": True, "analyzed_count": len(analyzed)}
 
 
@@ -159,6 +173,21 @@ def run_hourly_job(
         if not _within_business_hours(settings, profile, now_local):
             skipped_hours += 1
             continue
+
+        # Verificar frequência customizada do usuário
+        summi_freq = str(profile.get("summi_frequencia") or "1h").strip()
+        freq_map = {"1h": 1, "3h": 3, "6h": 6, "12h": 12, "24h": 24}
+        freq_hours = freq_map.get(summi_freq, 1)
+        ultimo_summi = profile.get("ultimo_summi_em")
+        if ultimo_summi and freq_hours > 1:
+            try:
+                ultimo_dt = dt.datetime.fromisoformat(str(ultimo_summi).replace("Z", "+00:00"))
+                elapsed = (dt.datetime.now(dt.timezone.utc) - ultimo_dt).total_seconds() / 3600
+                if elapsed < freq_hours:
+                    skipped_hours += 1
+                    continue
+            except Exception:
+                pass  # Se falhar o parse, envia normalmente
 
         # Paridade com n8n: analisa conversas novas/editadas antes de montar o Summi da Hora.
         try:
@@ -204,8 +233,18 @@ def run_hourly_job(
             continue
 
         summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
-        evolution.send_text(settings.summi_sender_instance, numero_usuario, f"🕦 *Summi da Hora*\n\n{summary_text}")
+        evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
         sent += 1
+
+        # Atualizar timestamp do último envio
+        try:
+            supabase.patch(
+                "profiles",
+                data={"ultimo_summi_em": _now_utc_iso()},
+                filters=[to_postgrest_filter_eq("id", user_id)],
+            )
+        except Exception:
+            pass  # Não aborta o fluxo por falha em timestamp
 
         if profile.get("Summi em Audio?") is True:
             audio_script = build_audio_script(openai, settings.openai_model_summary, summary_text=summary_text)

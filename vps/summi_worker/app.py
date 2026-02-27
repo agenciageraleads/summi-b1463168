@@ -434,9 +434,12 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             ],
             limit=1,
         )
-        if not monitored:
+        if not monitored and message_kind != "reaction":
             logger.info("evolution_webhook.ignored reason=group_not_monitored group_id=%s user_id=%s", raw_remote_jid, user_id)
             return {"ok": True, "stored": False, "reason": "group_not_monitored"}
+        elif not monitored and message_kind == "reaction":
+            # Se for reação ⚡ em grupo não monitorado, deixamos passar para processamento abaixo
+            pass
 
     from_me = bool(normalized.get("from_me") is True)
     author_name = str(normalized.get("push_name") or "Sem nome")

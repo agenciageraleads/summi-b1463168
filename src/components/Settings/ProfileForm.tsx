@@ -70,7 +70,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     send_on_reaction: profile.send_on_reaction ?? false,
     send_private_only: profile.send_private_only ?? false,
     'Summi em Audio?': profile['Summi em Audio?'] ?? false,
-    apenas_horario_comercial: profile.apenas_horario_comercial ?? true
+    apenas_horario_comercial: profile.apenas_horario_comercial ?? true,
+    summi_frequencia: profile.summi_frequencia || '1h'
   });
 
   // Estado para controlar a exibição formatada do número
@@ -91,7 +92,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       send_on_reaction: profile.send_on_reaction ?? false,
       send_private_only: profile.send_private_only ?? false,
       'Summi em Audio?': profile['Summi em Audio?'] ?? false,
-      apenas_horario_comercial: profile.apenas_horario_comercial ?? true
+      apenas_horario_comercial: profile.apenas_horario_comercial ?? true,
+      summi_frequencia: profile.summi_frequencia || '1h'
     };
     setFormData(newFormData);
 
@@ -250,6 +252,27 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
               checked={formData.apenas_horario_comercial}
               onCheckedChange={(checked) => handleInputChange('apenas_horario_comercial', checked)}
             />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="summi_frequencia">Frequência dos Relatórios (Summis)</Label>
+            <select
+              id="summi_frequencia"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              value={formData.summi_frequencia}
+              onChange={(e) => handleInputChange('summi_frequencia', e.target.value)}
+            >
+              <option value="1h">A cada 1 hora</option>
+              <option value="3h">A cada 3 horas</option>
+              <option value="6h">A cada 6 horas</option>
+              <option value="12h">A cada 12 horas</option>
+              <option value="24h">Uma vez por dia (24h)</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Escolha de quanto em quanto tempo você deseja receber o resumo das suas conversas.
+            </p>
           </div>
         </CardContent>
       </Card>

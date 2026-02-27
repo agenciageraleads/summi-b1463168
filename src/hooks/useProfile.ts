@@ -35,6 +35,11 @@ export interface Profile {
   default_calendar_id?: string;
   calendar_preferences?: any;
   role?: string;
+  total_segundos_audio?: number;
+  total_mensagens_analisadas?: number;
+  total_conversas_priorizadas?: number;
+  summi_frequencia?: string;
+  ultimo_summi_em?: string;
 }
 
 export const useProfile = () => {
@@ -54,7 +59,7 @@ export const useProfile = () => {
 
     try {
       console.log('[PROFILE] Fetching profile for user:', user.id);
-      
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -63,7 +68,7 @@ export const useProfile = () => {
 
       if (error) {
         console.error('[PROFILE] Erro ao buscar perfil:', error);
-        
+
         if (error.code === 'PGRST116') {
           console.log('[PROFILE] Profile not found, user may be new');
           toast({
@@ -77,7 +82,7 @@ export const useProfile = () => {
 
       setProfile(data);
       console.log('[PROFILE] Profile loaded successfully');
-      
+
     } catch (error) {
       console.error('[PROFILE] Erro inesperado ao buscar perfil:', error);
       toast({
@@ -108,7 +113,7 @@ export const useProfile = () => {
 
     try {
       console.log('[PROFILE] Initiating account deletion for user:', user.id);
-      
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         return { success: false, error: 'Sessão expirada. Faça login novamente.' };
@@ -130,16 +135,16 @@ export const useProfile = () => {
       }
 
       console.log('[PROFILE] Account deletion successful');
-      
+
       toast({
         title: "Conta deletada",
         description: "Sua conta foi deletada com sucesso",
       });
 
       await supabase.auth.signOut();
-      
+
       return { success: true };
-      
+
     } catch (error) {
       console.error('[PROFILE] Erro inesperado ao deletar conta:', error);
       toast({
@@ -164,7 +169,7 @@ export const useProfile = () => {
 
     try {
       console.log('[PROFILE] Accepting terms for user:', user.id);
-      
+
       const { data, error } = await supabase
         .from('profiles')
         .update({
@@ -187,7 +192,7 @@ export const useProfile = () => {
 
       console.log('[PROFILE] Terms accepted successfully');
       return { success: true, data };
-      
+
     } catch (error) {
       console.error('[PROFILE] Unexpected error accepting terms:', error);
       return { success: false, error: 'Erro inesperado ao aceitar termos' };

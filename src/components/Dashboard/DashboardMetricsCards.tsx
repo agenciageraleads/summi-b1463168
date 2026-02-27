@@ -6,6 +6,7 @@ import { Clock, MessageCircle, Sparkles } from 'lucide-react';
 
 interface DashboardMetricsCardsProps {
   chats: Chat[];
+  profile: any;
   isLoading: boolean;
 }
 
@@ -45,7 +46,7 @@ const extractAudioSeconds = (event: Record<string, unknown> | unknown): number =
   return 0;
 };
 
-export const DashboardMetricsCards = ({ chats, isLoading }: DashboardMetricsCardsProps) => {
+export const DashboardMetricsCards = ({ chats, profile, isLoading }: DashboardMetricsCardsProps) => {
   const metrics = useMemo(() => {
     let prioritizedConversations = 0;
     let analyzedMessages = 0;
@@ -73,11 +74,11 @@ export const DashboardMetricsCards = ({ chats, isLoading }: DashboardMetricsCard
     }
 
     return {
-      prioritizedConversations,
-      analyzedMessages,
-      audioMinutes: Math.round(audioSeconds / 60),
+      prioritizedConversations: prioritizedConversations + (profile?.total_conversas_priorizadas || 0),
+      analyzedMessages: analyzedMessages + (profile?.total_mensagens_analisadas || 0),
+      audioMinutes: Math.round(audioSeconds / 60) + Math.round((profile?.total_segundos_audio || 0) / 60),
     };
-  }, [chats]);
+  }, [chats, profile]);
 
   return (
     <div className="grid gap-4 md:grid-cols-3">

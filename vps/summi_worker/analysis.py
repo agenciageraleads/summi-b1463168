@@ -77,7 +77,10 @@ def analyze_single_chat(
         "- 3: urgente, precisa ser respondido o quanto antes\n"
         "- 2: precisa ser respondido hoje\n"
         "- 1: precisa responder, mas nao hoje\n"
-        "- 0: nao precisa responder\n\n"
+        "- 0: nao precisa responder OU ja foi respondido pelo vendedor\n\n"
+        "REGRA IMPORTANTE: Se a ultima mensagem da conversa foi enviada pelo vendedor (from_me=true ou from_me=True), "
+        "isso significa que o vendedor JA respondeu. Nesse caso a prioridade DEVE ser 0 "
+        "(a menos que o contexto indique claramente que ainda ha pendencia).\n\n"
         "Formato EXATO de saida (JSON):\n"
         "{\n"
         '  "id": "123",\n'
@@ -118,21 +121,23 @@ def analyze_single_chat(
     )
 
 
-def _build_items_section(items: List[AnalyzedChat], prioridade: str, emoji: str) -> str:
+def _build_items_section(items: List[AnalyzedChat], prioridade: str, emoji: str, title: str) -> str:
     """Monta a seção de itens de uma prioridade específica no template combinado."""
     filtrados = [it for it in items if it.prioridade == prioridade and it.contexto]
     if not filtrados:
         return ""
 
-    linhas = []
+    linhas = [f"*{emoji} {title}*"]
     for it in filtrados:
         telefone_limpo = "".join([c for c in it.telefone if c.isdigit()])
         if not telefone_limpo.startswith("55"):
             telefone_limpo = "55" + telefone_limpo
+        
+        # Design Premium: Nome em negritinho, contexto com bullet e link direto
         linhas.append(
-            f"{emoji} *{it.nome}*\n"
-            f"{it.contexto}\n"
-            f"Responder: wa.me/{telefone_limpo}"
+            f"👤 *{it.nome}*\n"
+            f"📝 {it.contexto}\n"
+            f"🔗 wa.me/{telefone_limpo}"
         )
     return "\n\n".join(linhas)
 
@@ -144,26 +149,28 @@ def build_summary_text(
     items: List[AnalyzedChat],
 ) -> str:
     """
-    Monta o Summi da Hora no template combinado:
-    🔴 urgentes (prioridade 3) e 🟡 importantes (prioridade 2),
-    com link wa.me embaixo de cada contato.
+    Monta o Summi da Hora em layout Premium.
     """
     if not items:
-        return "Você não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
+        return "✨ *Summi da Hora*\n\nVocê não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
 
-    secao_urgente = _build_items_section(items, "3", "🔥")
-    secao_importante = _build_items_section(items, "2", "🚨")
+    secao_urgente = _build_items_section(items, "3", "🔴", "URGENTES (Para Agora!)")
+    secao_importante = _build_items_section(items, "2", "🟡", "IMPORTANTES (Para Hoje)")
 
-    partes = []
+    partes = ["✨ *Summi da Hora*"]
     if secao_urgente:
-        partes.append(f"*🔥 Urgentes:*\n\n{secao_urgente}")
+        partes.append(secao_urgente)
     if secao_importante:
-        partes.append(f"*🚨 Importantes:*\n\n{secao_importante}")
+        partes.append(secao_importante)
 
-    if not partes:
-        return "Você não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
+    if len(partes) <= 1:
+        return "✨ *Summi da Hora*\n\nVocê não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
 
-    corpo = "\n\n---\n\n".join(partes)
+    # Separador elegante entre seções
+    corpo = "\n\n───────────────\n\n".join(partes)
+    
+    # Rodapé discreto
+    corpo += "\n\n_⚡️ Summi - Sua Assistente Invisível_"
     return corpo
 
 

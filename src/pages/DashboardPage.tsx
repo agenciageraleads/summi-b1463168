@@ -5,9 +5,11 @@ import { DashboardMetricsCards } from '@/components/Dashboard/DashboardMetricsCa
 import { Button } from '@/components/ui/button';
 import { useChats } from '@/hooks/useChats';
 import { useMessageAnalysis } from '@/hooks/useMessageAnalysis';
+import { useProfile } from '@/hooks/useProfile';
 import { Link } from 'react-router-dom';
 
 const DashboardPage = () => {
+  const { profile } = useProfile();
   const { chats, isLoading, fetchChats, deleteChat, deleteAllChats } = useChats();
   const { isAnalyzing, startAnalysis } = useMessageAnalysis();
 
@@ -37,7 +39,7 @@ const DashboardPage = () => {
         <SubscriptionWarningBanner />
 
         <div id="onboarding-dashboard-results" className="space-y-6">
-          <DashboardMetricsCards chats={chats} isLoading={isLoading} />
+          <DashboardMetricsCards chats={chats} profile={profile} isLoading={isLoading} />
           <ChatsList
             chats={chats}
             isLoading={isLoading}
