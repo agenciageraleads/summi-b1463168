@@ -61,10 +61,10 @@ serve(async (req) => {
     let priceId: string;
     let trialDays: number;
     if (planType === 'monthly') {
-      priceId = 'price_1RZ8j9KyDqE0F1PtNvJzdK0F';
+      priceId = 'price_1T5IoTKyDqE0F1Pt7P0r5WC4'; // R$ 47,90/mês
       trialDays = 7;
     } else {
-      priceId = 'price_1RZ8j9KyDqE0F1PtIlw9cx2C';
+      priceId = 'price_1T5IpBKyDqE0F1PtJEPbmtal'; // R$ 358,80/ano
       trialDays = 30;
     }
 

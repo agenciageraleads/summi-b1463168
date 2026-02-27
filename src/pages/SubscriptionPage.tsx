@@ -161,7 +161,7 @@ const SubscriptionPage = () => {
                     Plano {subscription.plan_type === 'monthly' ? 'Mensal' : 'Anual'}
                   </p>
                   <p className="text-sm text-summi-gray-600">
-                    {subscription.plan_type === 'monthly' ? 'R$ 29,90/mês' : 'R$ 19,90/mês (cobrado anualmente)'}
+                    {subscription.plan_type === 'monthly' ? 'R$ 47,90/mês' : 'R$ 29,90/mês (cobrado anualmente)'}
                   </p>
                 </div>
                 <Badge className="bg-summi-green text-white">Ativo</Badge>
@@ -176,7 +176,7 @@ const SubscriptionPage = () => {
                 </div>
               )}
 
-              <Button 
+              <Button
                 onClick={handleManageSubscription}
                 variant="outline"
                 className="w-full border-summi-green text-summi-green hover:bg-summi-green hover:text-white"
@@ -195,13 +195,12 @@ const SubscriptionPage = () => {
           </h2>
 
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl">
-            <Card className={`border-2 transition-all duration-300 hover:shadow-lg ${
-              subscription.plan_type === 'monthly' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
-            }`}>
+            <Card className={`border-2 transition-all duration-300 hover:shadow-lg ${subscription.plan_type === 'monthly' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
+              }`}>
               <CardHeader className="text-center">
                 <CardTitle className="text-xl text-summi-gray-900">Plano Mensal</CardTitle>
                 <div className="mt-4">
-                  <span className="text-3xl font-bold text-summi-gray-900">R$ 29,90</span>
+                  <span className="text-3xl font-bold text-summi-gray-900">R$ 47,90</span>
                   <span className="text-summi-gray-500 ml-2">por mês</span>
                 </div>
                 <CardDescription className="mt-2">
@@ -223,9 +222,9 @@ const SubscriptionPage = () => {
                     <span className="text-sm text-summi-gray-600">Cancelar quando quiser</span>
                   </li>
                 </ul>
-                
+
                 {subscription.plan_type !== 'monthly' && (
-                  <Button 
+                  <Button
                     onClick={() => handleSubscribe('monthly')}
                     className="w-full bg-summi-gradient hover:opacity-90 text-white"
                     disabled={subscription.subscribed && subscription.plan_type === 'monthly'}
@@ -233,7 +232,7 @@ const SubscriptionPage = () => {
                     {subscription.subscribed ? 'Alterar para Mensal' : 'Assinar Mensal'}
                   </Button>
                 )}
-                
+
                 {subscription.plan_type === 'monthly' && (
                   <div className="text-center py-2">
                     <Badge className="bg-summi-green text-white">Plano Atual</Badge>
@@ -242,20 +241,19 @@ const SubscriptionPage = () => {
               </CardContent>
             </Card>
 
-            <Card className={`border-2 transition-all duration-300 hover:shadow-lg relative ${
-              subscription.plan_type === 'annual' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
-            }`}>
+            <Card className={`border-2 transition-all duration-300 hover:shadow-lg relative ${subscription.plan_type === 'annual' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
+              }`}>
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-summi-green text-white">Melhor Oferta</Badge>
               </div>
               <CardHeader className="text-center">
                 <CardTitle className="text-xl text-summi-gray-900">Plano Anual</CardTitle>
                 <div className="mt-4">
-                  <span className="text-3xl font-bold text-summi-gray-900">R$ 19,90</span>
+                  <span className="text-3xl font-bold text-summi-gray-900">R$ 29,90</span>
                   <span className="text-summi-gray-500 ml-2">por mês</span>
                 </div>
                 <div className="text-sm text-summi-green font-medium">
-                  33% de desconto • R$ 238,80/ano
+                  37% de desconto • R$ 358,80/ano
                 </div>
                 <CardDescription className="mt-2">
                   Melhor custo-benefício + 30 dias grátis
@@ -273,12 +271,12 @@ const SubscriptionPage = () => {
                   </li>
                   <li className="flex items-center space-x-2">
                     <Check className="w-4 h-4 text-summi-green" />
-                    <span className="text-sm text-summi-gray-600">Economia de R$ 120/ano</span>
+                    <span className="text-sm text-summi-gray-600">Economia de R$ 216/ano</span>
                   </li>
                 </ul>
-                
+
                 {subscription.plan_type !== 'annual' && (
-                  <Button 
+                  <Button
                     onClick={() => handleSubscribe('annual')}
                     className="w-full bg-summi-green hover:bg-summi-green/90 text-white"
                     disabled={subscription.subscribed && subscription.plan_type === 'annual'}
@@ -286,7 +284,7 @@ const SubscriptionPage = () => {
                     {subscription.subscribed ? 'Alterar para Anual' : 'Assinar Anual'}
                   </Button>
                 )}
-                
+
                 {subscription.plan_type === 'annual' && (
                   <div className="text-center py-2">
                     <Badge className="bg-summi-green text-white">Plano Atual</Badge>
@@ -304,11 +302,11 @@ const SubscriptionPage = () => {
                 <h3 className="font-semibold text-summi-gray-900 mb-2">
                   🎉 Complete seu cadastro
                 </h3>
-                 <p className="text-sm text-summi-gray-600">
-                   Adicione seu cartão e ganhe <strong>7 dias grátis</strong> no plano mensal ou <strong>30 dias grátis</strong> no plano anual. 
-                   <br />
-                   <strong>Cancele quando quiser, sem taxas ou compromisso.</strong>
-                 </p>
+                <p className="text-sm text-summi-gray-600">
+                  Adicione seu cartão e ganhe <strong>7 dias grátis</strong> no plano mensal ou <strong>30 dias grátis</strong> no plano anual.
+                  <br />
+                  <strong>Cancele quando quiser, sem taxas ou compromisso.</strong>
+                </p>
               </div>
             </CardContent>
           </Card>
