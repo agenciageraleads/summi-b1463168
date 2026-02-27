@@ -112,7 +112,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
+  const handleInputChange = (field: keyof typeof formData, value: string | boolean | number) => {
     console.log(`[PROFILE_FORM] Field ${field} changed to:`, value);
     setFormData(prev => ({
       ...prev,
@@ -212,8 +212,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       </Card>
 
       {/* GOOGLE CALENDAR INTEGRATION com callback de refresh */}
-      <GoogleCalendarIntegration 
-        profile={profile} 
+      <GoogleCalendarIntegration
+        profile={profile}
         onUpdate={handleGoogleCalendarUpdate}
       />
 
@@ -294,7 +294,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                 Transcrever áudios recebidos
               </Label>
               <div className="text-sm text-muted-foreground">
-                {formData.send_on_reaction 
+                {formData.send_on_reaction
                   ? 'Desabilitado - usando transcrição por reação ⚡'
                   : 'Converter áudios recebidos em texto automaticamente'
                 }
@@ -321,7 +321,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                 Transcrever áudios enviados
               </Label>
               <div className="text-sm text-muted-foreground">
-                {formData.send_on_reaction 
+                {formData.send_on_reaction
                   ? 'Desabilitado - usando transcrição por reação ⚡'
                   : 'Converter áudios enviados em texto automaticamente'
                 }

@@ -10,14 +10,14 @@ import { useNavigate } from 'react-router-dom';
 import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  MessageSquare, 
-  Loader2, 
-  CheckCircle, 
-  AlertCircle, 
-  QrCode, 
-  Phone, 
-  Settings, 
+import {
+  MessageSquare,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  QrCode,
+  Phone,
+  Settings,
   RefreshCw,
   Smartphone,
   Copy,
@@ -69,7 +69,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
     }
 
     setIsRecreating(true);
-    
+
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
@@ -77,9 +77,9 @@ export const WhatsAppConnectionManager: React.FC = () => {
       }
 
       const { data: deleteData, error: deleteError } = await supabase.functions.invoke('evolution-api-handler', {
-        body: { 
+        body: {
           action: 'delete',
-          instanceName: profile.instance_name 
+          instanceName: profile.instance_name
         },
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
@@ -100,11 +100,11 @@ export const WhatsAppConnectionManager: React.FC = () => {
         duration: 5000
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[WhatsApp Manager] Erro ao recriar instância:', error);
       toast({
         title: "❌ Erro ao Recriar Instância",
-        description: error.message || 'Erro inesperado ao recriar instância',
+        description: error instanceof Error ? error.message : 'Erro inesperado ao recriar instância',
         variant: "destructive"
       });
     } finally {
@@ -135,79 +135,70 @@ export const WhatsAppConnectionManager: React.FC = () => {
             </Button>
           </div>
         );
-      case 'is_connecting':
+      case 'is_connecting': {
         // NOVA LÓGICA: Diferentes indicadores baseados no estado interno
         const isConnectingPersistent = state.connectingDetectedAt && (Date.now() - state.connectingDetectedAt) > 10000;
         const showRestartIndicator = state.isRestarting || isConnectingPersistent;
-        
+
         return (
-          <div className={`flex items-center space-x-3 p-4 rounded-xl ${
-            showRestartIndicator 
-              ? 'bg-orange-50 border border-orange-200' 
+          <div className={`flex items-center space-x-3 p-4 rounded-xl ${showRestartIndicator
+              ? 'bg-orange-50 border border-orange-200'
               : 'bg-blue-50 border border-blue-200'
-          }`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-              showRestartIndicator 
-                ? 'bg-orange-100' 
-                : 'bg-blue-100'
             }`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${showRestartIndicator
+                ? 'bg-orange-100'
+                : 'bg-blue-100'
+              }`}>
               {state.isRestarting ? (
-                <RotateCcw className={`w-5 h-5 animate-spin ${
-                  showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
-                }`} />
+                <RotateCcw className={`w-5 h-5 animate-spin ${showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
+                  }`} />
               ) : state.isRenewing ? (
-                <RefreshCw className={`w-5 h-5 animate-spin ${
-                  showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
-                }`} />
+                <RefreshCw className={`w-5 h-5 animate-spin ${showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
+                  }`} />
               ) : (
-                <Loader2 className={`w-5 h-5 animate-spin ${
-                  showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
-                }`} />
+                <Loader2 className={`w-5 h-5 animate-spin ${showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
+                  }`} />
               )}
             </div>
             <div className="flex-1">
-              <h3 className={`font-medium ${
-                showRestartIndicator ? 'text-orange-900' : 'text-blue-900'
-              }`}>
-                {state.isRestarting 
+              <h3 className={`font-medium ${showRestartIndicator ? 'text-orange-900' : 'text-blue-900'
+                }`}>
+                {state.isRestarting
                   ? `Reiniciando instância (${state.restartAttempts}/3)...`
-                  : state.isRenewing 
-                  ? 'Renovando códigos...' 
-                  : isConnectingPersistent
-                  ? 'Status connecting detectado'
-                  : 'Conectando...'
+                  : state.isRenewing
+                    ? 'Renovando códigos...'
+                    : isConnectingPersistent
+                      ? 'Status connecting detectado'
+                      : 'Conectando...'
                 }
               </h3>
-              <p className={`text-sm ${
-                showRestartIndicator ? 'text-orange-700' : 'text-blue-700'
-              }`}>
-                {state.isRestarting 
+              <p className={`text-sm ${showRestartIndicator ? 'text-orange-700' : 'text-blue-700'
+                }`}>
+                {state.isRestarting
                   ? 'Corrigindo status connecting persistente'
-                  : state.isRenewing 
-                  ? 'Gerando novos códigos de conexão' 
-                  : isConnectingPersistent
-                  ? 'Instância será reiniciada automaticamente'
-                  : 'Use um dos métodos abaixo'
+                  : state.isRenewing
+                    ? 'Gerando novos códigos de conexão'
+                    : isConnectingPersistent
+                      ? 'Instância será reiniciada automaticamente'
+                      : 'Use um dos métodos abaixo'
                 }
               </p>
               {state.isPolling && !state.isRenewing && !state.isRestarting && (
-                <p className={`text-xs mt-1 ${
-                  showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
-                }`}>🔄 Aguardando confirmação</p>
+                <p className={`text-xs mt-1 ${showRestartIndicator ? 'text-orange-600' : 'text-blue-600'
+                  }`}>🔄 Aguardando confirmação</p>
               )}
             </div>
-            
+
             {/* NOVO: Botão de restart manual */}
             {!state.isRestarting && state.restartAttempts < 3 && (
-              <Button 
-                onClick={forceRestartInstance} 
-                variant="outline" 
-                size="sm" 
-                className={`${
-                  showRestartIndicator 
-                    ? 'border-orange-300 text-orange-700 hover:bg-orange-100' 
+              <Button
+                onClick={forceRestartInstance}
+                variant="outline"
+                size="sm"
+                className={`${showRestartIndicator
+                    ? 'border-orange-300 text-orange-700 hover:bg-orange-100'
                     : 'border-blue-300 text-blue-700 hover:bg-blue-100'
-                }`}
+                  }`}
               >
                 <RotateCcw className="w-4 h-4 mr-1" />
                 Reiniciar
@@ -215,6 +206,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
             )}
           </div>
         );
+      }
       case 'error':
         return (
           <div className="flex items-center space-x-3 p-4 bg-red-50 border border-red-200 rounded-xl">
@@ -294,36 +286,32 @@ export const WhatsAppConnectionManager: React.FC = () => {
     const isExpiring = state.countdownSeconds <= 5;
 
     return (
-      <div className={`flex items-center justify-between p-3 rounded-lg transition-all ${
-        isExpiring ? 'bg-red-50 border border-red-200' : 
-        isWarning ? 'bg-amber-50 border border-amber-200' : 
-        'bg-blue-50 border border-blue-200'
-      }`}>
+      <div className={`flex items-center justify-between p-3 rounded-lg transition-all ${isExpiring ? 'bg-red-50 border border-red-200' :
+          isWarning ? 'bg-amber-50 border border-amber-200' :
+            'bg-blue-50 border border-blue-200'
+        }`}>
         <div className="flex items-center space-x-3">
-          <Clock className={`w-4 h-4 ${
-            isExpiring ? 'text-red-600' : 
-            isWarning ? 'text-amber-600' : 
-            'text-blue-600'
-          }`} />
-          <span className={`text-sm font-medium ${
-            isExpiring ? 'text-red-800' : 
-            isWarning ? 'text-amber-800' : 
-            'text-blue-800'
-          }`}>
-            {isExpiring ? 'Renovando automaticamente...' : 
-             `Renovação automática em ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`}
+          <Clock className={`w-4 h-4 ${isExpiring ? 'text-red-600' :
+              isWarning ? 'text-amber-600' :
+                'text-blue-600'
+            }`} />
+          <span className={`text-sm font-medium ${isExpiring ? 'text-red-800' :
+              isWarning ? 'text-amber-800' :
+                'text-blue-800'
+            }`}>
+            {isExpiring ? 'Renovando automaticamente...' :
+              `Renovação automática em ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`}
           </span>
         </div>
-        
+
         <Button
           variant="outline"
           size="sm"
           onClick={forceRenewCodes}
-          className={`text-xs px-3 py-1 h-7 ${
-            isExpiring ? 'border-red-300 text-red-700 hover:bg-red-100' :
-            isWarning ? 'border-amber-300 text-amber-700 hover:bg-amber-100' :
-            'border-blue-300 text-blue-700 hover:bg-blue-100'
-          }`}
+          className={`text-xs px-3 py-1 h-7 ${isExpiring ? 'border-red-300 text-red-700 hover:bg-red-100' :
+              isWarning ? 'border-amber-300 text-amber-700 hover:bg-amber-100' :
+                'border-blue-300 text-blue-700 hover:bg-blue-100'
+            }`}
           disabled={state.isRenewing}
         >
           {state.isRenewing ? (
@@ -352,10 +340,10 @@ export const WhatsAppConnectionManager: React.FC = () => {
         <div className="flex-1 min-w-0">
           <p className="text-sm text-orange-800 font-medium">
             {canRecreate
-            ? `Circuit breaker ativado (${state.errorCount} erros, ${state.restartAttempts} restarts). Auto-recovery em execução.`
+              ? `Circuit breaker ativado (${state.errorCount} erros, ${state.restartAttempts} restarts). Auto-recovery em execução.`
               : showRestartInfo
-              ? `Tentativa ${state.errorCount}/5 com ${state.restartAttempts}/3 restarts. Sistema corrigindo automaticamente...`
-              : `Tentativa ${state.errorCount}/5. Tentando reconectar...`
+                ? `Tentativa ${state.errorCount}/5 com ${state.restartAttempts}/3 restarts. Sistema corrigindo automaticamente...`
+                : `Tentativa ${state.errorCount}/5. Tentando reconectar...`
             }
           </p>
           {state.connectingDetectedAt && (
@@ -417,9 +405,9 @@ export const WhatsAppConnectionManager: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <p className="text-sm text-emerald-700 leading-relaxed">
-                    1. Abra o WhatsApp no seu celular<br/>
-                    2. Toque em <strong>⋮</strong> → <strong>Dispositivos conectados</strong><br/>
-                    3. Toque em <strong>Conectar um dispositivo</strong><br/>
+                    1. Abra o WhatsApp no seu celular<br />
+                    2. Toque em <strong>⋮</strong> → <strong>Dispositivos conectados</strong><br />
+                    3. Toque em <strong>Conectar um dispositivo</strong><br />
                     4. Toque em <strong>Conectar com código</strong>
                   </p>
                 </div>
@@ -457,17 +445,17 @@ export const WhatsAppConnectionManager: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <p className="text-sm text-blue-700 leading-relaxed">
-                    1. Abra o WhatsApp no seu celular<br/>
-                    2. Toque em <strong>⋮</strong> → <strong>Dispositivos conectados</strong><br/>
-                    3. Toque em <strong>Conectar um dispositivo</strong><br/>
+                    1. Abra o WhatsApp no seu celular<br />
+                    2. Toque em <strong>⋮</strong> → <strong>Dispositivos conectados</strong><br />
+                    3. Toque em <strong>Conectar um dispositivo</strong><br />
                     4. Aponte a câmera para o QR Code
                   </p>
                 </div>
                 <div className="bg-white border-2 border-blue-300 rounded-lg p-4 flex justify-center">
-                  <img 
-                    src={state.qrCode} 
-                    alt="QR Code para conectar WhatsApp" 
-                    className="w-40 h-40 object-contain rounded-lg" 
+                  <img
+                    src={state.qrCode}
+                    alt="QR Code para conectar WhatsApp"
+                    className="w-40 h-40 object-contain rounded-lg"
                   />
                 </div>
               </CardContent>

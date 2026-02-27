@@ -24,7 +24,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
   const { isAdmin } = useAdminAccess();
 
   // Filtrar usuários com base no termo de busca
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = users.filter(user =>
     user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -35,7 +35,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
   const betaUsers = filteredUsers
     .filter(user => user.role === 'beta')
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
-    
+
   const regularUsers = filteredUsers
     .filter(user => user.role === 'user')
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
@@ -53,9 +53,9 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
     }
 
     setLoadingStates(prev => ({ ...prev, [userId]: true }));
-    
+
     console.log(`[BETA-SECURE] 🔐 Iniciando ${action}: ${userName} (${userId})`);
-    
+
     try {
       // Obter token de autenticação
       const { data: { session } } = await supabase.auth.getSession();
@@ -80,7 +80,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
       );
 
       const json = await response.json();
-      
+
       if (!response.ok) {
         console.error('[BETA-SECURE] ❌ Erro da Edge Function:', {
           status: response.status,
@@ -97,15 +97,15 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
         title: "✅ Operação realizada!",
         description: json?.message || `${userName} foi ${actionText} beta com sucesso.`,
       });
-      
+
       // Atualizar lista
       onRefresh();
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       console.error('[BETA-SECURE] ❌ Erro crítico:', error);
       toast({
         title: "❌ Erro na operação",
-        description: error.message || 'Falha inesperada na operação',
+        description: error instanceof Error ? error.message : 'Falha inesperada na operação',
         variant: "destructive",
       });
     } finally {
@@ -127,7 +127,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
             Criado em: {new Date(user.created_at).toLocaleDateString('pt-BR')}
           </p>
         </div>
-        
+
         <div className="flex flex-col gap-2">
           {/* Só mostra botões se for admin */}
           {isAdmin && (
@@ -149,7 +149,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
                     <AlertDialogHeader>
                       <AlertDialogTitle>Remover do Programa Beta</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Tem certeza que deseja remover <strong>{user.nome}</strong> do programa beta? 
+                        Tem certeza que deseja remover <strong>{user.nome}</strong> do programa beta?
                         O usuário perderá acesso às funcionalidades beta e webhooks serão atualizados.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -182,7 +182,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
                     <AlertDialogHeader>
                       <AlertDialogTitle>Promover para Beta</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Tem certeza que deseja promover <strong>{user.nome}</strong> para usuário beta? 
+                        Tem certeza que deseja promover <strong>{user.nome}</strong> para usuário beta?
                         O usuário terá acesso às funcionalidades beta e webhooks serão configurados.
                       </AlertDialogDescription>
                     </AlertDialogHeader>

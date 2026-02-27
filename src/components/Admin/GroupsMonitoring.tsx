@@ -112,24 +112,7 @@ export const GroupsMonitoring: React.FC = () => {
     }
   }, [user]);
 
-  // Buscar grupos automaticamente quando o componente carrega
-  useEffect(() => {
-    if (user && profile?.instance_name) {
-      const initializeGroups = async () => {
-        const cacheLoaded = await loadGroupsWithCache();
-        
-        // Load monitored groups always
-        await fetchMonitoredGroups();
-        
-        // If no cache or cache is old, refresh from API
-        if (!cacheLoaded) {
-          await fetchWhatsAppGroups();
-        }
-      };
-      
-      initializeGroups();
-    }
-  }, [user, profile?.instance_name, loadGroupsWithCache]);
+
 
   // Buscar grupos do WhatsApp (força refresh da API)
   const fetchWhatsAppGroups = useCallback(async () => {
@@ -145,11 +128,11 @@ export const GroupsMonitoring: React.FC = () => {
     setIsLoading(true);
     try {
       console.log(`[GroupsMonitoring] Buscando grupos para usuário: ${profile.nome} (${profile.instance_name})`);
-      
+
       const { data, error } = await supabase.functions.invoke('fetch-whatsapp-groups', {
-        body: { 
+        body: {
           instanceName: profile.instance_name,
-          userId: user.id 
+          userId: user.id
         },
       });
 
@@ -158,10 +141,10 @@ export const GroupsMonitoring: React.FC = () => {
       if (data.success) {
         const newGroups = data.groups || [];
         setGroups(newGroups);
-        
+
         // Save to cache
         await saveGroupsToCache(newGroups);
-        
+
         console.log(`[GroupsMonitoring] ${newGroups.length} grupos encontrados e salvos em cache`);
         toast({
           title: "Grupos atualizados",
@@ -213,6 +196,25 @@ export const GroupsMonitoring: React.FC = () => {
     }
   }, [user, toast]);
 
+  // Buscar grupos automaticamente quando o componente carrega
+  useEffect(() => {
+    if (user && profile?.instance_name) {
+      const initializeGroups = async () => {
+        const cacheLoaded = await loadGroupsWithCache();
+
+        // Load monitored groups always
+        await fetchMonitoredGroups();
+
+        // If no cache or cache is old, refresh from API
+        if (!cacheLoaded) {
+          await fetchWhatsAppGroups();
+        }
+      };
+
+      initializeGroups();
+    }
+  }, [user, profile?.instance_name, loadGroupsWithCache, fetchMonitoredGroups, fetchWhatsAppGroups]);
+
   // Adicionar grupos ao monitoramento (um por vez)
   const addToMonitoring = async () => {
     if (!user || selectedGroups.length === 0) return;
@@ -227,7 +229,7 @@ export const GroupsMonitoring: React.FC = () => {
       for (const group of groupsToAdd) {
         try {
           console.log(`[GroupsMonitoring] Adicionando grupo: ${group.name} (${group.id})`);
-          
+
           const { data, error } = await supabase.functions.invoke('update-monitored-groups', {
             body: {
               userId: user.id,
@@ -289,7 +291,7 @@ export const GroupsMonitoring: React.FC = () => {
 
     try {
       console.log(`[GroupsMonitoring] Removendo grupo: ${groupId}`);
-      
+
       const { data, error } = await supabase.functions.invoke('update-monitored-groups', {
         body: {
           userId: user.id,
@@ -324,13 +326,13 @@ export const GroupsMonitoring: React.FC = () => {
   };
 
   // Filtrar grupos com base na busca (memoized for performance)
-  const filteredGroups = useMemo(() => 
+  const filteredGroups = useMemo(() =>
     groups.filter(group =>
       group.name.toLowerCase().includes(searchTerm.toLowerCase())
     ), [groups, searchTerm]
   );
 
-  const filteredMonitoredGroups = useMemo(() => 
+  const filteredMonitoredGroups = useMemo(() =>
     monitoredGroups.filter(group =>
       group.name.toLowerCase().includes(searchTerm.toLowerCase())
     ), [monitoredGroups, searchTerm]
@@ -370,8 +372,8 @@ export const GroupsMonitoring: React.FC = () => {
             </div>
           )}
           {selectedGroups.length > 0 && (
-            <Button 
-              onClick={addToMonitoring} 
+            <Button
+              onClick={addToMonitoring}
               disabled={isAddingGroups}
               className="bg-green-600 hover:bg-green-700"
             >

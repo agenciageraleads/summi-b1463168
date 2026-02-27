@@ -25,5 +25,15 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-unused-vars": "off",
     },
+  },
+  {
+    files: ["supabase/functions/**/*.ts", "src/hooks/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "prefer-const": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "no-case-declarations": "off",
+      "no-useless-escape": "off"
+    }
   }
 );

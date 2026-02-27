@@ -19,15 +19,15 @@ const asNumber = (value: unknown): number | null => {
 };
 
 const getNested = (obj: unknown, path: Array<string | number>) => {
-  let cur: any = obj;
+  let cur: unknown = obj;
   for (const key of path) {
-    if (cur == null) return undefined;
-    cur = cur[key as any];
+    if (cur == null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string | number, unknown>)[key];
   }
   return cur;
 };
 
-const extractAudioSeconds = (event: any): number => {
+const extractAudioSeconds = (event: Record<string, unknown> | unknown): number => {
   const candidates: Array<Array<string | number>> = [
     ['raw', 'body', 'data', 'message', 'audioMessage', 'seconds'],
     ['raw', 'data', 'message', 'audioMessage', 'seconds'],
@@ -52,7 +52,7 @@ export const DashboardMetricsCards = ({ chats, isLoading }: DashboardMetricsCard
     let audioSeconds = 0;
 
     for (const chat of chats) {
-      const priority = asNumber((chat as any).prioridade) ?? 0;
+      const priority = asNumber((chat as Chat & { prioridade?: unknown }).prioridade) ?? 0;
       if (priority >= 2) prioritizedConversations += 1;
 
       const events = Array.isArray(chat.conversa) ? chat.conversa : [];

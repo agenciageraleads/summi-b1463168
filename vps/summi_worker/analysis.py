@@ -118,39 +118,53 @@ def analyze_single_chat(
     )
 
 
+def _build_items_section(items: List[AnalyzedChat], prioridade: str, emoji: str) -> str:
+    """Monta a seção de itens de uma prioridade específica no template combinado."""
+    filtrados = [it for it in items if it.prioridade == prioridade and it.contexto]
+    if not filtrados:
+        return ""
+
+    linhas = []
+    for it in filtrados:
+        telefone_limpo = "".join([c for c in it.telefone if c.isdigit()])
+        if not telefone_limpo.startswith("55"):
+            telefone_limpo = "55" + telefone_limpo
+        linhas.append(
+            f"{emoji} *{it.nome}*\n"
+            f"{it.contexto}\n"
+            f"Responder: wa.me/{telefone_limpo}"
+        )
+    return "\n\n".join(linhas)
+
+
 def build_summary_text(
     openai: OpenAIClient,
     model: str,
     *,
     items: List[AnalyzedChat],
 ) -> str:
-    # Replica a ideia do node "Remodela a Mensagem2" (n8n): comentario direto + link wa.me.
+    """
+    Monta o Summi da Hora no template combinado:
+    🔴 urgentes (prioridade 3) e 🟡 importantes (prioridade 2),
+    com link wa.me embaixo de cada contato.
+    """
     if not items:
-        return "Voce nao tem nenhuma demanda importante por agora, fique tranquilo."
+        return "Você não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
 
-    fonte = "\n\n".join(
-        [
-            f"Contato: {it.nome}\nDemanda: {it.contexto}\nTelefone: {it.telefone}"
-            for it in items
-            if it.contexto
-        ]
-    )
+    secao_urgente = _build_items_section(items, "3", "🔥")
+    secao_importante = _build_items_section(items, "2", "🚨")
 
-    system = "Voce escreve mensagens curtas para WhatsApp. Seja extremamente direto."
-    user = (
-        "Voce, ainda na funcao de assistente de whatsapp, recebeu as mensagens de outro agente que ja filtrou as mensagens importantes. "
-        "Agora voce precisa juntar algumas informacoes importantes, sugerir alguma acao e repassar.\n\n"
-        "Regras:\n"
-        "- Nao invente nada\n"
-        "- Seja simples e direto\n"
-        "- Sem despedidas, sem pedir mais informacoes\n"
-        "- Caso nao tenha informacoes, diga: Nenhuma demanda importante por agora\n"
-        "- Coloque o nome do contato entre ** para ficar em negrito no whatsapp\n"
-        "- Use o link wa.me/telefone (com 55) na linha de baixo, com o prefixo 'Responder:'\n\n"
-        f"Fonte de Informacoes:\n{fonte}\n\n"
-        "Retorne apenas o texto final."
-    )
-    return openai.chat_text(model=model, system=system, user=user, temperature=0.4)
+    partes = []
+    if secao_urgente:
+        partes.append(f"*🔥 Urgentes:*\n\n{secao_urgente}")
+    if secao_importante:
+        partes.append(f"*🚨 Importantes:*\n\n{secao_importante}")
+
+    if not partes:
+        return "Você não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
+
+    corpo = "\n\n---\n\n".join(partes)
+    return corpo
 
 
 def build_audio_script(

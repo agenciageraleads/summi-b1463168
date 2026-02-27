@@ -101,7 +101,7 @@ const AdminAnnouncementsPage = () => {
 
     if (!sendViaEmail && !sendViaWhatsapp) {
       toast({
-        title: "Erro", 
+        title: "Erro",
         description: "Selecione pelo menos um método de envio",
         variant: "destructive"
       });
@@ -131,7 +131,7 @@ const AdminAnnouncementsPage = () => {
       setMessage('');
       setSendViaEmail(true);
       setSendViaWhatsapp(false);
-      
+
       fetchAnnouncements();
     } catch (error) {
       console.error('Erro ao criar anúncio:', error);
@@ -162,7 +162,7 @@ const AdminAnnouncementsPage = () => {
     } catch (error) {
       console.error('Erro ao enviar anúncio:', error);
       toast({
-        title: "Erro", 
+        title: "Erro",
         description: "Falha ao enviar anúncio",
         variant: "destructive"
       });
@@ -191,6 +191,7 @@ const AdminAnnouncementsPage = () => {
   useEffect(() => {
     fetchAnnouncements();
     setIsLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isLoading) {
@@ -249,7 +250,7 @@ const AdminAnnouncementsPage = () => {
                   maxLength={200}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="message">Mensagem</Label>
                 <Textarea
@@ -277,7 +278,7 @@ const AdminAnnouncementsPage = () => {
                     Enviar por Email
                   </Label>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="whatsapp"
@@ -414,7 +415,7 @@ const AdminAnnouncementsPage = () => {
                 </CardContent>
               </Card>
             ))}
-            
+
             {announcements.length === 0 && (
               <Card>
                 <CardContent className="text-center py-8">

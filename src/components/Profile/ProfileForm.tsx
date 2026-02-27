@@ -10,7 +10,7 @@ import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 
 interface ProfileFormProps {
   profile: Profile | null;
-  updateProfile: (updates: Partial<Profile>) => Promise<any>;
+  updateProfile: (updates: Partial<Profile>) => Promise<unknown>;
   isLoading: boolean;
 }
 
@@ -55,7 +55,7 @@ export const ProfileForm = ({ profile, updateProfile, isLoading }: ProfileFormPr
     setIsSaving(true);
 
     try {
-      const result = await updateProfile(formData);
+      const result = await updateProfile(formData) as { error?: string };
 
       if (result.error) {
         toast({
@@ -109,22 +109,22 @@ export const ProfileForm = ({ profile, updateProfile, isLoading }: ProfileFormPr
         />
       </div>
 
-        <div>
-          <Label htmlFor="numero">Número de WhatsApp</Label>
-          <Input
-            id="numero"
-            type="tel"
-            value={formData.numero || ''}
-            onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-            placeholder="5562999999999"
-            // **CORREÇÃO CRÍTICA: Campo editável exceto quando já conectado**
-            disabled={connectionState === 'already_connected'}
-            className="mt-1"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Formato: código do país + DDD + número (ex: 5562999999999)
-          </p>
-        </div>
+      <div>
+        <Label htmlFor="numero">Número de WhatsApp</Label>
+        <Input
+          id="numero"
+          type="tel"
+          value={formData.numero || ''}
+          onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+          placeholder="5562999999999"
+          // **CORREÇÃO CRÍTICA: Campo editável exceto quando já conectado**
+          disabled={connectionState === 'already_connected'}
+          className="mt-1"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Formato: código do país + DDD + número (ex: 5562999999999)
+        </p>
+      </div>
 
       <div>
         <Label htmlFor="temas_importantes">Temas Importantes</Label>

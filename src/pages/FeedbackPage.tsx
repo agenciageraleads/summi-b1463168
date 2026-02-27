@@ -19,7 +19,7 @@ const FeedbackPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const success = await submitFeedback({
       type: feedbackType,
       title,
@@ -86,7 +86,7 @@ const FeedbackPage = () => {
                 <Label className="text-base font-medium">Tipo de Feedback</Label>
                 <RadioGroup
                   value={feedbackType}
-                  onValueChange={(value) => setFeedbackType(value as any)}
+                  onValueChange={(value) => setFeedbackType(value as 'avaliacao' | 'sugestao' | 'bug')}
                   className="grid md:grid-cols-3 gap-4"
                 >
                   {feedbackTypes.map((type) => {
@@ -126,9 +126,8 @@ const FeedbackPage = () => {
                         key={star}
                         type="button"
                         onClick={() => setRating(star)}
-                        className={`p-1 transition-colors ${
-                          star <= rating ? 'text-yellow-400' : 'text-summi-gray-300'
-                        } hover:text-yellow-400`}
+                        className={`p-1 transition-colors ${star <= rating ? 'text-yellow-400' : 'text-summi-gray-300'
+                          } hover:text-yellow-400`}
                       >
                         <Star className="w-6 h-6 fill-current" />
                       </button>
@@ -155,8 +154,8 @@ const FeedbackPage = () => {
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={
                     feedbackType === 'avaliacao' ? 'Ex: Experiência geral com a plataforma' :
-                    feedbackType === 'sugestao' ? 'Ex: Melhorar interface de configurações' :
-                    'Ex: Erro ao conectar WhatsApp'
+                      feedbackType === 'sugestao' ? 'Ex: Melhorar interface de configurações' :
+                        'Ex: Erro ao conectar WhatsApp'
                   }
                   required
                 />
@@ -173,8 +172,8 @@ const FeedbackPage = () => {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={
                     feedbackType === 'avaliacao' ? 'Conte-nos sobre sua experiência usando a Summi...' :
-                    feedbackType === 'sugestao' ? 'Descreva sua sugestão de melhoria...' :
-                    'Descreva o problema encontrado, quando aconteceu e os passos para reproduzi-lo...'
+                      feedbackType === 'sugestao' ? 'Descreva sua sugestão de melhoria...' :
+                        'Descreva o problema encontrado, quando aconteceu e os passos para reproduzi-lo...'
                   }
                   rows={6}
                   required
@@ -201,7 +200,7 @@ const FeedbackPage = () => {
                 Obrigado pelo seu tempo!
               </h3>
               <p className="text-sm text-summi-gray-600">
-                Sua opinião nos ajuda a criar uma experiência melhor para todos os usuários. 
+                Sua opinião nos ajuda a criar uma experiência melhor para todos os usuários.
                 Nossa equipe analisa cada feedback recebido.
               </p>
             </div>

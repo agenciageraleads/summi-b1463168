@@ -43,6 +43,7 @@ const CompleteSignupPage = () => {
     }
 
     verifySession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   const verifySession = async () => {

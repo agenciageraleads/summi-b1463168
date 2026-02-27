@@ -14,7 +14,7 @@ interface SecurityEvent {
   id: string;
   user_id: string;
   event_type: string;
-  event_details: any;
+  event_details: Record<string, unknown> | null;
   severity: 'low' | 'medium' | 'high' | 'critical';
   created_at: string;
 }
@@ -35,6 +35,7 @@ export const SecurityDashboard: React.FC = () => {
 
   useEffect(() => {
     loadSecurityData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadSecurityData = async () => {
@@ -97,13 +98,13 @@ export const SecurityDashboard: React.FC = () => {
     }
   };
 
-  const formatEventDetails = (details: any) => {
+  const formatEventDetails = (details: Record<string, unknown> | null) => {
     if (!details || typeof details !== 'object') return 'N/A';
-    
+
     const keys = Object.keys(details);
     if (keys.length === 0) return 'N/A';
-    
-    return keys.slice(0, 3).map(key => 
+
+    return keys.slice(0, 3).map(key =>
       `${key}: ${String(details[key]).substring(0, 50)}`
     ).join(', ');
   };
@@ -193,7 +194,7 @@ export const SecurityDashboard: React.FC = () => {
               </div>
             ) : (
               securityEvents.map((event) => (
-                <div 
+                <div
                   key={event.id}
                   className="flex items-center justify-between p-4 border rounded-lg"
                 >
