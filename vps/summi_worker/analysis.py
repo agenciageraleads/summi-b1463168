@@ -142,7 +142,7 @@ def build_summary_text(
 
     corpo_mensagens = []
     for it in filtrados:
-        emoji = "🚨" if it.prioridade == "3" else "🔥"
+        emoji = "🔥" if it.prioridade == "3" else "🚨"
         
         telefone_limpo = "".join([c for c in it.telefone if c.isdigit()])
         if not telefone_limpo.startswith("55"):
@@ -164,7 +164,7 @@ def build_summary_text(
 
     # Rodapé discreto
     corpo = "\n\n".join(partes)
-    corpo += "\n\n_⚡️ Summi - Sua Assistente Invisível_"
+    corpo += "\n\n_⚡️ Summi - Secretária Invisível_"
     return corpo
 
 

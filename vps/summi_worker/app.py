@@ -213,7 +213,7 @@ def _send_aux_message(
     if not text.strip() or not target_number:
         return {"sent": False, "destination": destination}
 
-    branded_text = f"{text.rstrip()}\n\n_⚡️ Summi - Sua Assistente Invisível_"
+    branded_text = f"{text.rstrip()}\n\n_⚡️ Summi - Secretária Invisível_"
     evolution.send_text(target_instance, target_number, branded_text, quoted_message_id=quoted_message_id)
     return {
         "sent": True,
