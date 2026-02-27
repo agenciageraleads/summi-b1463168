@@ -15,7 +15,7 @@ const BetaPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-              <TestTube className="h-8 w-8 text-purple-600" />
+              <TestTube className="h-8 w-8 text-emerald-600" />
               Funcionalidades Beta
             </h1>
             <p className="text-gray-600">
@@ -57,7 +57,7 @@ const BetaPage: React.FC = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
-                <TestTube className="h-5 w-5 text-purple-500" />
+                <TestTube className="h-5 w-5 text-emerald-500" />
                 Feedback
               </CardTitle>
             </CardHeader>
@@ -81,7 +81,7 @@ const BetaPage: React.FC = () => {
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
                 Monitoramento de Grupos WhatsApp
-                <span className="ml-auto text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                <span className="ml-auto text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
                   BETA
                 </span>
               </CardTitle>

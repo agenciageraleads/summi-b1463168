@@ -24,7 +24,7 @@ export const BetaBadge: React.FC<BetaBadgeProps> = ({ className = '', size = 'md
 
   return (
     <Badge 
-      className={`bg-gradient-to-r from-purple-500 to-pink-500 text-white ${sizeClasses[size]} ${className}`}
+      className={`bg-gradient-to-r from-emerald-500 to-teal-400 text-white ${sizeClasses[size]} ${className}`}
     >
       <TestTube className={`${iconSizes[size]} mr-1`} />
       BETA

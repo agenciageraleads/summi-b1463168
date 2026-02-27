@@ -48,8 +48,8 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
       title: 'Total de Chats',
       value: stats.totalChats,
       icon: MessageSquare,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-100',
     },
     {
       title: 'Feedbacks',

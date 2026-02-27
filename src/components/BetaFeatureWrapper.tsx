@@ -64,8 +64,8 @@ export const BetaFeatureWrapper: React.FC<BetaFeatureWrapperProps> = ({
       <CardContent className="text-center py-8">
         <div className="max-w-md mx-auto">
           <div className="mb-4">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <TestTube className="h-8 w-8 text-purple-600" />
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <TestTube className="h-8 w-8 text-emerald-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
               Funcionalidade Beta

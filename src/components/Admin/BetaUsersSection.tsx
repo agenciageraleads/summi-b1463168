@@ -119,7 +119,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="font-medium text-gray-900">{user.nome}</h3>
-            {isBeta && <Badge className="bg-purple-100 text-purple-800">BETA</Badge>}
+            {isBeta && <Badge className="bg-emerald-100 text-emerald-800">BETA</Badge>}
           </div>
           <p className="text-sm text-gray-600">{user.numero || 'Sem número'}</p>
           <p className="text-xs text-gray-500 font-mono">{user.id}</p>
@@ -172,7 +172,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
                       variant="outline"
                       size="sm"
                       disabled={loadingStates[user.id]}
-                      className="text-purple-600 hover:text-purple-700"
+                      className="text-emerald-600 hover:text-emerald-700"
                     >
                       <UserCheck className="h-4 w-4 mr-1" />
                       {loadingStates[user.id] ? 'Promovendo...' : 'Promover Beta'}
@@ -190,7 +190,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => callPromoteBeta(user.id, 'promote', user.nome)}
-                        className="bg-purple-600 hover:bg-purple-700"
+                        className="bg-emerald-600 hover:bg-emerald-700"
                         disabled={loadingStates[user.id]}
                       >
                         Promover para Beta
@@ -233,7 +233,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TestTube className="h-5 w-5 text-purple-600" />
+            <TestTube className="h-5 w-5 text-emerald-600" />
             Usuários Beta ({betaUsers.length})
           </CardTitle>
         </CardHeader>
