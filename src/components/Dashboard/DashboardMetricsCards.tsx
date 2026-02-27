@@ -2,11 +2,12 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Chat } from '@/hooks/useChats';
+import type { Profile } from '@/hooks/useProfile';
 import { Clock, MessageCircle, Sparkles } from 'lucide-react';
 
 interface DashboardMetricsCardsProps {
   chats: Chat[];
-  profile: any;
+  profile: Profile | null;
   isLoading: boolean;
 }
 
