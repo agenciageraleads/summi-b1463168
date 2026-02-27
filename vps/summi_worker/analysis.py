@@ -121,27 +121,6 @@ def analyze_single_chat(
     )
 
 
-def _build_items_section(items: List[AnalyzedChat], prioridade: str, emoji: str, title: str) -> str:
-    """Monta a seção de itens de uma prioridade específica no template combinado."""
-    filtrados = [it for it in items if it.prioridade == prioridade and it.contexto]
-    if not filtrados:
-        return ""
-
-    linhas = [f"*{emoji} {title}*"]
-    for it in filtrados:
-        telefone_limpo = "".join([c for c in it.telefone if c.isdigit()])
-        if not telefone_limpo.startswith("55"):
-            telefone_limpo = "55" + telefone_limpo
-        
-        # Design Premium: Nome em negritinho, contexto com bullet e link direto
-        linhas.append(
-            f"👤 *{it.nome}*\n"
-            f"📝 {it.contexto}\n"
-            f"🔗 wa.me/{telefone_limpo}"
-        )
-    return "\n\n".join(linhas)
-
-
 def build_summary_text(
     openai: OpenAIClient,
     model: str,
@@ -149,27 +128,42 @@ def build_summary_text(
     items: List[AnalyzedChat],
 ) -> str:
     """
-    Monta o Summi da Hora em layout Premium.
+    Monta o Summi da Hora em layout Premium simplificado.
     """
     if not items:
         return "✨ *Summi da Hora*\n\nVocê não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
 
-    secao_urgente = _build_items_section(items, "3", "🔴", "URGENTES (Para Agora!)")
-    secao_importante = _build_items_section(items, "2", "🟡", "IMPORTANTES (Para Hoje)")
+    # Filtrar e ordenar: Prioridade 3 (Urgente) primeiro, depois 2 (Importante)
+    filtrados = [it for it in items if it.prioridade in ("2", "3") and it.contexto]
+    filtrados.sort(key=lambda x: x.prioridade, reverse=True)
 
-    partes = ["✨ *Summi da Hora*"]
-    if secao_urgente:
-        partes.append(secao_urgente)
-    if secao_importante:
-        partes.append(secao_importante)
-
-    if len(partes) <= 1:
+    if not filtrados:
         return "✨ *Summi da Hora*\n\nVocê não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
 
-    # Separador elegante entre seções
-    corpo = "\n\n───────────────\n\n".join(partes)
+    corpo_mensagens = []
+    for it in filtrados:
+        emoji = "🔴" if it.prioridade == "3" else "🟡"
+        
+        telefone_limpo = "".join([c for c in it.telefone if c.isdigit()])
+        if not telefone_limpo.startswith("55"):
+            telefone_limpo = "55" + telefone_limpo
+        
+        # Design Premium Simplificado: Emoji de prioridade seguido do Nome
+        item_text = (
+            f"{emoji} *{it.nome}*\n"
+            f"📝 {it.contexto}\n"
+            f"🔗 wa.me/{telefone_limpo}"
+        )
+        corpo_mensagens.append(item_text)
+
+    # Construção final da mensagem
+    partes = ["✨ *Summi da Hora*"]
     
+    # Unifica todas as mensagens com o separador elegante
+    partes.append("\n\n───────────────\n\n".join(corpo_mensagens))
+
     # Rodapé discreto
+    corpo = "\n\n".join(partes)
     corpo += "\n\n_⚡️ Summi - Sua Assistente Invisível_"
     return corpo
 
