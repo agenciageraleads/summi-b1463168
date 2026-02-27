@@ -62,13 +62,13 @@ export const DriverJsOnboarding = ({
       stageRadius: 10,
       ...options,
       steps,
-      onNextClick: (_element, _step, opts) => {
+      onNextClick: () => {
         destroyReasonRef.current = 'complete';
-        opts.driver.destroy();
+        driverRef.current?.destroy();
       },
-      onCloseClick: (_element, _step, opts) => {
+      onCloseClick: () => {
         destroyReasonRef.current = 'exit';
-        opts.driver.destroy();
+        driverRef.current?.destroy();
       },
       onDestroyed: async () => {
         const reason = destroyReasonRef.current;

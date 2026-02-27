@@ -38,27 +38,27 @@ const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     // A função de login é chamada, e os toasts de sucesso/erro são exibidos.
     await login(formData.email, formData.password);
-    
+
     // A navegação foi removida daqui para evitar a condição de corrida.
     // O useEffect acima agora é o único responsável pelo redirecionamento.
-    
+
     setIsSubmitting(false);
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     const result = await resetPassword(resetEmail);
-    
+
     if (!result.error) {
       setShowResetPassword(false);
       setResetEmail('');
     }
-    
+
     setIsSubmitting(false);
   };
 
@@ -77,9 +77,9 @@ const LoginPage = () => {
         <div className="text-center">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg">
-              <img 
-                src="/lovable-uploads/3cf7feb3-ab92-46ee-85a8-7706495a4bcf.png" 
-                alt="Summi Logo" 
+              <img
+                src="/lovable-uploads/3cf7feb3-ab92-46ee-85a8-7706495a4bcf.png"
+                alt="Summi Logo"
                 className="w-full h-full object-cover"
               />
             </div>
@@ -94,14 +94,7 @@ const LoginPage = () => {
             {showResetPassword ? 'Redefinir Senha' : 'Entre na sua conta'}
           </h2>
           <p className="mt-2 text-sm text-summi-gray-600">
-            {showResetPassword 
-              ? 'Digite seu e-mail para receber instruções'
-              : 'Ou '}
-            {!showResetPassword && (
-              <Link to="/register" className="font-medium text-summi-green hover:text-summi-secondary transition-colors">
-                cadastre-se gratuitamente
-              </Link>
-            )}
+            {showResetPassword && 'Digite seu e-mail para receber instruções'}
           </p>
         </div>
 
@@ -136,7 +129,7 @@ const LoginPage = () => {
                     className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
                   />
                 </div>
-                
+
                 <div className="flex space-x-3">
                   <Button
                     type="button"
@@ -160,7 +153,7 @@ const LoginPage = () => {
                 {/* **ADIÇÃO: Botão Google antes do formulário** */}
                 <div className="space-y-4">
                   <GoogleLoginButton />
-                  
+
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
                       <span className="w-full border-t border-summi-gray-300" />
@@ -179,7 +172,7 @@ const LoginPage = () => {
                       type="email"
                       required
                       value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="seu@email.com"
                       className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
                     />
@@ -192,7 +185,7 @@ const LoginPage = () => {
                       type="password"
                       required
                       value={formData.password}
-                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       placeholder="••••••••"
                       className="mt-1 border-summi-gray-300 focus:border-summi-green focus:ring-summi-green/20"
                     />

@@ -38,14 +38,14 @@ export const OnboardingFlow = () => {
     setSearchParams(next, { replace: true });
   }, [shouldRun, stageParam, searchParams, setSearchParams]);
 
-  // Auto-iniciar onboarding quando o usuário cair em /settings pela 1ª vez
+  // Auto-iniciar onboarding quando o usuário cair em /dashboard ou /settings pela 1ª vez
   useEffect(() => {
     if (!shouldRun) return;
     if (stage) return;
-    if (location.pathname !== '/settings') return;
+    if (location.pathname !== '/settings' && location.pathname !== '/dashboard') return;
 
     const next = new URLSearchParams(searchParams);
-    if (!next.get('tab')) next.set('tab', 'connection');
+    if (location.pathname === '/settings' && !next.get('tab')) next.set('tab', 'connection');
     next.set(ONBOARDING_PARAM, 'welcome');
     setSearchParams(next, { replace: true });
   }, [shouldRun, stage, location.pathname, searchParams, setSearchParams]);
@@ -54,8 +54,10 @@ export const OnboardingFlow = () => {
   useEffect(() => {
     if (!shouldRun || !stage) return;
 
-    if (stage === 'welcome' && location.pathname !== '/settings') {
-      navigate('/settings?tab=connection&onboarding=welcome', { replace: true });
+    if (stage === 'welcome') {
+      if (location.pathname !== '/settings' && location.pathname !== '/dashboard') {
+        navigate('/dashboard?onboarding=welcome', { replace: true });
+      }
       return;
     }
 
@@ -75,7 +77,7 @@ export const OnboardingFlow = () => {
   const isReady =
     shouldRun &&
     stage !== null &&
-    ((stage === 'welcome' && location.pathname === '/settings') ||
+    ((stage === 'welcome' && (location.pathname === '/settings' || location.pathname === '/dashboard')) ||
       (stage === 'whatsapp' && location.pathname === '/settings' && searchParams.get('tab') === 'connection') ||
       (stage === 'dashboard' && location.pathname === '/dashboard'));
 
@@ -85,7 +87,6 @@ export const OnboardingFlow = () => {
     if (stage === 'welcome') {
       return [
         {
-          element: 'body',
           popover: {
             title: 'Bem-vindo! (1/3)',
             description:
