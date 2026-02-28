@@ -130,7 +130,12 @@ class SupabaseRest:
         resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
         if not resp.ok:
             raise SupabaseError(f"rpc failed: {resp.status_code} {resp.text}")
-        return resp.json()
+        if not resp.text.strip():
+            return None
+        try:
+            return resp.json()
+        except ValueError:
+            return resp.text
 
 
 def to_postgrest_filter_eq(column: str, value: str) -> Tuple[str, str]:
