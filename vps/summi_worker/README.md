@@ -74,6 +74,7 @@ Use a stack completa em:
 - `/app/vps/portainer/stack.summi-complete.yml` (no repo: `vps/portainer/stack.summi-complete.yml`)
 - Historico operacional interno: `vps/CHANGELOG_INTERNAL.md`
 - Procedimento de promocao: `vps/RELEASE_PROMOTION.md`
+- Checklist de release: `vps/RELEASE_CHECKLIST.md`
 
 Ela sobe:
 - frontend (Traefik host `${SUMMI_FRONTEND_HOST}`)
