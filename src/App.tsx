@@ -46,6 +46,10 @@ const RouteFallback = () => (
 );
 
 const PROTECTED_ROUTE_PREFIXES = [
+  "/login",
+  "/register",
+  "/complete-signup",
+  "/reset-password",
   "/dashboard",
   "/settings",
   "/subscription",
@@ -72,137 +76,158 @@ function OnboardingFlowGate() {
   );
 }
 
+function AppRoutes() {
+  return (
+    <>
+      <OnboardingFlowGate />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/landing" element={<SalesLandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/complete-signup" element={<CompleteSignupPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/lgpd" element={<LGPDPage />} />
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <SubscriptionGuard>
+                  <DashboardPage />
+                </SubscriptionGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/whatsapp"
+            element={
+              <ProtectedRoute>
+                <SubscriptionGuard>
+                  <Navigate to="/settings?tab=connection" replace />
+                </SubscriptionGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/whatsapp-v2"
+            element={
+              <ProtectedRoute>
+                <SubscriptionGuard>
+                  <Navigate to="/settings?tab=connection" replace />
+                </SubscriptionGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/whatsapp-connection"
+            element={
+              <ProtectedRoute>
+                <Navigate to="/settings?tab=connection" replace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/subscription"
+            element={
+              <ProtectedRoute>
+                <SubscriptionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/feedback"
+            element={
+              <ProtectedRoute>
+                <SubscriptionGuard>
+                  <FeedbackPage />
+                </SubscriptionGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/referrals"
+            element={
+              <ProtectedRoute>
+                <SubscriptionGuard>
+                  <ReferralsPage />
+                </SubscriptionGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/beta"
+            element={
+              <ProtectedRoute>
+                <SubscriptionGuard>
+                  <BetaPage />
+                </SubscriptionGuard>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/releases"
+            element={
+              <ProtectedRoute>
+                <ReleasesPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/beta-users" element={<AdminBetaUsersPage />} />
+          <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
+
+          <Route path="/convite/:referralCode" element={<ReferralPage />} />
+          <Route path="/r/:referralCode" element={<ReferralPage />} />
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </>
+  );
+}
+
+function AppRouter() {
+  const { pathname } = useLocation();
+  const shouldLoadAuth = PROTECTED_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  if (!shouldLoadAuth) {
+    return <AppRoutes />;
+  }
+
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <div className="min-h-screen">
-              <OnboardingFlowGate />
-              <Suspense fallback={<RouteFallback />}>
-                <Routes>
-                  <Route path="/" element={<LandingPage />} />
-                  <Route path="/landing" element={<SalesLandingPage />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/complete-signup" element={<CompleteSignupPage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/terms" element={<TermsPage />} />
-                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                  <Route path="/lgpd" element={<LGPDPage />} />
-
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <SubscriptionGuard>
-                          <DashboardPage />
-                        </SubscriptionGuard>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/whatsapp"
-                    element={
-                      <ProtectedRoute>
-                        <SubscriptionGuard>
-                          <Navigate to="/settings?tab=connection" replace />
-                        </SubscriptionGuard>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/whatsapp-v2"
-                    element={
-                      <ProtectedRoute>
-                        <SubscriptionGuard>
-                          <Navigate to="/settings?tab=connection" replace />
-                        </SubscriptionGuard>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/whatsapp-connection"
-                    element={
-                      <ProtectedRoute>
-                        <Navigate to="/settings?tab=connection" replace />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <ProtectedRoute>
-                        <SettingsPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/subscription"
-                    element={
-                      <ProtectedRoute>
-                        <SubscriptionPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/feedback"
-                    element={
-                      <ProtectedRoute>
-                        <SubscriptionGuard>
-                          <FeedbackPage />
-                        </SubscriptionGuard>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/referrals"
-                    element={
-                      <ProtectedRoute>
-                        <SubscriptionGuard>
-                          <ReferralsPage />
-                        </SubscriptionGuard>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/beta"
-                    element={
-                      <ProtectedRoute>
-                        <SubscriptionGuard>
-                          <BetaPage />
-                        </SubscriptionGuard>
-                      </ProtectedRoute>
-                    }
-                  />
-
-                  <Route
-                    path="/releases"
-                    element={
-                      <ProtectedRoute>
-                        <ReleasesPage />
-                      </ProtectedRoute>
-                    }
-                  />
-
-                  <Route path="/admin" element={<AdminDashboardPage />} />
-                  <Route path="/admin/users" element={<AdminUsersPage />} />
-                  <Route path="/admin/beta-users" element={<AdminBetaUsersPage />} />
-                  <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
-
-                  <Route path="/convite/:referralCode" element={<ReferralPage />} />
-                  <Route path="/r/:referralCode" element={<ReferralPage />} />
-
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </div>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <div className="min-h-screen">
+            <AppRouter />
+          </div>
+        </BrowserRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
