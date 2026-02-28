@@ -13,12 +13,12 @@ const ReferralPage: React.FC = () => {
   const { referralCode } = useParams<{ referralCode: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [referrerName, setReferrerName] = useState<string>('');
   const [isValidCode, setIsValidCode] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
-  
+
   // Dados do formulário
   const [formData, setFormData] = useState({
     name: '',
@@ -39,7 +39,7 @@ const ReferralPage: React.FC = () => {
 
       try {
         console.log('[REFERRAL-PAGE] Validando código:', referralCode);
-        
+
         // Buscar perfil com o código de indicação (case insensitive)
         const { data, error } = await supabase
           .from('profiles')
@@ -72,7 +72,7 @@ const ReferralPage: React.FC = () => {
   // Função para registrar com código de indicação
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Erro",
@@ -84,7 +84,7 @@ const ReferralPage: React.FC = () => {
 
     if (formData.password.length < 6) {
       toast({
-        title: "Erro", 
+        title: "Erro",
         description: "A senha deve ter pelo menos 6 caracteres",
         variant: "destructive",
       });
@@ -95,7 +95,7 @@ const ReferralPage: React.FC = () => {
 
     try {
       console.log('[REFERRAL-PAGE] Iniciando registro com indicação, código:', referralCode);
-      
+
       // Chamar a função de signup com código de indicação
       const { data, error } = await supabase.functions.invoke('handle-signup', {
         body: {
@@ -116,7 +116,7 @@ const ReferralPage: React.FC = () => {
       }
 
       console.log('[REFERRAL-PAGE] Registro bem-sucedido');
-      
+
       toast({
         title: "Conta criada com sucesso!",
         description: data.message || "Sua conta foi criada e você ganhou 10 dias de teste gratuito!",
@@ -124,10 +124,10 @@ const ReferralPage: React.FC = () => {
 
       // Redirecionar para login com mensagem
       setTimeout(() => {
-        navigate('/login', { 
-          state: { 
+        navigate('/login', {
+          state: {
             message: 'Conta criada! Faça login para começar seu teste gratuito de 10 dias.',
-            email: formData.email 
+            email: formData.email
           }
         });
       }, 2000);
@@ -173,8 +173,8 @@ const ReferralPage: React.FC = () => {
             <p className="text-summi-gray-600">
               Este link de convite não é válido ou pode ter expirado.
             </p>
-            <Button 
-              onClick={() => navigate('/register')} 
+            <Button
+              onClick={() => navigate('/register')}
               className="btn-primary w-full"
             >
               Criar Conta Normalmente
@@ -197,7 +197,7 @@ const ReferralPage: React.FC = () => {
             <strong>{referrerName}</strong> te convidou para conhecer a Summi
           </p>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           {/* Benefícios */}
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
@@ -213,10 +213,6 @@ const ReferralPage: React.FC = () => {
               <li className="flex items-center gap-2">
                 <Gift className="h-4 w-4" />
                 <span>Acesso completo a todas as funcionalidades</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <ArrowRight className="h-4 w-4" />
-                <span>Seu amigo também ganha 3 dias extras!</span>
               </li>
             </ul>
           </div>
@@ -276,9 +272,9 @@ const ReferralPage: React.FC = () => {
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className="btn-primary w-full" 
+            <Button
+              type="submit"
+              className="btn-primary w-full"
               disabled={isRegistering}
             >
               {isRegistering ? (
@@ -294,8 +290,8 @@ const ReferralPage: React.FC = () => {
 
           <div className="text-center text-xs text-summi-gray-500">
             Já tem uma conta?{' '}
-            <Button 
-              variant="link" 
+            <Button
+              variant="link"
               className="p-0 h-auto text-xs text-summi-blue hover:underline"
               onClick={() => navigate('/login')}
             >

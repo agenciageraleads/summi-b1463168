@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import type { Profile } from '@/hooks/useProfile';
 import { useProfile } from '@/hooks/useProfile';
+import { SetupProgressBanner } from '@/components/Settings/SetupProgressBanner';
 import { AccountDeletion } from '@/components/Settings/AccountDeletion';
 import { SubscriptionStatus } from '@/components/SubscriptionStatus';
 import { WhatsAppConnectionManager } from '@/components/Dashboard/WhatsAppConnectionManager';
@@ -65,6 +66,13 @@ const SettingsPage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        <SetupProgressBanner
+          whatsappConnected={!!profile.numero && !!profile.instance_name}
+          hasPreferencesSet={!!profile.onboarding_completed}
+          onGoToWhatsApp={() => setSearchParams({ tab: 'connection' })}
+          onGoToPreferences={() => setSearchParams({ tab: 'config' })}
+        />
+
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
           <p className="text-muted-foreground">

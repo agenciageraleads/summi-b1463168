@@ -226,7 +226,13 @@ def _send_aux_message(
 
 def _detect_message_shape(payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     payload = _unwrap(payload) if isinstance(payload, list) else payload
-    msg = _get_in(payload, "body", "data", "message") or _get_in(payload, "data", "message") or payload.get("message") or {}
+    msg = (
+        _get_in(payload, "body", "data", "message") 
+        or _get_in(payload, "data", "message") 
+        or _get_in(payload, "data", "update", "message")
+        or payload.get("message") 
+        or {}
+    )
     if not isinstance(msg, dict):
         msg = {}
     if "audioMessage" in msg:
@@ -241,8 +247,10 @@ def _detect_message_shape(payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]
 
 
 def _get_reaction_target_message_id(payload: Dict[str, Any]) -> Optional[str]:
-    return _get_in(payload, "body", "data", "message", "reactionMessage", "key", "id") or _get_in(
-        payload, "data", "message", "reactionMessage", "key", "id"
+    return (
+        _get_in(payload, "body", "data", "message", "reactionMessage", "key", "id") 
+        or _get_in(payload, "data", "message", "reactionMessage", "key", "id")
+        or _get_in(payload, "data", "update", "message", "reactionMessage", "key", "id")
     )
 
 
@@ -250,6 +258,7 @@ def _get_reaction_text(payload: Dict[str, Any]) -> str:
     return str(
         _get_in(payload, "body", "data", "message", "reactionMessage", "text")
         or _get_in(payload, "data", "message", "reactionMessage", "text")
+        or _get_in(payload, "data", "update", "message", "reactionMessage", "text")
         or ""
     )
 
@@ -259,6 +268,21 @@ def _decode_b64_media(media_b64: str) -> bytes:
     if "," in raw and raw.lower().startswith("data:"):
         raw = raw.split(",", 1)[1]
     return base64.b64decode(raw)
+
+
+def _is_audio(media_bytes: bytes) -> bool:
+    if not media_bytes:
+        return False
+    header = media_bytes[:32]
+    if header.startswith(b"OggS"):
+        return True
+    if header.startswith(b"ID3"):
+        return True
+    if len(header) > 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0:
+        return True
+    if b"ftypM4A" in header:
+        return True
+    return False
 
 
 def _get_inline_media_base64(payload: Dict[str, Any]) -> Optional[str]:
@@ -526,33 +550,47 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             # pois adapters diferentes podem enviar from_me=False para reacoes proprias.
             # A condicao de seguranca e: send_on_reaction ativo + emoji ⚡ + target_id presente.
             if send_on_reaction and _lightning_reaction(reaction_text) and target_id:
-                media_b64 = evolution.get_media_base64(instance_name, target_id)
-                if media_b64:
-                    mp3_bytes = _decode_b64_media(media_b64)
-                    transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
-                    final_text = transcript
-                    resume_audio = _profile_bool(profile, "resume_audio", False)
-                    segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
-                    if resume_audio and (duration_seconds or 0) > segundos_para_resumir and transcript.strip():
-                        final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript)
-                        extra["reaction_audio_summarized"] = True
-                    if final_text.strip():
-                        outbound = _send_aux_message(
-                            evolution=evolution,
-                            settings=settings,
-                            profile=profile,
-                            payload=payload,
-                            instance_name=instance_name,
-                            remote_jid_digits=remote_jid_digits,
-                            text=final_text.strip(),
-                            quoted_message_id=target_id,
-                        )
-                        extra["reaction_audio_transcribed"] = True
-                else:
+                author_jid = str(normalized.get("author_jid") or _get_in(payload, "body", "sender") or "")
+                profile_number = _digits(profile.get("numero", ""))
+                reaction_is_from_owner = from_me or bool(profile_number and profile_number in _digits(author_jid))
+                
+                if is_group and not reaction_is_from_owner:
                     logger.warning(
-                        "evolution_webhook.reaction_no_media instance=%s target_id=%s",
-                        instance_name, target_id,
+                        "evolution_webhook.reaction_ignored reason=third_party_in_group instance=%s target_id=%s author=%s",
+                        instance_name, target_id, author_jid,
                     )
+                else:
+                    media_b64 = evolution.get_media_base64(instance_name, target_id)
+                    if media_b64:
+                        mp3_bytes = _decode_b64_media(media_b64)
+                        if not _is_audio(mp3_bytes):
+                            logger.warning("evolution_webhook.reaction_ignored reason=media_not_audio instance=%s target_id=%s", instance_name, target_id)
+                            extra["reaction_media_not_audio"] = True
+                        else:
+                            transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
+                            final_text = transcript
+                            resume_audio = _profile_bool(profile, "resume_audio", False)
+                            segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
+                            if resume_audio and (duration_seconds or 0) > segundos_para_resumir and transcript.strip():
+                                final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript)
+                                extra["reaction_audio_summarized"] = True
+                            if final_text.strip():
+                                outbound = _send_aux_message(
+                                    evolution=evolution,
+                                    settings=settings,
+                                    profile=profile,
+                                    payload=payload,
+                                    instance_name=instance_name,
+                                    remote_jid_digits=remote_jid_digits,
+                                    text=final_text.strip(),
+                                    quoted_message_id=target_id,
+                                )
+                                extra["reaction_audio_transcribed"] = True
+                    else:
+                        logger.warning(
+                            "evolution_webhook.reaction_no_media instance=%s target_id=%s",
+                            instance_name, target_id,
+                        )
             # Reacoes nao entram no historico de conversa para analise
             text_for_chat = None
 

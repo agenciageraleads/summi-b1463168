@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Info } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +30,7 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
     send_private_only: profile.send_private_only ?? false,
     'Summi em Audio?': profile['Summi em Audio?'] ?? false,
     apenas_horario_comercial: profile.apenas_horario_comercial ?? true,
+    summi_frequencia: profile.summi_frequencia || '1h',
   });
 
   useEffect(() => {
@@ -41,10 +43,11 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
       send_private_only: profile.send_private_only ?? false,
       'Summi em Audio?': profile['Summi em Audio?'] ?? false,
       apenas_horario_comercial: profile.apenas_horario_comercial ?? true,
+      summi_frequencia: profile.summi_frequencia || '1h',
     });
   }, [profile]);
 
-  const handleInputChange = (field: keyof typeof formData, value: boolean | number) => {
+  const handleInputChange = (field: keyof typeof formData, value: boolean | number | string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -103,6 +106,38 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
               checked={formData.apenas_horario_comercial}
               onCheckedChange={(checked) => handleInputChange('apenas_horario_comercial', checked)}
             />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <Label className="text-base font-medium text-slate-800">Frequência dos Relatórios (Summis)</Label>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {[
+                { label: '1h', value: '1h' },
+                { label: '3h', value: '3h' },
+                { label: '6h', value: '6h' },
+                { label: '12h', value: '12h' },
+                { label: 'Diário', value: '24h' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleInputChange('summi_frequencia', opt.value)}
+                  className={cn(
+                    "flex-1 min-w-[70px] px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200",
+                    formData.summi_frequencia === opt.value
+                      ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 italic">
+              Escolha o intervalo ideal para receber os resumos das suas conversas.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -217,18 +252,25 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
           </div>
 
           {formData.resume_audio && (
-            <div className="space-y-2">
-              <Label htmlFor="segundos_para_resumir">Segundos mínimos para resumir</Label>
+            <div className="space-y-3 p-4 bg-slate-50/50 rounded-xl border border-slate-100">
+              <Label htmlFor="segundos_para_resumir" className="text-slate-700">Segundos mínimos para resumir</Label>
               <Input
                 id="segundos_para_resumir"
                 type="number"
                 min="10"
                 max="300"
                 value={formData.segundos_para_resumir}
-                onChange={(e) => handleInputChange('segundos_para_resumir', Number(e.target.value))}
+                onChange={(e) => handleInputChange('segundos_para_resumir', parseInt(e.target.value, 10) || 0)}
+                onBlur={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  const clamped = val < 10 ? 10 : (val > 300 ? 300 : val);
+                  handleInputChange('segundos_para_resumir', clamped);
+                }}
+                className="bg-white border-slate-200"
               />
-              <p className="text-xs text-muted-foreground">
-                Ex: 45 = áudios com mais de 45s viram resumo. (Recomendado: 45–60s)
+              <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-slate-400" />
+                Áudios com mais de <span className="font-bold text-slate-700 underline decoration-primary/30">{formData.segundos_para_resumir} segundos</span> receberão um resumo.
               </p>
             </div>
           )}

@@ -136,6 +136,43 @@ def analyze_user_chats(
     return {"success": True, "analyzed_count": len(analyzed)}
 
 
+import time
+
+def send_onboarding_messages(evolution: EvolutionClient, instance: str, numero: str, nome: str):
+    """Envia a sequência de 3 mensagens de onboarding no WhatsApp."""
+    nome_salut = nome.split()[0] if nome else "usuário"
+    
+    msg1 = (
+        f"👋 Oi, {nome_salut}! Tudo certo por aqui.\n\n"
+        "Sou a *Summi*, sua assistente inteligente de WhatsApp. Estou conectada ao seu número e já estou monitorando suas conversas. 🚀\n\n"
+        "Me dá alguns segundos que vou te explicar como funciono!"
+    )
+    
+    msg2 = (
+        "📊 As suas mensagens serão ranqueadas por prioridade de atenção para poupar seu tempo:\n\n"
+        "🚨 Prioridade 3 = Urgente\n"
+        "🔥 Prioridade 2 = Importante\n"
+        "⚪ Prioridade 1/0 = Pode esperar\n\n"
+        "Assim você nunca mais perde tempo garimpando o que é importante no WhatsApp."
+    )
+    
+    msg3 = (
+        "⚡ *Dica rápida:* Reaja a qualquer áudio com o emoji ⚡ e eu te mando a transcrição na hora — sem precisar ouvir!\n\n"
+        "Lembre-se: no painel da Summi você pode *personalizar tudo*: frequência dos relatórios, horários, resumo em áudio e muito mais.\n\n"
+        "Configure aqui: summi.gera-leads.com/settings\n\n"
+        "Bem-vindo(a) à Summi! 🚀"
+    )
+
+    try:
+        evolution.send_text(instance, numero, msg1)
+        time.sleep(2)
+        evolution.send_text(instance, numero, msg2)
+        time.sleep(4)
+        evolution.send_text(instance, numero, msg3)
+    except Exception as e:
+        print(f"Error sending onboarding to {numero}: {e}")
+
+
 def run_hourly_job(
     settings: Settings,
     supabase: SupabaseRest,
@@ -178,7 +215,23 @@ def run_hourly_job(
         summi_freq = str(profile.get("summi_frequencia") or "1h").strip()
         freq_map = {"1h": 1, "3h": 3, "6h": 6, "12h": 12, "24h": 24}
         freq_hours = freq_map.get(summi_freq, 1)
+        # Verificar se precisa de onboarding (primeiro envio)
         ultimo_summi = profile.get("ultimo_summi_em")
+        onboarding_done = profile.get("onboarding_completed")
+        
+        if not ultimo_summi and not onboarding_done:
+            print(f"Sending onboarding to new user: {user_id}")
+            send_onboarding_messages(evolution, settings.summi_sender_instance, numero_usuario, profile.get("nome", ""))
+            # Marcar como enviado para evitar repetição (usando onboarding_completed já existente)
+            try:
+                supabase.patch(
+                    "profiles",
+                    data={"onboarding_completed": True},
+                    filters=[to_postgrest_filter_eq("id", user_id)],
+                )
+            except Exception:
+                pass
+
         if ultimo_summi and freq_hours > 1:
             try:
                 ultimo_dt = dt.datetime.fromisoformat(str(ultimo_summi).replace("Z", "+00:00"))
