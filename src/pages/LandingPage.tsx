@@ -359,7 +359,7 @@ const LandingPage = () => {
 
                 <div className="mt-4 p-3 bg-green-100 rounded-lg border border-green-200">
                   <p className="text-green-800 font-semibold text-lg">
-                    💰 Economia de R$ 215,88 por ano!
+                    💰 Economia de R$ 216,00 por ano!
                   </p>
                   <p className="text-green-700 text-sm">
                     Equivale a mais de 4 meses grátis
