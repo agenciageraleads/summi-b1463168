@@ -7,13 +7,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Crown, Calendar, RefreshCw, Clock } from 'lucide-react';
 import { useSubscriptionSync } from '@/hooks/useSubscriptionSync';
 import { useNavigate } from 'react-router-dom';
+import { getPlanLabel, normalizePlanType, type PlanType } from '@/lib/subscriptionPlans';
 
 interface SubscriptionData {
   isSubscribed: boolean;
   status: string; // 'trialing', 'active', 'inactive', etc.
   stripe_price_id: string | null;
   subscription_end: string | null;
-  plan_type: string | null;
+  plan_type: PlanType | null;
 }
 
 /**
@@ -47,13 +48,7 @@ export const SubscriptionStatus = () => {
       }
 
       if (data) {
-        // Determina o tipo de plano baseado no stripe_price_id
-        let planType = null;
-        if (data.stripe_price_id === 'price_1T5IoTKyDqE0F1Pt7P0r5WC4') {
-          planType = 'monthly';
-        } else if (data.stripe_price_id === 'price_1T5IpBKyDqE0F1PtJEPbmtal') {
-          planType = 'annual';
-        }
+        const planType = normalizePlanType(null, data.stripe_price_id);
 
         setSubscriptionData({
           isSubscribed: data.subscription_status === 'active' || data.subscription_status === 'trialing',
@@ -217,7 +212,7 @@ export const SubscriptionStatus = () => {
             <div className="flex items-center justify-between">
               <span className="text-sm text-summi-gray-600">Plano:</span>
               <span className="text-sm font-medium text-summi-gray-900">
-                {subscriptionData.plan_type === 'monthly' ? 'Mensal' : 'Anual'}
+                {getPlanLabel(subscriptionData.plan_type) ?? 'Ativo'}
               </span>
             </div>
           )}

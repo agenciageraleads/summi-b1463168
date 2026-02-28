@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import base64
+from io import BytesIO
 import json
 from typing import Any, Dict, Optional, Tuple
 
 import requests
+from mutagen import File as MutagenFile
 
 
 class OpenAIError(RuntimeError):
@@ -105,6 +107,23 @@ class OpenAIClient:
             return "image/webp"
         return default_mime
 
+    def _probe_audio_duration_seconds(self, audio_bytes: bytes) -> Optional[float]:
+        try:
+            audio_file = MutagenFile(BytesIO(audio_bytes))
+        except Exception:
+            return None
+        if audio_file is None:
+            return None
+        info = getattr(audio_file, "info", None)
+        length = getattr(info, "length", None)
+        if length is None:
+            return None
+        try:
+            duration = float(length)
+        except Exception:
+            return None
+        return duration if duration > 0 else None
+
     def transcribe_mp3(self, mp3_bytes: bytes, filename: str = "audio.mp3") -> Tuple[str, Optional[float]]:
         """
         Retorna (texto, duracao_segundos?) usando /audio/transcriptions.
@@ -125,6 +144,8 @@ class OpenAIClient:
             duration_num = float(duration) if duration is not None else None
         except Exception:
             duration_num = None
+        if duration_num is None:
+            duration_num = self._probe_audio_duration_seconds(mp3_bytes)
         return text, duration_num
 
     def describe_image_base64(self, model: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:

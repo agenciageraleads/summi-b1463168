@@ -6,10 +6,14 @@ import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Check, Crown, Calendar, CreditCard, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getPlanActivePriceLabel, getPlanLabel, normalizePlanType } from '@/lib/subscriptionPlans';
 
 const SubscriptionPage = () => {
   const { subscription, isLoading, createCheckout, manageSubscription } = useSubscription();
   const { toast } = useToast();
+  const currentPlanType = normalizePlanType(subscription.plan_type, subscription.stripe_price_id);
+  const currentPlanLabel = getPlanLabel(currentPlanType);
+  const currentPlanPriceLabel = getPlanActivePriceLabel(currentPlanType);
 
   const handleSubscribe = async (planType: 'monthly' | 'annual') => {
     try {
@@ -158,11 +162,9 @@ const SubscriptionPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium text-summi-gray-900">
-                    Plano {subscription.plan_type === 'monthly' ? 'Mensal' : 'Anual'}
+                    {currentPlanLabel ? `Plano ${currentPlanLabel}` : 'Assinatura ativa'}
                   </p>
-                  <p className="text-sm text-summi-gray-600">
-                    {subscription.plan_type === 'monthly' ? 'R$ 47,90/mês' : 'R$ 29,90/mês (cobrado anualmente)'}
-                  </p>
+                  {currentPlanPriceLabel && <p className="text-sm text-summi-gray-600">{currentPlanPriceLabel}</p>}
                 </div>
                 <Badge className="bg-summi-green text-white">Ativo</Badge>
               </div>
@@ -195,7 +197,7 @@ const SubscriptionPage = () => {
           </h2>
 
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl">
-            <Card className={`border-2 transition-all duration-300 hover:shadow-lg ${subscription.plan_type === 'monthly' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
+            <Card className={`border-2 transition-all duration-300 hover:shadow-lg ${currentPlanType === 'monthly' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
               }`}>
               <CardHeader className="text-center">
                 <CardTitle className="text-xl text-summi-gray-900">Plano Mensal</CardTitle>
@@ -223,17 +225,17 @@ const SubscriptionPage = () => {
                   </li>
                 </ul>
 
-                {subscription.plan_type !== 'monthly' && (
+                {currentPlanType !== 'monthly' && (
                   <Button
                     onClick={() => handleSubscribe('monthly')}
                     className="w-full bg-summi-gradient hover:opacity-90 text-white"
-                    disabled={subscription.subscribed && subscription.plan_type === 'monthly'}
+                    disabled={subscription.subscribed && currentPlanType === 'monthly'}
                   >
                     {subscription.subscribed ? 'Alterar para Mensal' : 'Assinar Mensal'}
                   </Button>
                 )}
 
-                {subscription.plan_type === 'monthly' && (
+                {currentPlanType === 'monthly' && (
                   <div className="text-center py-2">
                     <Badge className="bg-summi-green text-white">Plano Atual</Badge>
                   </div>
@@ -241,7 +243,7 @@ const SubscriptionPage = () => {
               </CardContent>
             </Card>
 
-            <Card className={`border-2 transition-all duration-300 hover:shadow-lg relative ${subscription.plan_type === 'annual' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
+            <Card className={`border-2 transition-all duration-300 hover:shadow-lg relative ${currentPlanType === 'annual' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
               }`}>
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-summi-green text-white">Melhor Oferta</Badge>
@@ -275,17 +277,17 @@ const SubscriptionPage = () => {
                   </li>
                 </ul>
 
-                {subscription.plan_type !== 'annual' && (
+                {currentPlanType !== 'annual' && (
                   <Button
                     onClick={() => handleSubscribe('annual')}
                     className="w-full bg-summi-green hover:bg-summi-green/90 text-white"
-                    disabled={subscription.subscribed && subscription.plan_type === 'annual'}
+                    disabled={subscription.subscribed && currentPlanType === 'annual'}
                   >
                     {subscription.subscribed ? 'Alterar para Anual' : 'Assinar Anual'}
                   </Button>
                 )}
 
-                {subscription.plan_type === 'annual' && (
+                {currentPlanType === 'annual' && (
                   <div className="text-center py-2">
                     <Badge className="bg-summi-green text-white">Plano Atual</Badge>
                   </div>

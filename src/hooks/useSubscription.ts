@@ -4,10 +4,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { normalizePlanType, type PlanType } from '@/lib/subscriptionPlans';
 
 export interface Subscription {
   subscribed: boolean;
-  plan_type: string | null;
+  plan_type: PlanType | null;
   stripe_price_id: string | null;
   subscription_end: string | null;
   cancel_at_period_end: boolean;
@@ -44,9 +45,10 @@ export const useSubscription = () => {
         return;
       }
 
+      const planType = normalizePlanType(data.plan_type, data.stripe_price_id);
       setSubscription({
         subscribed: data.subscribed || false,
-        plan_type: data.plan_type || null,
+        plan_type: planType,
         stripe_price_id: data.stripe_price_id || null,
         subscription_end: data.subscription_end || null,
         cancel_at_period_end: data.cancel_at_period_end || false

@@ -27,6 +27,8 @@ import AdminBetaUsersPage from "./pages/AdminBetaUsersPage";
 import AdminAnnouncementsPage from "./pages/AdminAnnouncementsPage";
 import ReferralPage from '@/pages/ReferralPage';
 import TermsPage from "./pages/TermsPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import LGPDPage from "./pages/LGPDPage";
 import { OnboardingFlow } from "./components/Onboarding/OnboardingFlow";
 
 const queryClient = new QueryClient();
@@ -49,6 +51,8 @@ function App() {
                 <Route path="/complete-signup" element={<CompleteSignupPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/lgpd" element={<LGPDPage />} />
 
                 <Route path="/dashboard" element={
                   <ProtectedRoute>

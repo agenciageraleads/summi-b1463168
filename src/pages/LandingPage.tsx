@@ -57,7 +57,7 @@ const LandingPage = () => {
 
           {/* CTA Buttons */}
           <div className="flex items-center space-x-4">
-            <Link to="/register">
+            <Link to="/login">
               <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg">
                 Entrar
               </Button>

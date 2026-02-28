@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getPlanTypeFromPriceId } from "../_shared/subscriptionPlans.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -154,12 +155,7 @@ serve(async (req) => {
 
       logStep("Active or trialing subscription found", { subscriptionId: subscription.id, status: subscriptionStatus, endDate: subscriptionEnd, priceId: stripePriceId, hasPaymentMethod, cancelAtPeriodEnd });
 
-      // Determinar tipo do plano baseado no Price ID
-      if (stripePriceId === "price_1T5IoTKyDqE0F1Pt7P0r5WC4") {
-        planType = "monthly";
-      } else if (stripePriceId === "price_1T5IpBKyDqE0F1PtJEPbmtal") {
-        planType = "annual";
-      }
+      planType = getPlanTypeFromPriceId(stripePriceId);
       logStep("Determined plan type", { priceId: stripePriceId, planType });
     } else {
       logStep("No active or trialing subscription found");

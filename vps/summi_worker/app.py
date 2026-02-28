@@ -95,6 +95,31 @@ def _profile_int(profile: Dict[str, Any], key: str, default: int) -> int:
         return default
 
 
+def _safe_positive_int(value: Any) -> Optional[int]:
+    try:
+        parsed = int(float(value))
+    except Exception:
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _increment_audio_metrics(supabase: SupabaseRest, *, user_id: str, audio_seconds: Optional[int]) -> None:
+    if not audio_seconds or audio_seconds <= 0:
+        return
+    try:
+        supabase.rpc(
+            "increment_profile_metrics",
+            {
+                "target_user_id": user_id,
+                "inc_audio_segundos": int(audio_seconds),
+                "inc_mensagens_analisadas": 0,
+                "inc_conversas_priorizadas": 0,
+            },
+        )
+    except Exception as exc:
+        logger.warning("audio_metrics.increment_failed user_id=%s seconds=%s error=%s", user_id, audio_seconds, exc)
+
+
 def _lightning_reaction(text: str) -> bool:
     return "⚡" in (text or "")
 
@@ -489,6 +514,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
     remote_jid_digits = _digits(remote_jid)
     text_for_chat: Optional[str] = None
     outbound: Dict[str, Any] = {"sent": False}
+    processed_audio_seconds: Optional[int] = None
     extra: Dict[str, Any] = {}
 
     try:
@@ -522,26 +548,22 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                     or _get_in(payload, "message", "audioMessage", "seconds")
                 )
                 audio_seconds: Optional[int] = None
-                try:
-                    if seconds_from_payload is not None:
-                        audio_seconds = int(seconds_from_payload)
-                    elif duration_seconds is not None:
-                        # gpt-4o-mini-transcribe não retorna duration; whisper sim.
-                        audio_seconds = int(duration_seconds)
-                except Exception:
-                    audio_seconds = None
+                if seconds_from_payload is not None:
+                    audio_seconds = _safe_positive_int(seconds_from_payload)
+                if audio_seconds is None and duration_seconds is not None:
+                    audio_seconds = _safe_positive_int(duration_seconds)
 
                 resume_audio = _profile_bool(profile, "resume_audio", False)
                 segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
-                # Se nenhuma fonte de duração disponível (modelo não retorna), assume que
-                # o áudio pode ser longo e aplica resumo de forma conservadora (safe fallback).
-                audio_seconds_for_check = audio_seconds if audio_seconds is not None else (segundos_para_resumir + 1)
-                should_summarize = bool(resume_audio and audio_seconds_for_check > segundos_para_resumir)
+                should_summarize = bool(
+                    resume_audio and audio_seconds is not None and audio_seconds > segundos_para_resumir
+                )
                 logger.info(
                     "evolution_webhook.audio_duration instance=%s message_id=%s seconds_payload=%s duration_openai=%s audio_seconds=%s should_summarize=%s",
                     instance_name, message_id, seconds_from_payload, duration_seconds, audio_seconds, should_summarize,
                 )
                 final_audio_text = transcript
+                processed_audio_seconds = audio_seconds
                 if should_summarize and transcript.strip():
                     final_audio_text = _summarize_transcription(openai, settings.openai_model_summary, transcript, profile)
 
@@ -609,13 +631,17 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         else:
                             transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
                             final_text = transcript
+                            audio_seconds = _safe_positive_int(duration_seconds)
                             resume_audio = _profile_bool(profile, "resume_audio", False)
                             segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
-                            # Se a API não retornou duração (gpt-4o-mini-transcribe), assume que deve resumir.
-                            dur_for_check = duration_seconds if duration_seconds is not None else (segundos_para_resumir + 1)
-                            if resume_audio and dur_for_check > segundos_para_resumir and transcript.strip():
+                            should_summarize_reaction = bool(
+                                resume_audio and audio_seconds is not None and audio_seconds > segundos_para_resumir
+                            )
+                            if should_summarize_reaction and transcript.strip():
                                 final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript, profile)
                                 extra["reaction_audio_summarized"] = True
+                            extra["reaction_audio_seconds"] = audio_seconds
+                            processed_audio_seconds = audio_seconds
                             if final_text.strip():
                                 outbound = _send_aux_message(
                                     evolution=evolution,
@@ -651,6 +677,8 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             text_for_chat = _derive_message_content(payload, normalized)
 
     chat_id: Optional[str] = None
+
+    _increment_audio_metrics(supabase, user_id=user_id, audio_seconds=processed_audio_seconds)
     
     if from_me:
         # Inbox Zero: A resposta do usuário (ele mesmo respondendo o lead) limpa a conversa do dashboard.

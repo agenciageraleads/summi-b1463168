@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { PRICE_ID_BY_PLAN } from "../_shared/subscriptionPlans.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,15 +59,13 @@ serve(async (req) => {
     }
 
     // Definir price_id e trial_days baseado no tipo de plano
-    let priceId: string;
     let trialDays: number;
     if (planType === 'monthly') {
-      priceId = 'price_1T5IoTKyDqE0F1Pt7P0r5WC4'; // R$ 47,90/mês
       trialDays = 7;
     } else {
-      priceId = 'price_1T5IpBKyDqE0F1PtJEPbmtal'; // R$ 358,80/ano
       trialDays = 30;
     }
+    const priceId = PRICE_ID_BY_PLAN[planType];
 
     // Checkout público — sem usuário logado
     // O Stripe coleta email, nome e telefone via custom_fields

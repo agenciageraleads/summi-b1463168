@@ -7,6 +7,34 @@ import { Rocket, Zap, Bug, Sparkles, Clock } from 'lucide-react';
 
 const releases = [
     {
+        version: 'v1.2.1',
+        date: '28 de Fevereiro, 2026',
+        title: 'Correções Críticas de Fluxo e Métricas',
+        type: 'major',
+        changes: [
+            {
+                type: 'fix',
+                text: 'Citações no WhatsApp: respostas de transcrição e resumo agora voltam a marcar corretamente o áudio original no balão da conversa.',
+                icon: Bug
+            },
+            {
+                type: 'improvement',
+                text: 'Resumo por duração real: a Summi passou a medir a duração do áudio antes de resumir, inclusive em transcrições disparadas por reação ⚡.',
+                icon: Zap
+            },
+            {
+                type: 'improvement',
+                text: 'Dashboard com memória: os segundos de áudios processados agora são acumulados no perfil e continuam aparecendo mesmo depois que a conversa sai da lista.',
+                icon: Sparkles
+            },
+            {
+                type: 'improvement',
+                text: 'Configurações refinadas: frequência dos relatórios por usuário, rotas públicas legais e status da assinatura ficaram consistentes com os dados reais do checkout.',
+                icon: Rocket
+            }
+        ]
+    },
+    {
         version: 'v1.2.0',
         date: '28 de Fevereiro, 2026',
         title: 'Inteligência Contextual e Refinamentos',

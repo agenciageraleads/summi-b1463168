@@ -47,11 +47,17 @@ const extractAudioSeconds = (event: Record<string, unknown> | unknown): number =
   return 0;
 };
 
+const formatAudioDuration = (seconds: number): string => {
+  if (seconds <= 0) return '0 min';
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.round(seconds / 60)} min`;
+};
+
 export const DashboardMetricsCards = ({ chats, profile, isLoading }: DashboardMetricsCardsProps) => {
   const metrics = useMemo(() => {
     let prioritizedConversations = 0;
     let analyzedMessages = 0;
-    let audioSeconds = 0;
+    let liveAudioSeconds = 0;
 
     for (const chat of chats) {
       const priority = asNumber((chat as Chat & { prioridade?: unknown }).prioridade) ?? 0;
@@ -70,14 +76,17 @@ export const DashboardMetricsCards = ({ chats, profile, isLoading }: DashboardMe
           Boolean(getNested(event, ['raw', 'message', 'audioMessage']));
 
         if (!isAudio) continue;
-        audioSeconds += extractAudioSeconds(event);
+        liveAudioSeconds += extractAudioSeconds(event);
       }
     }
+
+    const persistedAudioSeconds = asNumber(profile?.total_segundos_audio) ?? 0;
+    const audioSeconds = Math.max(liveAudioSeconds, persistedAudioSeconds);
 
     return {
       prioritizedConversations: prioritizedConversations + (profile?.total_conversas_priorizadas || 0),
       analyzedMessages: analyzedMessages + (profile?.total_mensagens_analisadas || 0),
-      audioMinutes: Math.round(audioSeconds / 60) + Math.round((profile?.total_segundos_audio || 0) / 60),
+      audioSeconds,
     };
   }, [chats, profile]);
 
@@ -90,7 +99,7 @@ export const DashboardMetricsCards = ({ chats, profile, isLoading }: DashboardMe
             Áudios processados
           </CardDescription>
           <CardTitle className="text-2xl">
-            {isLoading ? <Skeleton className="h-7 w-24" /> : `${metrics.audioMinutes} min`}
+            {isLoading ? <Skeleton className="h-7 w-24" /> : formatAudioDuration(metrics.audioSeconds)}
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
@@ -130,4 +139,3 @@ export const DashboardMetricsCards = ({ chats, profile, isLoading }: DashboardMe
     </div>
   );
 };
-
