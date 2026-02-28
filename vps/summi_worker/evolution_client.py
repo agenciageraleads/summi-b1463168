@@ -63,14 +63,22 @@ class EvolutionClient:
                 last = f"{url} {resp.status_code} {resp.text}"
         raise EvolutionError(f"request failed: {last}")
 
-    def send_text(self, instance: str, remote_jid: str, text: str, quoted_message_id: str | None = None) -> None:
-        # Tentativa 1 (comum): /message/sendText/{instance}
+    def send_text(
+        self,
+        instance: str,
+        remote_jid: str,
+        text: str,
+        quoted_message_id: str | None = None,
+        quoted_text: str | None = None,
+    ) -> None:
         url = f"{self._url}/message/sendText/{instance}"
-        payload = {"number": remote_jid, "text": text}
+        payload: Dict[str, Any] = {"number": remote_jid, "text": text}
         if quoted_message_id:
-            # Best-effort: diferentes builds da Evolution aceitam formatos distintos.
-            payload["options_message"] = {"quoted": {"messageQuoted": {"messageId": quoted_message_id}}}
-            payload["options"] = {"quoted": {"messageId": quoted_message_id}}
+            # Estrutura completa exigida pela Evolution API v2 para renderizar o quote
+            payload["quoted"] = {
+                "key": {"id": quoted_message_id},
+                "message": {"conversation": quoted_text or "Áudio/Mensagem"},
+            }
         resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
         if resp.ok:
             return

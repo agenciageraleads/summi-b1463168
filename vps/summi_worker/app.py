@@ -196,6 +196,7 @@ def _send_aux_message(
     remote_jid_digits: str,
     text: str,
     quoted_message_id: Optional[str] = None,
+    quoted_text: Optional[str] = None,
 ) -> Dict[str, Any]:
     send_private_only = _profile_bool(profile, "send_private_only", False)
     destination = "conversation"
@@ -214,7 +215,7 @@ def _send_aux_message(
         return {"sent": False, "destination": destination}
 
     branded_text = f"{text.rstrip()}\n\n_⚡️ Summi - Secretária Invisível_"
-    evolution.send_text(target_instance, target_number, branded_text, quoted_message_id=quoted_message_id)
+    evolution.send_text(target_instance, target_number, branded_text, quoted_message_id=quoted_message_id, quoted_text=quoted_text)
     return {
         "sent": True,
         "destination": destination,
@@ -496,16 +497,32 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             if media_b64:
                 mp3_bytes = _decode_b64_media(media_b64)
                 transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
-                seconds_from_payload = _get_in(payload, "body", "data", "message", "audioMessage", "seconds")
-                audio_seconds = None
+                # Extrai duração do payload em múltiplos caminhos (versões diferentes da Evolution)
+                seconds_from_payload = (
+                    _get_in(payload, "body", "data", "message", "audioMessage", "seconds")
+                    or _get_in(payload, "data", "message", "audioMessage", "seconds")
+                    or _get_in(payload, "message", "audioMessage", "seconds")
+                )
+                audio_seconds: Optional[int] = None
                 try:
-                    audio_seconds = int(seconds_from_payload) if seconds_from_payload is not None else None
+                    if seconds_from_payload is not None:
+                        audio_seconds = int(seconds_from_payload)
+                    elif duration_seconds is not None:
+                        # gpt-4o-mini-transcribe não retorna duration; whisper sim.
+                        audio_seconds = int(duration_seconds)
                 except Exception:
-                    audio_seconds = int(duration_seconds) if duration_seconds else None
+                    audio_seconds = None
 
                 resume_audio = _profile_bool(profile, "resume_audio", False)
                 segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
-                should_summarize = bool(resume_audio and (audio_seconds or 0) > segundos_para_resumir)
+                # Se nenhuma fonte de duração disponível (modelo não retorna), assume que
+                # o áudio pode ser longo e aplica resumo de forma conservadora (safe fallback).
+                audio_seconds_for_check = audio_seconds if audio_seconds is not None else (segundos_para_resumir + 1)
+                should_summarize = bool(resume_audio and audio_seconds_for_check > segundos_para_resumir)
+                logger.info(
+                    "evolution_webhook.audio_duration instance=%s message_id=%s seconds_payload=%s duration_openai=%s audio_seconds=%s should_summarize=%s",
+                    instance_name, message_id, seconds_from_payload, duration_seconds, audio_seconds, should_summarize,
+                )
                 final_audio_text = transcript
                 if should_summarize and transcript.strip():
                     final_audio_text = _summarize_transcription(openai, settings.openai_model_summary, transcript)
@@ -526,7 +543,11 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                     if from_me
                     else _profile_bool(profile, "transcreve_audio_recebido", True)
                 )
-                should_send_now = can_send_based_on_origin and (not send_on_reaction)
+                # O resumo automático deve ser enviado se o áudio for longo, mesmo que a transcrição
+                # de áudios curtos (originada por can_send_based_on_origin) esteja desativada.
+                # Exceto se o usuário configurou para enviar APENAS na reação.
+                should_send_now = (can_send_based_on_origin or should_summarize) and (not send_on_reaction)
+                
                 if should_send_now and text_for_chat:
                     outbound = _send_aux_message(
                         evolution=evolution,
@@ -537,6 +558,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         remote_jid_digits=remote_jid_digits,
                         text=text_for_chat,
                         quoted_message_id=message_id or None,
+                        quoted_text="Áudio",
                     )
 
         elif message_kind == "reaction":
@@ -554,9 +576,9 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                 profile_number = _digits(profile.get("numero", ""))
                 reaction_is_from_owner = from_me or bool(profile_number and profile_number in _digits(author_jid))
                 
-                if is_group and not reaction_is_from_owner:
+                if not reaction_is_from_owner:
                     logger.warning(
-                        "evolution_webhook.reaction_ignored reason=third_party_in_group instance=%s target_id=%s author=%s",
+                        "evolution_webhook.reaction_ignored reason=third_party instance=%s target_id=%s author=%s",
                         instance_name, target_id, author_jid,
                     )
                 else:
@@ -571,7 +593,9 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                             final_text = transcript
                             resume_audio = _profile_bool(profile, "resume_audio", False)
                             segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
-                            if resume_audio and (duration_seconds or 0) > segundos_para_resumir and transcript.strip():
+                            # Se a API não retornou duração (gpt-4o-mini-transcribe), assume que deve resumir.
+                            dur_for_check = duration_seconds if duration_seconds is not None else (segundos_para_resumir + 1)
+                            if resume_audio and dur_for_check > segundos_para_resumir and transcript.strip():
                                 final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript)
                                 extra["reaction_audio_summarized"] = True
                             if final_text.strip():
@@ -584,6 +608,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                     remote_jid_digits=remote_jid_digits,
                                     text=final_text.strip(),
                                     quoted_message_id=target_id,
+                                    quoted_text="Áudio",
                                 )
                                 extra["reaction_audio_transcribed"] = True
                     else:
