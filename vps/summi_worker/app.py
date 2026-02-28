@@ -669,8 +669,33 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             text_for_chat = _derive_message_content(payload, normalized)
 
     chat_id: Optional[str] = None
-    # Removida a trava (not from_me) para que o dashboard mostre o historico completo (minhas mensagens e do lead)
-    # e para permitir que reacoes em mensagens proprias (ex: áudio enviado por mim) funcionem (precisam estar no DB).
+    
+    if from_me:
+        # Inbox Zero: A resposta do usuário (ele mesmo respondendo o lead) limpa a conversa do dashboard.
+        # Isso economiza tokens pois evita que a IA analise algo que o usuário já resolveu manualmente.
+        logger.info("Inbox Zero: user response detected. Deleting chat for remote_jid=%s", chat_remote_jid)
+        try:
+            supabase.delete("chats", filters=[
+                to_postgrest_filter_eq("id_usuario", user_id),
+                to_postgrest_filter_eq("remote_jid", chat_remote_jid)
+            ])
+            # Incrementamos métricas para o usuário ver que a Summi "registrou" o trabalho dele como economia de tempo
+            supabase.rpc("increment_profile_metrics", {
+                "target_user_id": user_id,
+                "inc_audio_segundos": 0,
+                "inc_mensagens_analisadas": 1,
+                "inc_conversas_priorizadas": 0,
+            })
+        except Exception as exc:
+            logger.warning("Inbox Zero delete failed for %s: %s", chat_remote_jid, exc)
+            
+        return {
+            "ok": True,
+            "inbox_zero": True,
+            "message_kind": message_kind,
+            "outbound": outbound
+        }
+
     should_store = bool((text_for_chat or "").strip()) and message_kind in ("text", "audio", "image")
     if should_store and text_for_chat:
         chat_id = _upsert_chat_message(
