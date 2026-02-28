@@ -99,14 +99,26 @@ def _lightning_reaction(text: str) -> bool:
     return "⚡" in (text or "")
 
 
-def _summarize_transcription(openai: OpenAIClient, model: str, transcription: str) -> str:
+def _summarize_transcription(openai: OpenAIClient, model: str, transcription: str, profile: Dict[str, Any]) -> str:
+    temas_urgentes = profile.get("temas_urgentes") or "Nenhum específico"
+    temas_importantes = profile.get("temas_importantes") or "Nenhum específico"
+    
+    system = (
+        "Voce resume transcricoes de audio em portugues. Seja objetivo.\n"
+        f"Considere que para este usuario, temas URGENTES sao: {temas_urgentes}\n"
+        f"Temas IMPORTANTES sao: {temas_importantes}"
+    )
+    
+    user = (
+        "Resuma a transcricao a seguir de forma direta e objetiva, trazendo apenas os pontos mais importantes. "
+        "Dê ênfase especial se encontrar algo relacionado aos temas urgentes ou importantes definidos no seu contexto.\n\n"
+        f"Transcricao:\n{transcription}"
+    )
+    
     return openai.chat_text(
         model=model,
-        system="Voce resume transcricoes de audio em portugues. Seja objetivo.",
-        user=(
-            "Resuma a transcricao a seguir de forma direta e objetiva, trazendo apenas os pontos mais importantes.\n\n"
-            f"Transcricao:\n{transcription}"
-        ),
+        system=system,
+        user=user,
         temperature=0.2,
     )
 
@@ -525,7 +537,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                 )
                 final_audio_text = transcript
                 if should_summarize and transcript.strip():
-                    final_audio_text = _summarize_transcription(openai, settings.openai_model_summary, transcript)
+                    final_audio_text = _summarize_transcription(openai, settings.openai_model_summary, transcript, profile)
 
                 text_for_chat = final_audio_text.strip() if final_audio_text.strip() else None
                 extra.update(
@@ -596,7 +608,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                             # Se a API não retornou duração (gpt-4o-mini-transcribe), assume que deve resumir.
                             dur_for_check = duration_seconds if duration_seconds is not None else (segundos_para_resumir + 1)
                             if resume_audio and dur_for_check > segundos_para_resumir and transcript.strip():
-                                final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript)
+                                final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript, profile)
                                 extra["reaction_audio_summarized"] = True
                             if final_text.strip():
                                 outbound = _send_aux_message(
