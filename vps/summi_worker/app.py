@@ -209,8 +209,6 @@ def _send_aux_message(
     text: str,
     quoted_message_id: Optional[str] = None,
     quoted_text: Optional[str] = None,
-    quoted_remote_jid: Optional[str] = None,
-    quoted_from_me: bool = False,
 ) -> Dict[str, Any]:
     send_private_only = _profile_bool(profile, "send_private_only", False)
     destination = "conversation"
@@ -230,13 +228,11 @@ def _send_aux_message(
 
     branded_text = f"{text.rstrip()}\n\n_⚡️ Summi - Secretária Invisível_"
     evolution.send_text(
-        target_instance, 
-        target_number, 
-        branded_text, 
-        quoted_message_id=quoted_message_id, 
+        target_instance,
+        target_number,
+        branded_text,
+        quoted_message_id=quoted_message_id,
         quoted_text=quoted_text,
-        quoted_remote_jid=quoted_remote_jid,
-        quoted_from_me=quoted_from_me
     )
     return {
         "sent": True,
@@ -274,14 +270,6 @@ def _get_reaction_target_message_id(payload: Dict[str, Any]) -> Optional[str]:
         _get_in(payload, "body", "data", "message", "reactionMessage", "key", "id") 
         or _get_in(payload, "data", "message", "reactionMessage", "key", "id")
         or _get_in(payload, "data", "update", "message", "reactionMessage", "key", "id")
-    )
-
-
-def _get_reaction_target_from_me(payload: Dict[str, Any]) -> bool:
-    return bool(
-        _get_in(payload, "body", "data", "message", "reactionMessage", "key", "fromMe") 
-        or _get_in(payload, "data", "message", "reactionMessage", "key", "fromMe")
-        or _get_in(payload, "data", "update", "message", "reactionMessage", "key", "fromMe")
     )
 
 
@@ -589,17 +577,13 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         text=text_for_chat,
                         quoted_message_id=message_id or None,
                         quoted_text="Áudio",
-                        quoted_remote_jid=chat_remote_jid,
-                        quoted_from_me=from_me,
                     )
 
         elif message_kind == "reaction":
             reaction_text = _get_reaction_text(payload)
             target_id = _get_reaction_target_message_id(payload)
-            target_from_me = _get_reaction_target_from_me(payload)
             extra["reaction_text"] = reaction_text
             extra["reaction_target_message_id"] = target_id
-            extra["reaction_target_from_me"] = target_from_me
 
             send_on_reaction = _profile_bool(profile, "send_on_reaction", False)
             # Reacao com ⚡: transcreve o audio alvo independente de from_me,
@@ -643,8 +627,6 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                     text=final_text.strip(),
                                     quoted_message_id=target_id,
                                     quoted_text="Áudio",
-                                    quoted_remote_jid=chat_remote_jid,
-                                    quoted_from_me=target_from_me,
                                 )
                                 extra["reaction_audio_transcribed"] = True
                     else:

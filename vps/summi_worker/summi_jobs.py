@@ -211,6 +211,12 @@ def run_hourly_job(
             skipped_hours += 1
             continue
 
+        # Numero do usuario e usado tanto no onboarding quanto no envio regular.
+        numero_usuario = (profile.get("numero") or "").strip()
+        numero_usuario = "".join([c for c in numero_usuario if c.isdigit()])
+        if not numero_usuario:
+            continue
+
         # Verificar frequência customizada do usuário
         summi_freq = str(profile.get("summi_frequencia") or "1h").strip()
         freq_map = {"1h": 1, "3h": 3, "6h": 6, "12h": 12, "24h": 24}
@@ -279,12 +285,6 @@ def run_hourly_job(
                 )
             )
 
-        # Monta resumo e envia para o numero do usuario (profiles.numero)
-        numero_usuario = (profile.get("numero") or "").strip()
-        numero_usuario = "".join([c for c in numero_usuario if c.isdigit()])
-        if not numero_usuario:
-            continue
-
         summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
         evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
         sent += 1
@@ -300,9 +300,12 @@ def run_hourly_job(
             pass  # Não aborta o fluxo por falha em timestamp
 
         if profile.get("Summi em Audio?") is True:
-            audio_script = build_audio_script(openai, settings.openai_model_summary, summary_text=summary_text)
-            mp3 = openai.tts_mp3(settings.openai_tts_model, settings.openai_tts_voice, audio_script)
-            evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, mp3)
+            try:
+                audio_script = build_audio_script(openai, settings.openai_model_summary, summary_text=summary_text)
+                mp3 = openai.tts_mp3(settings.openai_tts_model, settings.openai_tts_voice, audio_script)
+                evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, mp3)
+            except Exception as exc:
+                print(f"Audio summary failed for user {user_id}: {exc}")
 
         auto_delete_low = str(profile.get("Apaga Mensagens Não Importantes Automaticamente?", "")).strip().lower() == "sim"
         if auto_delete_low:

@@ -70,32 +70,29 @@ class EvolutionClient:
         text: str,
         quoted_message_id: str | None = None,
         quoted_text: str | None = None,
-        quoted_remote_jid: str | None = None,
-        quoted_from_me: bool = False,
     ) -> None:
         import logging
         _log = logging.getLogger("summi_worker.evolution_client")
-        
+
         url = f"{self._url}/message/sendText/{instance}"
         payload: Dict[str, Any] = {"number": remote_jid, "text": text}
         if quoted_message_id:
-            # Estrutura completa exigida pela Evolution API v2 para renderizar o quote corretamente no WA
-            key = {"id": quoted_message_id, "fromMe": quoted_from_me}
-            if quoted_remote_jid:
-                key["remoteJid"] = quoted_remote_jid
+            # O node oficial do n8n converte options_message em body.quoted/body.linkPreview
+            # antes do POST. Replicamos exatamente esse shape.
+            payload["quoted"] = {"key": {"id": quoted_message_id}}
+            payload["linkPreview"] = False
 
-            payload["quoted"] = {
-                "key": key,
-                "message": {"audioMessage": {}},
-            }
-        
         _log.info(
-            "send_text debug: instance=%s number=%s quoted_id=%s quoted_from_me=%s quoted_remote_jid=%s payload_keys=%s",
-            instance, remote_jid, quoted_message_id, quoted_from_me, quoted_remote_jid, list(payload.keys())
+            "send_text debug: instance=%s number=%s quoted_id=%s payload_keys=%s",
+            instance, remote_jid, quoted_message_id, list(payload.keys())
         )
         if "quoted" in payload:
-            _log.info("send_text quoted_payload=%s", json.dumps(payload["quoted"]))
-        
+            _log.info(
+                "send_text quoted_payload=%s linkPreview=%s",
+                json.dumps(payload["quoted"]),
+                payload.get("linkPreview"),
+            )
+
         resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
         _log.info("send_text response1: status=%s body=%s", resp.status_code, resp.text[:300])
         if resp.ok:

@@ -134,6 +134,18 @@ export const useProfileSecurity = () => {
             }
             break;
 
+          case 'summi_frequencia':
+            if (typeof value === 'string') {
+              const trimmed = value.trim();
+              const allowedFrequencies = new Set(['1h', '3h', '6h', '12h', '24h']);
+              if (!allowedFrequencies.has(trimmed)) {
+                validationErrors.push('Frequência do Summi inválida');
+              } else {
+                sanitizedUpdates[key] = trimmed;
+              }
+            }
+            break;
+
           case 'instance_name':
             // instance_name só deve ser alterado pelo sistema
             if (typeof value === 'string' && value.length > 0) {
