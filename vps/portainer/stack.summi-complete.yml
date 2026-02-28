@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   summi-frontend:
-    image: ghcr.io/agenciageraleads/summi-b1463168-frontend:latest
+    image: ghcr.io/agenciageraleads/summi-b1463168-frontend:a06ab4ebe92f2135864a48bb4e1c8015d0ead9f4
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -28,7 +28,7 @@ services:
         - traefik.http.services.summi-frontend.loadbalancer.passHostHeader=true
 
   summi-worker-api:
-    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:a06ab4ebe92f2135864a48bb4e1c8015d0ead9f4
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5).read()"]
       interval: 30s
@@ -73,7 +73,7 @@ services:
         - traefik.http.services.summi-worker.loadbalancer.passHostHeader=true
 
   summi-worker-scheduler:
-    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:a06ab4ebe92f2135864a48bb4e1c8015d0ead9f4
     command: ["python", "-m", "summi_worker.scheduler"]
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
@@ -104,7 +104,7 @@ services:
           - node.role == manager
 
   summi-worker-queue-analysis:
-    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:a06ab4ebe92f2135864a48bb4e1c8015d0ead9f4
     command: ["python", "-m", "summi_worker.queue_worker", "analysis"]
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
@@ -135,7 +135,7 @@ services:
           - node.role == manager
 
   summi-worker-queue-summary:
-    image: ghcr.io/agenciageraleads/summi-b1463168-worker:latest
+    image: ghcr.io/agenciageraleads/summi-b1463168-worker:a06ab4ebe92f2135864a48bb4e1c8015d0ead9f4
     command: ["python", "-m", "summi_worker.queue_worker", "summary"]
     environment:
       - SUPABASE_URL=${SUPABASE_URL}

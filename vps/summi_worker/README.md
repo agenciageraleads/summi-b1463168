@@ -72,6 +72,7 @@ Mantive fallback para as envs antigas (`WEBHOOK_N8N_*`) para nao quebrar deploy.
 ## Portainer (stack unica)
 Use a stack completa em:
 - `/app/vps/portainer/stack.summi-complete.yml` (no repo: `vps/portainer/stack.summi-complete.yml`)
+- Historico operacional interno: `vps/CHANGELOG_INTERNAL.md`
 
 Ela sobe:
 - frontend (Traefik host `${SUMMI_FRONTEND_HOST}`)
