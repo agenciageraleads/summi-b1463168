@@ -16,6 +16,7 @@ import SubscriptionPage from "./pages/SubscriptionPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import ReferralsPage from "./pages/ReferralsPage";
 import BetaPage from "./pages/BetaPage";
+import ReleasesPage from "./pages/ReleasesPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -37,7 +38,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-              <BrowserRouter>
+          <BrowserRouter>
             <div className="min-h-screen">
               <OnboardingFlow />
               <Routes>
@@ -48,7 +49,7 @@ function App() {
                 <Route path="/complete-signup" element={<CompleteSignupPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/terms" element={<TermsPage />} />
-                
+
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
                     <SubscriptionGuard>
@@ -106,17 +107,23 @@ function App() {
                     </SubscriptionGuard>
                   </ProtectedRoute>
                 } />
-                
+
+                <Route path="/releases" element={
+                  <ProtectedRoute>
+                    <ReleasesPage />
+                  </ProtectedRoute>
+                } />
+
                 {/* Admin Routes */}
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
                 <Route path="/admin/beta-users" element={<AdminBetaUsersPage />} />
                 <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
-                
+
                 {/* Rotas de convite - ambas funcionam */}
                 <Route path="/convite/:referralCode" element={<ReferralPage />} />
                 <Route path="/r/:referralCode" element={<ReferralPage />} />
-                
+
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </div>

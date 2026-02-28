@@ -3,12 +3,13 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { 
-  BarChart3, 
-  Settings, 
-  CreditCard, 
-  Users, 
-  MessageSquare, 
+import {
+  BarChart3,
+  Settings,
+  CreditCard,
+  Users,
+  MessageSquare,
+  Rocket,
   TestTube,
   LogOut,
   X,
@@ -34,11 +35,12 @@ export const Sidebar = () => {
     // { name: 'Assinatura', href: '/subscription', icon: CreditCard }, // OCULTO TEMPORARIAMENTE
     { name: 'Indicações', href: '/referrals', icon: Users },
     { name: 'Feedback', href: '/feedback', icon: MessageSquare },
+    { name: 'Novidades', href: '/releases', icon: Rocket },
   ];
 
   // Adicionar itens condicionais baseados no role do usuário
   const conditionalNavigation = [];
-  
+
   // Beta para admin e beta users
   if (profile?.role === 'admin' || profile?.role === 'beta') {
     conditionalNavigation.push({
@@ -122,7 +124,7 @@ export const Sidebar = () => {
             </p>
           </div>
         </div>
-        
+
         <Button
           onClick={handleLogout}
           variant="outline"
