@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SubscriptionGuard } from "./components/SubscriptionGuard";
@@ -45,6 +45,33 @@ const RouteFallback = () => (
   </div>
 );
 
+const PROTECTED_ROUTE_PREFIXES = [
+  "/dashboard",
+  "/settings",
+  "/subscription",
+  "/feedback",
+  "/referrals",
+  "/beta",
+  "/releases",
+  "/whatsapp",
+  "/whatsapp-v2",
+  "/whatsapp-connection",
+  "/admin",
+];
+
+function OnboardingFlowGate() {
+  const { pathname } = useLocation();
+  const shouldLoadOnboarding = PROTECTED_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  if (!shouldLoadOnboarding) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <OnboardingFlow />
+    </Suspense>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -54,9 +81,7 @@ function App() {
           <Sonner />
           <BrowserRouter>
             <div className="min-h-screen">
-              <Suspense fallback={null}>
-                <OnboardingFlow />
-              </Suspense>
+              <OnboardingFlowGate />
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
