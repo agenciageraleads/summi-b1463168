@@ -4,14 +4,13 @@ import { ArrowRight, Check, Clock, CreditCard, Loader2, ShieldCheck, Sparkles, Z
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSubscription } from '@/hooks/useSubscription';
+import { createCheckoutSession } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 type PlanType = 'monthly' | 'annual';
 
 const SalesLandingPage = () => {
-  const { createCheckout } = useSubscription();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
@@ -51,7 +50,7 @@ const SalesLandingPage = () => {
   const handleCheckout = async () => {
     try {
       setIsLoading(true);
-      await createCheckout(selectedPlan, referralCode);
+      await createCheckoutSession(selectedPlan, referralCode);
     } catch (error) {
       toast({
         title: 'Erro ao iniciar o checkout',
@@ -288,4 +287,3 @@ const SalesLandingPage = () => {
 };
 
 export default SalesLandingPage;
-

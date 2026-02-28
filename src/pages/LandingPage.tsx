@@ -6,18 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useSubscription } from "@/hooks/useSubscription";
+import { createCheckoutSession } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
 
 const LandingPage = () => {
-  const { createCheckout } = useSubscription();
   const { toast } = useToast();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   const handleCheckout = async (planType: 'monthly' | 'annual') => {
     try {
       setLoadingPlan(planType);
-      await createCheckout(planType);
+      await createCheckoutSession(planType);
     } catch (error) {
       toast({
         title: 'Erro',

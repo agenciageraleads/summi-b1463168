@@ -14,6 +14,28 @@ export interface Subscription {
   cancel_at_period_end: boolean;
 }
 
+export const createCheckoutSession = async (planType: 'monthly' | 'annual', referralCode?: string) => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const headers: Record<string, string> = {};
+
+  if (sessionData.session?.access_token) {
+    headers.Authorization = `Bearer ${sessionData.session.access_token}`;
+  }
+
+  const { data, error } = await supabase.functions.invoke('create-checkout', {
+    headers,
+    body: { planType, ...(referralCode ? { referralCode } : {}) },
+  });
+
+  if (error) throw error;
+
+  if (data?.url) {
+    window.location.href = data.url;
+  }
+
+  return data;
+};
+
 export const useSubscription = () => {
   const [subscription, setSubscription] = useState<Subscription>({
     subscribed: false,
@@ -63,23 +85,7 @@ export const useSubscription = () => {
   // Criar checkout do Stripe — funciona SEM login (Stripe-First)
   const createCheckout = async (planType: 'monthly' | 'annual', referralCode?: string) => {
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {};
-      if (sessionData.session?.access_token) {
-        headers.Authorization = `Bearer ${sessionData.session.access_token}`;
-      }
-
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        headers,
-        body: { planType, ...(referralCode ? { referralCode } : {}) },
-      });
-
-      if (error) throw error;
-
-      // Redirecionar para o Stripe Checkout (mesma aba)
-      if (data?.url) {
-        window.location.href = data.url;
-      }
+      await createCheckoutSession(planType, referralCode);
     } catch (error) {
       console.error('Erro ao criar checkout:', error);
       throw error;
