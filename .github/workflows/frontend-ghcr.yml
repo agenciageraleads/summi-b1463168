@@ -37,6 +37,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get version
+        id: get_version
+        run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
+
       - name: Build & Push
         uses: docker/build-push-action@v6
         with:
@@ -47,4 +51,5 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}-frontend:latest
             ghcr.io/${{ github.repository }}-frontend:${{ github.sha }}
+            ghcr.io/${{ github.repository }}-frontend:${{ steps.get_version.outputs.VERSION }}
 
