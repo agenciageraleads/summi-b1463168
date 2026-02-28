@@ -73,26 +73,38 @@ class EvolutionClient:
         quoted_remote_jid: str | None = None,
         quoted_from_me: bool = False,
     ) -> None:
+        import logging
+        _log = logging.getLogger("summi_worker.evolution_client")
+        
         url = f"{self._url}/message/sendText/{instance}"
         payload: Dict[str, Any] = {"number": remote_jid, "text": text}
         if quoted_message_id:
             # Estrutura completa exigida pela Evolution API v2 para renderizar o quote corretamente no WA
-            key = {"id": quoted_message_id}
+            key = {"id": quoted_message_id, "fromMe": quoted_from_me}
             if quoted_remote_jid:
                 key["remoteJid"] = quoted_remote_jid
-            key["fromMe"] = quoted_from_me
 
             payload["quoted"] = {
                 "key": key,
-                "message": {"conversation": quoted_text or "Áudio/Mensagem"},
+                "message": {"audioMessage": {}},
             }
+        
+        _log.info(
+            "send_text debug: instance=%s number=%s quoted_id=%s quoted_from_me=%s quoted_remote_jid=%s payload_keys=%s",
+            instance, remote_jid, quoted_message_id, quoted_from_me, quoted_remote_jid, list(payload.keys())
+        )
+        if "quoted" in payload:
+            _log.info("send_text quoted_payload=%s", json.dumps(payload["quoted"]))
+        
         resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
+        _log.info("send_text response1: status=%s body=%s", resp.status_code, resp.text[:300])
         if resp.ok:
             return
 
         # Tentativa 2: /messages/sendText/{instance}
         url2 = f"{self._url}/messages/sendText/{instance}"
         resp2 = requests.post(url2, headers=self._headers(), data=json.dumps(payload), timeout=30)
+        _log.info("send_text response2: status=%s body=%s", resp2.status_code, resp2.text[:300])
         if resp2.ok:
             return
 

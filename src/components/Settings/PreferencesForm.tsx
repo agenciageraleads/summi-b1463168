@@ -42,6 +42,8 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
       send_on_reaction: profile.send_on_reaction ?? false,
       send_private_only: profile.send_private_only ?? false,
       'Summi em Audio?': profile['Summi em Audio?'] ?? false,
+      apenas_horario_comercial: profile.apenas_horario_comercial ?? true,
+      summi_frequencia: profile.summi_frequencia || '1h',
     });
   }, [profile]);
 
@@ -100,12 +102,43 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
                 Envia o “Summi da Hora” apenas no horário comercial (geralmente 08h–18h, conforme configuração do sistema).
               </p>
             </div>
-            {/* The switch for 'apenas_horario_comercial' was removed as per the revert instruction */}
+            <Switch
+              checked={formData.apenas_horario_comercial}
+              onCheckedChange={(checked) => handleInputChange('apenas_horario_comercial', checked)}
+            />
           </div>
 
           <Separator />
 
-          {/* The entire 'Frequência dos Relatórios (Summis)' section was removed as per the revert instruction */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium text-slate-800">Frequência dos Relatórios (Summis)</Label>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {[
+                { label: '1h', value: '1h' },
+                { label: '3h', value: '3h' },
+                { label: '6h', value: '6h' },
+                { label: '12h', value: '12h' },
+                { label: 'Diário', value: '24h' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleInputChange('summi_frequencia', opt.value)}
+                  className={cn(
+                    "flex-1 min-w-[70px] px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200",
+                    formData.summi_frequencia === opt.value
+                      ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 italic">
+              Escolha o intervalo ideal para receber os resumos das suas conversas.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
