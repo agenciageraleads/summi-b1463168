@@ -70,13 +70,20 @@ class EvolutionClient:
         text: str,
         quoted_message_id: str | None = None,
         quoted_text: str | None = None,
+        quoted_remote_jid: str | None = None,
+        quoted_from_me: bool = False,
     ) -> None:
         url = f"{self._url}/message/sendText/{instance}"
         payload: Dict[str, Any] = {"number": remote_jid, "text": text}
         if quoted_message_id:
-            # Estrutura completa exigida pela Evolution API v2 para renderizar o quote
+            # Estrutura completa exigida pela Evolution API v2 para renderizar o quote corretamente no WA
+            key = {"id": quoted_message_id}
+            if quoted_remote_jid:
+                key["remoteJid"] = quoted_remote_jid
+            key["fromMe"] = quoted_from_me
+
             payload["quoted"] = {
-                "key": {"id": quoted_message_id},
+                "key": key,
                 "message": {"conversation": quoted_text or "Áudio/Mensagem"},
             }
         resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
