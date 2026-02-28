@@ -49,9 +49,9 @@ export const SubscriptionStatus = () => {
       if (data) {
         // Determina o tipo de plano baseado no stripe_price_id
         let planType = null;
-        if (data.stripe_price_id === 'price_1RZ8j9KyDqE0F1PtNvJzdK0F') {
+        if (data.stripe_price_id === 'price_1T5IoTKyDqE0F1Pt7P0r5WC4') {
           planType = 'monthly';
-        } else if (data.stripe_price_id === 'price_1RZ8j9KyDqE0F1PtIlw9cx2C') {
+        } else if (data.stripe_price_id === 'price_1T5IpBKyDqE0F1PtJEPbmtal') {
           planType = 'annual';
         }
 
@@ -155,7 +155,7 @@ export const SubscriptionStatus = () => {
         <CardContent className="p-6">
           <div className="text-center">
             <p className="text-summi-gray-600">Nenhuma assinatura encontrada</p>
-            <Button 
+            <Button
               onClick={handleRefresh}
               variant="outline"
               size="sm"
@@ -189,7 +189,7 @@ export const SubscriptionStatus = () => {
               Status da Assinatura
             </span>
           </div>
-          <Button 
+          <Button
             onClick={handleRefresh}
             variant="ghost"
             size="sm"
@@ -203,9 +203,9 @@ export const SubscriptionStatus = () => {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-summi-gray-600">Status:</span>
-            <Badge 
-              className={subscriptionData.isSubscribed 
-                ? 'bg-summi-green text-white' 
+            <Badge
+              className={subscriptionData.isSubscribed
+                ? 'bg-summi-green text-white'
                 : 'bg-summi-gray-100 text-summi-gray-600'
               }
             >
@@ -223,14 +223,14 @@ export const SubscriptionStatus = () => {
           )}
 
           {subscriptionData.status === 'trialing' && subscriptionData.subscription_end && (
-             <div className="flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded-md">
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm text-blue-700">Seu teste termina em:</span>
-                </div>
-                <span className="text-sm font-medium text-blue-800">
-                  {new Date(subscriptionData.subscription_end).toLocaleDateString('pt-BR')}
-                </span>
+            <div className="flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center space-x-2">
+                <Clock className="w-4 h-4 text-blue-600" />
+                <span className="text-sm text-blue-700">Seu teste termina em:</span>
+              </div>
+              <span className="text-sm font-medium text-blue-800">
+                {new Date(subscriptionData.subscription_end).toLocaleDateString('pt-BR')}
+              </span>
             </div>
           )}
 
