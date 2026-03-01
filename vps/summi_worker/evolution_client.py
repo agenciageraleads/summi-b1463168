@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from typing import Any, Dict, Optional
 
 import requests
@@ -108,21 +109,28 @@ class EvolutionClient:
         raise EvolutionError(f"send_text failed: {resp.status_code} {resp.text} / {resp2.status_code} {resp2.text}")
 
     def send_audio_mp3(self, instance: str, remote_jid: str, mp3_bytes: bytes) -> None:
-        # Muitos setups aceitam base64.
+        _log = logging.getLogger("summi_worker.evolution_client")
+
+        # Evolution 2.3.x documenta sendWhatsAppAudio; mantemos fallbacks para builds antigos.
         b64 = base64.b64encode(mp3_bytes).decode("ascii")
-
-        url = f"{self._url}/message/sendAudio/{instance}"
         payload = {"number": remote_jid, "audio": b64}
-        resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=60)
-        if resp.ok:
-            return
+        paths = [
+            f"/message/sendWhatsAppAudio/{instance}",
+            f"/messages/sendWhatsAppAudio/{instance}",
+            f"/message/sendAudio/{instance}",
+            f"/messages/sendAudio/{instance}",
+        ]
+        attempts: list[str] = []
 
-        url2 = f"{self._url}/messages/sendAudio/{instance}"
-        resp2 = requests.post(url2, headers=self._headers(), data=json.dumps(payload), timeout=60)
-        if resp2.ok:
-            return
+        for path in paths:
+            url = f"{self._url}{path}"
+            resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=60)
+            attempts.append(f"{resp.status_code} {resp.text}")
+            _log.info("send_audio response: path=%s status=%s body=%s", path, resp.status_code, resp.text[:300])
+            if resp.ok:
+                return
 
-        raise EvolutionError(f"send_audio failed: {resp.status_code} {resp.text} / {resp2.status_code} {resp2.text}")
+        raise EvolutionError(f"send_audio failed: {' / '.join(attempts)}")
 
     def get_media_base64(self, instance: str, message_id: str) -> str:
         """

@@ -1,5 +1,9 @@
 import json
-from app import _detect_message_shape, _get_in, _get_reaction_text, _get_reaction_target_message_id
+
+try:
+  from .app import _detect_message_shape, _get_in, _get_reaction_text, _get_reaction_target_message_id
+except ImportError:
+  from app import _detect_message_shape, _get_in, _get_reaction_text, _get_reaction_target_message_id
 
 payload_update = {
   "event": "messages.update",
@@ -37,4 +41,3 @@ print(f"_get_reaction_text helper: {text2}")
 
 id2 = _get_reaction_target_message_id(payload_update)
 print(f"_get_reaction_target_message_id helper: {id2}")
-
