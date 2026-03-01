@@ -7,6 +7,34 @@ import { Rocket, Zap, Bug, Sparkles, Clock } from 'lucide-react';
 
 const releases = [
     {
+        version: 'v1.2.2',
+        date: '1 de Março, 2026',
+        title: 'Blindagem do Summi da Hora e Resumo de Áudio',
+        type: 'major',
+        changes: [
+            {
+                type: 'fix',
+                text: 'Summi da Hora sem invenção: quando não há demandas prioritárias, o áudio agora usa uma resposta fixa e determinística, sem depender de IA.',
+                icon: Bug
+            },
+            {
+                type: 'fix',
+                text: 'Proteção contra auto-eco: a Summi passou a ignorar a conversa interna da própria instância, evitando reprocessar mensagens e áudios dela mesma.',
+                icon: Bug
+            },
+            {
+                type: 'improvement',
+                text: 'Resumo de áudio contextual: áudios curtos recebem um resumo direto; áudios mais densos passam a sair organizados por assunto principal, assuntos discutidos e atividades.',
+                icon: Sparkles
+            },
+            {
+                type: 'improvement',
+                text: 'Prompts do worker reforçados: o roteiro falado do Summi da Hora agora recebe instruções explícitas para não inventar conteúdo e manter a fala objetiva no trânsito.',
+                icon: Zap
+            }
+        ]
+    },
+    {
         version: 'v1.2.1',
         date: '28 de Fevereiro, 2026',
         title: 'Correções Críticas de Fluxo e Métricas',

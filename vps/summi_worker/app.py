@@ -13,6 +13,7 @@ from .config import Settings, load_settings
 from .evolution_client import EvolutionClient, EvolutionError
 from .evolution_webhook import normalize_message_event
 from .openai_client import OpenAIClient, OpenAIError
+from .prompt_builders import build_transcription_summary_prompt, is_internal_summi_thread
 from .redis_dedupe import RedisDedupe
 from .redis_queue import RedisQueueClient
 from .summi_jobs import analyze_user_chats, run_hourly_job
@@ -124,22 +125,24 @@ def _lightning_reaction(text: str) -> bool:
     return "⚡" in (text or "")
 
 
-def _summarize_transcription(openai: OpenAIClient, model: str, transcription: str, profile: Dict[str, Any]) -> str:
+def _summarize_transcription(
+    openai: OpenAIClient,
+    model: str,
+    transcription: str,
+    profile: Dict[str, Any],
+    *,
+    audio_seconds: Optional[int] = None,
+) -> str:
     temas_urgentes = profile.get("temas_urgentes") or "Nenhum específico"
     temas_importantes = profile.get("temas_importantes") or "Nenhum específico"
-    
-    system = (
-        "Voce resume transcricoes de audio em portugues. Seja objetivo.\n"
-        f"Considere que para este usuario, temas URGENTES sao: {temas_urgentes}\n"
-        f"Temas IMPORTANTES sao: {temas_importantes}"
+
+    system, user = build_transcription_summary_prompt(
+        transcription,
+        temas_urgentes=temas_urgentes,
+        temas_importantes=temas_importantes,
+        audio_seconds=audio_seconds,
     )
-    
-    user = (
-        "Resuma a transcricao a seguir de forma direta e objetiva, trazendo apenas os pontos mais importantes. "
-        "Dê ênfase especial se encontrar algo relacionado aos temas urgentes ou importantes definidos no seu contexto.\n\n"
-        f"Transcricao:\n{transcription}"
-    )
-    
+
     return openai.chat_text(
         model=model,
         system=system,
@@ -463,6 +466,15 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
         logger.warning("evolution_webhook.ignored reason=missing_instance_name remote_jid=%s", remote_jid)
         return {"ok": True, "stored": False, "reason": "missing_instance_name"}
 
+    if is_internal_summi_thread(chat_remote_jid, settings.ignore_remote_jid):
+        logger.info(
+            "evolution_webhook.ignored reason=internal_summi_thread instance=%s remote_jid=%s message_id=%s",
+            instance_name,
+            chat_remote_jid,
+            message_id,
+        )
+        return {"ok": True, "stored": False, "reason": "internal_summi_thread"}
+
     if message_id and dedupe.enabled:
         dedupe_key = f"summi:webhook:{instance_name}:{message_id}"
         if dedupe.seen_or_mark(dedupe_key, settings.webhook_dedupe_ttl_seconds):
@@ -565,7 +577,13 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                 final_audio_text = transcript
                 processed_audio_seconds = audio_seconds
                 if should_summarize and transcript.strip():
-                    final_audio_text = _summarize_transcription(openai, settings.openai_model_summary, transcript, profile)
+                    final_audio_text = _summarize_transcription(
+                        openai,
+                        settings.openai_model_summary,
+                        transcript,
+                        profile,
+                        audio_seconds=audio_seconds,
+                    )
 
                 text_for_chat = final_audio_text.strip() if final_audio_text.strip() else None
                 extra.update(
@@ -638,7 +656,13 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                 resume_audio and audio_seconds is not None and audio_seconds > segundos_para_resumir
                             )
                             if should_summarize_reaction and transcript.strip():
-                                final_text = _summarize_transcription(openai, settings.openai_model_summary, transcript, profile)
+                                final_text = _summarize_transcription(
+                                    openai,
+                                    settings.openai_model_summary,
+                                    transcript,
+                                    profile,
+                                    audio_seconds=audio_seconds,
+                                )
                                 extra["reaction_audio_summarized"] = True
                             extra["reaction_audio_seconds"] = audio_seconds
                             processed_audio_seconds = audio_seconds

@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from .openai_client import OpenAIClient
+from .prompt_builders import (
+    SUMMI_HOUR_FALLBACK_TEXT,
+    build_summi_audio_prompt,
+    render_summi_hour_audio_fallback,
+)
 
 
 @dataclass(frozen=True)
@@ -131,14 +136,14 @@ def build_summary_text(
     Monta o Summi da Hora em layout Premium simplificado.
     """
     if not items:
-        return "✨ *Summi da Hora*\n\nVocê não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
+        return SUMMI_HOUR_FALLBACK_TEXT
 
     # Filtrar e ordenar: Prioridade 3 (Urgente) primeiro, depois 2 (Importante)
     filtrados = [it for it in items if it.prioridade in ("2", "3") and it.contexto]
     filtrados.sort(key=lambda x: x.prioridade, reverse=True)
 
     if not filtrados:
-        return "✨ *Summi da Hora*\n\nVocê não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
+        return SUMMI_HOUR_FALLBACK_TEXT
 
     corpo_mensagens = []
     for it in filtrados:
@@ -174,12 +179,9 @@ def build_audio_script(
     *,
     summary_text: str,
 ) -> str:
-    system = "Voce escreve um roteiro curto, falado, para transcricao em audio."
-    user = (
-        "Preciso que agora voce traga de uma forma mais fluida o que havia sido resumido pois o seu resultado vai ser transcrito em audio.\n\n"
-        f"Mensagem: {summary_text}\n\n"
-        "Inicie com: Summi (le-se Sami) da Hora: ...\n"
-        "Nao pareca uma IA (sem 'Claro', sem 'Aqui esta', sem despedidas).\n"
-        "Retorne apenas o texto final."
-    )
-    return openai.chat_text(model=model, system=system, user=user, temperature=0.4)
+    fallback_script = render_summi_hour_audio_fallback(summary_text)
+    if fallback_script:
+        return fallback_script
+
+    system, user = build_summi_audio_prompt(summary_text)
+    return openai.chat_text(model=model, system=system, user=user, temperature=0.2)
