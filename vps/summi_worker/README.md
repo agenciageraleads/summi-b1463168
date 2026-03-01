@@ -67,8 +67,6 @@ No Supabase (env vars das Edge Functions):
 - `WEBHOOK_RECEBE_MENSAGEM`: aponte para `https://<sua-vps>/webhooks/evolution`
 - `WEBHOOK_ANALISA_MENSAGENS`: aponte para `https://<sua-vps>/webhooks/evolution-analyze`
 
-Mantive fallback para as envs antigas (`WEBHOOK_N8N_*`) para nao quebrar deploy.
-
 ## Portainer (stack unica)
 Use a stack completa em:
 - `/app/vps/portainer/stack.summi-complete.yml` (no repo: `vps/portainer/stack.summi-complete.yml`)

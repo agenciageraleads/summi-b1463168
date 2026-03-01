@@ -399,9 +399,8 @@ const createInstanceWithPairingSupport = async (instanceName: string, phoneNumbe
   console.log(`[CREATE-INSTANCE] 👤 Role do usuário: ${userRole}`);
   
   // Determinar webhook baseado no role do usuário.
-  // Mantem compatibilidade com envs antigas do n8n, mas permite apontar para o worker na VPS.
   const finalWebhookUrl = userRole === 'beta'
-    ? (Deno.env.get("WEBHOOK_ANALISA_MENSAGENS") ?? Deno.env.get("WEBHOOK_N8N_ANALISA_MENSAGENS") ?? webhookUrl)
+    ? (Deno.env.get("WEBHOOK_ANALISA_MENSAGENS") ?? webhookUrl)
     : webhookUrl;
   
   console.log(`[CREATE-INSTANCE] 🎯 Webhook selecionado: ${finalWebhookUrl} (role: ${userRole})`);
@@ -655,8 +654,8 @@ serve(async (req) => {
     // Validação rigorosa das variáveis de ambiente
     const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL");
     const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY");
-    // Webhook para receber eventos da Evolution (antes: n8n). Agora pode apontar para o worker na VPS.
-    const webhookUrl = Deno.env.get("WEBHOOK_RECEBE_MENSAGEM") ?? Deno.env.get("WEBHOOK_N8N_RECEBE_MENSAGEM");
+    // Webhook para receber eventos da Evolution.
+    const webhookUrl = Deno.env.get("WEBHOOK_RECEBE_MENSAGEM");
 
     if (!evolutionApiUrl || !evolutionApiKey) {
       console.error('[EVOLUTION-HANDLER] ❌ Variáveis de ambiente não configuradas');

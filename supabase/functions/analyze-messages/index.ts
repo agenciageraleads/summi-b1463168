@@ -31,12 +31,12 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Destino da analise: VPS worker. Mantemos compatibilidade com a env antiga do n8n.
-    const workerUrl = Deno.env.get('SUMMI_WORKER_ANALYZE_URL') ?? Deno.env.get('WEBHOOK_N8N_ANALISA_MENSAGENS');
+    // Destino da analise: VPS worker.
+    const workerUrl = Deno.env.get('SUMMI_WORKER_ANALYZE_URL');
     console.log(`[ANALYZE] Destino: ${workerUrl ? 'CONFIGURADO' : 'NÃO CONFIGURADO'}`);
     
     if (!workerUrl) {
-      console.error('[ANALYZE] SUMMI_WORKER_ANALYZE_URL/WEBHOOK_N8N_ANALISA_MENSAGENS não configurado');
+      console.error('[ANALYZE] SUMMI_WORKER_ANALYZE_URL não configurado');
       return new Response(
         JSON.stringify({ 
           error: 'Destino de analise nao configurado',
