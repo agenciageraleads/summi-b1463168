@@ -1,5 +1,14 @@
 # Changelog Interno VPS
 
+## 2026-03-01
+
+- Release promovido para o commit `7e42bfacd6b354d610d675b767c77644ffc574ed`.
+- Frontend pinado em `ghcr.io/agenciageraleads/summi-b1463168-frontend:7e42bfacd6b354d610d675b767c77644ffc574ed`.
+- Worker/API, scheduler e filas pinados em `ghcr.io/agenciageraleads/summi-b1463168-worker:7e42bfacd6b354d610d675b767c77644ffc574ed`.
+- `Summi da Hora` blindado para nao usar LLM no fallback sem demandas, reduzindo risco de audio com conteudo inventado.
+- Webhook passou a ignorar a conversa interna da propria Summi para evitar auto-eco e reprocessamento indevido.
+- Resumo de audio do worker agora alterna entre resumo direto e estrutura por assunto/atividades, sem criar acoes quando elas nao existem.
+
 ## 2026-02-28
 
 - Producao fixada por SHA, sem uso de `latest`, para evitar drift entre o que foi validado e o que o GHCR publica depois.
