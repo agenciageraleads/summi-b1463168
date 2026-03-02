@@ -201,6 +201,13 @@ def _transcribe_audio_with_fallback(
     if not fallback_reason:
         return base_result, metadata
 
+    logger.info(
+        "openai.transcription_fallback_triggered base_model=%s fallback_model=%s reason=%s confidence=%s",
+        base_result.model,
+        settings.openai_transcription_fallback_model,
+        fallback_reason,
+        base_result.average_confidence,
+    )
     fallback_result = openai.transcribe_audio(
         audio_bytes,
         model=settings.openai_transcription_fallback_model,
@@ -233,6 +240,16 @@ def _derive_message_content(payload: Dict[str, Any], normalized: Dict[str, Any],
     if text:
         return text
     return None
+
+
+def _event_for_storage(normalized_event: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:
+    if not extra:
+        return dict(normalized_event)
+    event = dict(normalized_event)
+    for key, value in extra.items():
+        if value is not None:
+            event[key] = value
+    return event
 
 
 def _append_legacy_line(existing: str, author_name: str, text: str) -> str:
@@ -682,6 +699,15 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                     audio_bytes=mp3_bytes,
                 )
                 transcript, duration_seconds = transcription.text, transcription.duration_seconds
+                logger.info(
+                    "evolution_webhook.audio_transcribed instance=%s message_id=%s transcript_chars=%s model=%s fallback=%s confidence=%s",
+                    instance_name,
+                    message_id,
+                    len(transcript),
+                    transcription.model,
+                    transcription_meta.get("audio_transcription_used_fallback"),
+                    transcription.average_confidence,
+                )
                 # Extrai duração do payload em múltiplos caminhos (versões diferentes da Evolution)
                 seconds_from_payload = (
                     _get_in(payload, "body", "data", "message", "audioMessage", "seconds")
@@ -785,6 +811,15 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                 audio_bytes=mp3_bytes,
                             )
                             transcript, duration_seconds = transcription.text, transcription.duration_seconds
+                            logger.info(
+                                "evolution_webhook.reaction_audio_transcribed instance=%s target_id=%s transcript_chars=%s model=%s fallback=%s confidence=%s",
+                                instance_name,
+                                target_id,
+                                len(transcript),
+                                transcription.model,
+                                transcription_meta.get("audio_transcription_used_fallback"),
+                                transcription.average_confidence,
+                            )
                             final_text = transcript
                             audio_seconds = _safe_positive_int(duration_seconds)
                             resume_audio = _profile_bool(profile, "resume_audio", False)
@@ -879,7 +914,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             display_name=author_name or remote_jid_digits,
             is_group=is_group,
             author_name=author_name,
-            normalized_event=normalized,
+            normalized_event=_event_for_storage(normalized, extra),
             message_text_for_chat=text_for_chat,
         )
 
