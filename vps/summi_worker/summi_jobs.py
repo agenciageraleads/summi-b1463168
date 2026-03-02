@@ -10,6 +10,7 @@ from .openai_client import OpenAIClient
 from .supabase_rest import (
     SupabaseRest,
     to_postgrest_filter_eq,
+    to_postgrest_filter_gt,
     to_postgrest_filter_gte,
     to_postgrest_filter_lt,
     to_postgrest_filter_neq,
@@ -26,6 +27,73 @@ def _within_business_hours(settings: Settings, profile: Dict[str, Any], now_loca
         h = now_local.hour
         return settings.business_hours_start <= h < settings.business_hours_end
     return True
+
+
+def _build_summary_items(chats: List[Dict[str, Any]]) -> List[AnalyzedChat]:
+    items: List[AnalyzedChat] = []
+    for c in chats:
+        prioridade = str(c.get("prioridade", "")).strip()
+        if prioridade not in ("2", "3"):
+            continue
+        items.append(
+            AnalyzedChat(
+                chat_id=c["id"],
+                prioridade=prioridade,
+                nome=c.get("nome") or "",
+                telefone=c.get("remote_jid") or "",
+                contexto=(c.get("contexto") or "")[:250],
+                horario=c.get("criado_em") or "",
+            )
+        )
+    return items
+
+
+def _summary_chat_filters(settings: Settings, *, user_id: str, ultimo_summi: str | None) -> List[Tuple[str, str]]:
+    filters = [
+        to_postgrest_filter_eq("id_usuario", user_id),
+        to_postgrest_filter_neq("remote_jid", settings.ignore_remote_jid),
+        ("contexto", "not.is.null"),
+    ]
+    if ultimo_summi:
+        filters.append(to_postgrest_filter_gt("analisado_em", str(ultimo_summi)))
+    else:
+        filters.append(("analisado_em", "not.is.null"))
+    return filters
+
+
+def _unique_active_user_ids(subscribers: List[Dict[str, Any]]) -> List[str]:
+    user_ids: List[str] = []
+    seen: set[str] = set()
+    for subscriber in subscribers:
+        user_id = str(subscriber.get("user_id") or "").strip()
+        if not user_id or user_id in seen:
+            continue
+        seen.add(user_id)
+        user_ids.append(user_id)
+    return user_ids
+
+
+def _summary_frequency_hours(profile: Dict[str, Any]) -> int:
+    summi_freq = str(profile.get("summi_frequencia") or "1h").strip()
+    freq_map = {"1h": 1, "3h": 3, "6h": 6, "12h": 12, "24h": 24}
+    return freq_map.get(summi_freq, 1)
+
+
+def _summary_is_due(profile: Dict[str, Any], *, now_utc: dt.datetime) -> bool:
+    ultimo_summi = profile.get("ultimo_summi_em")
+    if not ultimo_summi:
+        return True
+
+    try:
+        ultimo_dt = dt.datetime.fromisoformat(str(ultimo_summi).replace("Z", "+00:00"))
+    except Exception:
+        return True
+
+    if ultimo_dt.tzinfo is None:
+        ultimo_dt = ultimo_dt.replace(tzinfo=dt.timezone.utc)
+
+    elapsed_hours = (now_utc - ultimo_dt).total_seconds() / 3600
+    return elapsed_hours >= _summary_frequency_hours(profile)
 
 
 def analyze_user_chats(
@@ -180,6 +248,7 @@ def run_hourly_job(
     evolution: EvolutionClient,
 ) -> Dict[str, Any]:
     now_local = dt.datetime.now()
+    now_utc = dt.datetime.now(dt.timezone.utc)
 
     # Assinantes ativos
     subs = supabase.select(
@@ -197,10 +266,9 @@ def run_hourly_job(
     analyzed_users = 0
     analyze_errors = 0
     low_priority_deleted = 0
-    for sub in subs:
-        user_id = sub.get("user_id")
-        if not user_id:
-            continue
+    user_ids = _unique_active_user_ids(subs)
+    deduplicated_rows = len(subs) - len(user_ids)
+    for user_id in user_ids:
 
         profiles = supabase.select("profiles", select="*", filters=[to_postgrest_filter_eq("id", user_id)], limit=1)
         if not profiles:
@@ -217,10 +285,6 @@ def run_hourly_job(
         if not numero_usuario:
             continue
 
-        # Verificar frequência customizada do usuário
-        summi_freq = str(profile.get("summi_frequencia") or "1h").strip()
-        freq_map = {"1h": 1, "3h": 3, "6h": 6, "12h": 12, "24h": 24}
-        freq_hours = freq_map.get(summi_freq, 1)
         # Verificar se precisa de onboarding (primeiro envio)
         ultimo_summi = profile.get("ultimo_summi_em")
         onboarding_done = profile.get("onboarding_completed")
@@ -238,15 +302,9 @@ def run_hourly_job(
             except Exception:
                 pass
 
-        if ultimo_summi and freq_hours > 1:
-            try:
-                ultimo_dt = dt.datetime.fromisoformat(str(ultimo_summi).replace("Z", "+00:00"))
-                elapsed = (dt.datetime.now(dt.timezone.utc) - ultimo_dt).total_seconds() / 3600
-                if elapsed < freq_hours:
-                    skipped_hours += 1
-                    continue
-            except Exception:
-                pass  # Se falhar o parse, envia normalmente
+        if not _summary_is_due(profile, now_utc=now_utc):
+            skipped_hours += 1
+            continue
 
         # Paridade com n8n: analisa conversas novas/editadas antes de montar o Summi da Hora.
         try:
@@ -256,34 +314,16 @@ def run_hourly_job(
             # Nao aborta o job inteiro por erro em um usuario.
             analyze_errors += 1
 
-        # Puxa chats ja analisados com prioridade 2/3 e contexto nao nulo
+        # O Summi da Hora deve considerar apenas o lote recem-analisado desde o ultimo envio.
         chats = supabase.select(
             "chats",
             select="id,nome,remote_jid,prioridade,contexto,criado_em,modificado_em,analisado_em",
-            filters=[
-                to_postgrest_filter_eq("id_usuario", user_id),
-                to_postgrest_filter_neq("remote_jid", settings.ignore_remote_jid),
-                ("contexto", "not.is.null"),
-            ],
+            filters=_summary_chat_filters(settings, user_id=user_id, ultimo_summi=ultimo_summi),
             order="analisado_em.desc",
             limit=50,
         )
 
-        items: List[AnalyzedChat] = []
-        for c in chats:
-            p = str(c.get("prioridade", "")).strip()
-            if p not in ("2", "3"):
-                continue
-            items.append(
-                AnalyzedChat(
-                    chat_id=c["id"],
-                    prioridade=p,
-                    nome=c.get("nome") or "",
-                    telefone=c.get("remote_jid") or "",
-                    contexto=(c.get("contexto") or "")[:250],
-                    horario=c.get("criado_em") or "",
-                )
-            )
+        items = _build_summary_items(chats)
 
         summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
         evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
@@ -331,6 +371,8 @@ def run_hourly_job(
     return {
         "success": True,
         "subscribers": len(subs),
+        "unique_subscribers": len(user_ids),
+        "deduplicated_subscriber_rows": deduplicated_rows,
         "sent": sent,
         "skipped_outside_business_hours": skipped_hours,
         "analyzed_users_before_summary": analyzed_users,

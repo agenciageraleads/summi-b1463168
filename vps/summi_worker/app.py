@@ -170,6 +170,48 @@ def _append_legacy_line(existing: str, author_name: str, text: str) -> str:
     return f"{existing.rstrip()}\n{line}"
 
 
+def _normalize_jid(value: Any) -> Optional[str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if "@" in raw:
+        return raw
+    digits = _digits(raw)
+    if not digits:
+        return None
+    return f"{digits}@s.whatsapp.net"
+
+
+def _extract_quoted_remote_jid(payload: Dict[str, Any]) -> Optional[str]:
+    return _normalize_jid(
+        _get_in(payload, "body", "data", "key", "remoteJidAlt")
+        or _get_in(payload, "data", "key", "remoteJidAlt")
+        or _get_in(payload, "body", "data", "key", "remoteJid")
+        or _get_in(payload, "data", "key", "remoteJid")
+        or _get_in(payload, "key", "remoteJid")
+    )
+
+
+def _extract_quoted_participant(payload: Dict[str, Any]) -> Optional[str]:
+    return _normalize_jid(
+        _get_in(payload, "body", "data", "key", "participant")
+        or _get_in(payload, "data", "key", "participant")
+        or _get_in(payload, "key", "participant")
+    )
+
+
+def _extract_quoted_from_me(payload: Dict[str, Any]) -> Optional[bool]:
+    for path in (
+        ("body", "data", "key", "fromMe"),
+        ("data", "key", "fromMe"),
+        ("key", "fromMe"),
+    ):
+        value = _get_in(payload, *path)
+        if isinstance(value, bool):
+            return value
+    return None
+
+
 def _upsert_chat_message(
     supabase: SupabaseRest,
     *,
@@ -237,6 +279,7 @@ def _send_aux_message(
     text: str,
     quoted_message_id: Optional[str] = None,
     quoted_text: Optional[str] = None,
+    source_author_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     send_private_only = _profile_bool(profile, "send_private_only", False)
     destination = "conversation"
@@ -254,13 +297,20 @@ def _send_aux_message(
     if not text.strip() or not target_number:
         return {"sent": False, "destination": destination}
 
-    branded_text = f"{text.rstrip()}\n\n_⚡️ Summi - Secretária Invisível_"
+    outbound_text = f"{text.rstrip()}\n\n_⚡️ Summi - Secretária Invisível_"
+    if send_private_only:
+        author_label = (source_author_name or "").strip()
+        outbound_text = f"{author_label} disse:\n{text.rstrip()}" if author_label else text.rstrip()
+
     evolution.send_text(
         target_instance,
         target_number,
-        branded_text,
+        outbound_text,
         quoted_message_id=quoted_message_id,
         quoted_text=quoted_text,
+        quoted_remote_jid=_extract_quoted_remote_jid(payload),
+        quoted_from_me=_extract_quoted_from_me(payload),
+        quoted_participant=_extract_quoted_participant(payload),
     )
     return {
         "sent": True,
@@ -268,6 +318,7 @@ def _send_aux_message(
         "target_instance": target_instance,
         "target_number": target_number,
         "quoted_message_id": quoted_message_id,
+        "quoted_remote_jid": _extract_quoted_remote_jid(payload),
     }
 
 
@@ -617,6 +668,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         text=text_for_chat,
                         quoted_message_id=message_id or None,
                         quoted_text="Áudio",
+                        source_author_name=author_name,
                     )
 
         elif message_kind == "reaction":
@@ -677,6 +729,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                     text=final_text.strip(),
                                     quoted_message_id=target_id,
                                     quoted_text="Áudio",
+                                    source_author_name=author_name,
                                 )
                                 extra["reaction_audio_transcribed"] = True
                     else:

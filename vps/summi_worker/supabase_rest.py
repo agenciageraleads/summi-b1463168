@@ -150,6 +150,10 @@ def to_postgrest_filter_gte(column: str, value: str) -> Tuple[str, str]:
     return (column, f"gte.{value}")
 
 
+def to_postgrest_filter_gt(column: str, value: str) -> Tuple[str, str]:
+    return (column, f"gt.{value}")
+
+
 def to_postgrest_filter_lt(column: str, value: str) -> Tuple[str, str]:
     return (column, f"lt.{value}")
 

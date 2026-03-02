@@ -71,42 +71,117 @@ class EvolutionClient:
         text: str,
         quoted_message_id: str | None = None,
         quoted_text: str | None = None,
+        quoted_remote_jid: str | None = None,
+        quoted_from_me: bool | None = None,
+        quoted_participant: str | None = None,
     ) -> None:
         import logging
         _log = logging.getLogger("summi_worker.evolution_client")
 
-        url = f"{self._url}/message/sendText/{instance}"
-        payload: Dict[str, Any] = {"number": remote_jid, "text": text}
-        if quoted_message_id:
-            # O node oficial do n8n converte options_message em body.quoted/body.linkPreview
-            # antes do POST. Replicamos exatamente esse shape.
-            payload["quoted"] = {"key": {"id": quoted_message_id}}
-            payload["linkPreview"] = False
-
-        _log.info(
-            "send_text debug: instance=%s number=%s quoted_id=%s payload_keys=%s",
-            instance, remote_jid, quoted_message_id, list(payload.keys())
+        payloads = self._build_text_payloads(
+            remote_jid=remote_jid,
+            text=text,
+            quoted_message_id=quoted_message_id,
+            quoted_text=quoted_text,
+            quoted_remote_jid=quoted_remote_jid,
+            quoted_from_me=quoted_from_me,
+            quoted_participant=quoted_participant,
         )
-        if "quoted" in payload:
-            _log.info(
-                "send_text quoted_payload=%s linkPreview=%s",
-                json.dumps(payload["quoted"]),
-                payload.get("linkPreview"),
+        attempts: list[str] = []
+
+        for path in (f"/message/sendText/{instance}", f"/messages/sendText/{instance}"):
+            url = f"{self._url}{path}"
+            for payload in payloads:
+                _log.info(
+                    "send_text debug: instance=%s number=%s quoted_id=%s payload_keys=%s path=%s",
+                    instance,
+                    remote_jid,
+                    quoted_message_id,
+                    list(payload.keys()),
+                    path,
+                )
+                if "quoted" in payload:
+                    _log.info(
+                        "send_text quoted_payload=%s linkPreview=%s",
+                        json.dumps(payload["quoted"]),
+                        payload.get("linkPreview"),
+                    )
+                if "options" in payload:
+                    _log.info("send_text options_payload=%s", json.dumps(payload["options"]))
+
+                resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
+                _log.info("send_text response: path=%s status=%s body=%s", path, resp.status_code, resp.text[:300])
+                if resp.ok:
+                    return
+                attempts.append(f"{path} {resp.status_code} {resp.text}")
+
+        raise EvolutionError(f"send_text failed: {' / '.join(attempts)}")
+
+    def _build_text_payloads(
+        self,
+        *,
+        remote_jid: str,
+        text: str,
+        quoted_message_id: str | None,
+        quoted_text: str | None,
+        quoted_remote_jid: str | None,
+        quoted_from_me: bool | None,
+        quoted_participant: str | None,
+    ) -> list[Dict[str, Any]]:
+        payloads: list[Dict[str, Any]] = []
+        if quoted_message_id:
+            quoted_key: Dict[str, Any] = {"id": quoted_message_id}
+            if quoted_remote_jid:
+                quoted_key["remoteJid"] = quoted_remote_jid
+            if quoted_from_me is not None:
+                quoted_key["fromMe"] = bool(quoted_from_me)
+            normalized_participant = self._normalize_participant_jid(quoted_participant)
+            if normalized_participant:
+                quoted_key["participant"] = normalized_participant
+
+            quoted_message = {"conversation": (quoted_text or "Mensagem").strip()}
+            payloads.append(
+                {
+                    "number": remote_jid,
+                    "textMessage": {"text": text},
+                    "options": {
+                        "quoted": {
+                            "key": quoted_key,
+                            "message": quoted_message,
+                        },
+                        "linkPreview": False,
+                    },
+                }
             )
 
-        resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=30)
-        _log.info("send_text response1: status=%s body=%s", resp.status_code, resp.text[:300])
-        if resp.ok:
-            return
+        legacy_payload: Dict[str, Any] = {"number": remote_jid, "text": text}
+        if quoted_message_id:
+            legacy_quoted_key: Dict[str, Any] = {"id": quoted_message_id}
+            if quoted_remote_jid:
+                legacy_quoted_key["remoteJid"] = quoted_remote_jid
+            if quoted_from_me is not None:
+                legacy_quoted_key["fromMe"] = bool(quoted_from_me)
+            normalized_participant = self._normalize_participant_jid(quoted_participant)
+            if normalized_participant:
+                legacy_quoted_key["participant"] = normalized_participant
+            legacy_payload["quoted"] = {
+                "key": legacy_quoted_key,
+                "message": {"conversation": (quoted_text or "Mensagem").strip()},
+            }
+            legacy_payload["linkPreview"] = False
+        payloads.append(legacy_payload)
+        return payloads
 
-        # Tentativa 2: /messages/sendText/{instance}
-        url2 = f"{self._url}/messages/sendText/{instance}"
-        resp2 = requests.post(url2, headers=self._headers(), data=json.dumps(payload), timeout=30)
-        _log.info("send_text response2: status=%s body=%s", resp2.status_code, resp2.text[:300])
-        if resp2.ok:
-            return
-
-        raise EvolutionError(f"send_text failed: {resp.status_code} {resp.text} / {resp2.status_code} {resp2.text}")
+    def _normalize_participant_jid(self, participant: str | None) -> str | None:
+        raw = (participant or "").strip()
+        if not raw:
+            return None
+        if "@" in raw:
+            return raw
+        digits = "".join(ch for ch in raw if ch.isdigit())
+        if not digits:
+            return None
+        return f"{digits}@s.whatsapp.net"
 
     def send_audio_mp3(self, instance: str, remote_jid: str, mp3_bytes: bytes) -> None:
         _log = logging.getLogger("summi_worker.evolution_client")
