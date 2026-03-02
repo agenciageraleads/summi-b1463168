@@ -46,6 +46,7 @@ SUMMI_VPS_PASSWORD='...' python3 scripts/promote_release.py --sha <commit-sha> -
   - `/releases`
   - health do worker
   - fluxo critico alterado na release
+  - se a release mexer em audio: enviar 1 audio curto e 1 audio com numero/marca para validar transcricao e fallback
 
 ## 6. Verificacao Operacional
 
@@ -55,6 +56,10 @@ SUMMI_VPS_PASSWORD='...' python3 scripts/promote_release.py --sha <commit-sha> -
   - `summi_summi-worker-scheduler`
 
 - Confirmar que nao houve erro novo relevante nos logs.
+- Se a release mexer em transcricao, procurar:
+  - `openai.transcription_fallback_triggered`
+  - `evolution_webhook.audio_transcribed`
+  - `evolution_webhook.reaction_audio_transcribed`
 
 ## 7. Rollback
 

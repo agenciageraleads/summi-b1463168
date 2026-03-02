@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import base64
+from dataclasses import dataclass
 from io import BytesIO
 import json
+import math
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -11,6 +13,15 @@ from mutagen import File as MutagenFile
 
 class OpenAIError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class TranscriptionResult:
+    text: str
+    duration_seconds: Optional[float]
+    model: str
+    average_logprob: Optional[float] = None
+    average_confidence: Optional[float] = None
 
 
 def _extract_json_object(text: str) -> Dict[str, Any]:
@@ -25,6 +36,29 @@ def _extract_json_object(text: str) -> Dict[str, Any]:
         raise OpenAIError(f"Could not locate JSON object in response: {text[:200]}")
     raw = text[start : end + 1]
     return json.loads(raw)
+
+
+def _to_float(value: Any) -> Optional[float]:
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _extract_logprob_values(node: Any) -> list[float]:
+    values: list[float] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "logprob":
+                parsed = _to_float(value)
+                if parsed is not None:
+                    values.append(parsed)
+                continue
+            values.extend(_extract_logprob_values(value))
+    elif isinstance(node, list):
+        for item in node:
+            values.extend(_extract_logprob_values(item))
+    return values
 
 
 class OpenAIClient:
@@ -124,29 +158,67 @@ class OpenAIClient:
             return None
         return duration if duration > 0 else None
 
-    def transcribe_mp3(self, mp3_bytes: bytes, filename: str = "audio.mp3") -> Tuple[str, Optional[float]]:
+    def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        *,
+        model: str = "gpt-4o-mini-transcribe",
+        filename: str = "audio.mp3",
+        language: str | None = None,
+        prompt: str | None = None,
+        include_logprobs: bool = True,
+        auto_chunking_min_seconds: int | None = None,
+    ) -> TranscriptionResult:
         """
-        Retorna (texto, duracao_segundos?) usando /audio/transcriptions.
+        Retorna texto, duração e sinais de confiança usando /audio/transcriptions.
         Apesar do nome historico, detecta formato real (ogg/opus, mp3, wav, etc.).
         """
         url = "https://api.openai.com/v1/audio/transcriptions"
         headers = {"Authorization": f"Bearer {self._api_key}"}
-        upload_filename, mime_type = self._detect_audio_upload_meta(mp3_bytes, default_filename=filename)
-        files = {"file": (upload_filename, mp3_bytes, mime_type)}
-        data = {"model": "gpt-4o-mini-transcribe"}
+        upload_filename, mime_type = self._detect_audio_upload_meta(audio_bytes, default_filename=filename)
+        files = {"file": (upload_filename, audio_bytes, mime_type)}
+        estimated_duration = self._probe_audio_duration_seconds(audio_bytes)
+        data: list[tuple[str, str]] = [
+            ("model", model),
+            ("response_format", "json"),
+        ]
+        if language:
+            data.append(("language", language))
+        if prompt:
+            data.append(("prompt", prompt))
+        if include_logprobs:
+            data.append(("include[]", "logprobs"))
+        if (
+            auto_chunking_min_seconds is not None
+            and estimated_duration is not None
+            and estimated_duration >= auto_chunking_min_seconds
+        ):
+            data.append(("chunking_strategy", "auto"))
         resp = requests.post(url, headers=headers, data=data, files=files, timeout=180)
         if not resp.ok:
             raise OpenAIError(f"transcribe failed: {resp.status_code} {resp.text}")
         payload = resp.json()
         text = str(payload.get("text") or "").strip()
-        duration = payload.get("duration")
-        try:
-            duration_num = float(duration) if duration is not None else None
-        except Exception:
-            duration_num = None
+        duration_num = _to_float(payload.get("duration"))
         if duration_num is None:
-            duration_num = self._probe_audio_duration_seconds(mp3_bytes)
-        return text, duration_num
+            duration_num = estimated_duration
+        logprob_values = _extract_logprob_values(payload.get("logprobs"))
+        average_logprob: Optional[float] = None
+        average_confidence: Optional[float] = None
+        if logprob_values:
+            average_logprob = sum(logprob_values) / len(logprob_values)
+            average_confidence = min(max(math.exp(average_logprob), 0.0), 1.0)
+        return TranscriptionResult(
+            text=text,
+            duration_seconds=duration_num,
+            model=model,
+            average_logprob=average_logprob,
+            average_confidence=average_confidence,
+        )
+
+    def transcribe_mp3(self, mp3_bytes: bytes, filename: str = "audio.mp3") -> Tuple[str, Optional[float]]:
+        result = self.transcribe_audio(mp3_bytes, filename=filename)
+        return result.text, result.duration_seconds
 
     def describe_image_base64(self, model: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
         mime_type = self._detect_image_mime(image_bytes, default_mime=mime_type)

@@ -12,8 +12,14 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from .config import Settings, load_settings
 from .evolution_client import EvolutionClient, EvolutionError
 from .evolution_webhook import normalize_message_event
-from .openai_client import OpenAIClient, OpenAIError
-from .prompt_builders import build_transcription_summary_prompt, is_internal_summi_thread
+from .openai_client import OpenAIClient, OpenAIError, TranscriptionResult
+from .prompt_builders import (
+    build_transcription_hint_terms,
+    build_transcription_prompt,
+    build_transcription_summary_prompt,
+    choose_transcription_fallback_reason,
+    is_internal_summi_thread,
+)
 from .redis_dedupe import RedisDedupe
 from .redis_queue import RedisQueueClient
 from .summi_jobs import analyze_user_chats, run_hourly_job
@@ -149,6 +155,72 @@ def _summarize_transcription(
         user=user,
         temperature=0.2,
     )
+
+
+def _transcribe_audio_with_fallback(
+    *,
+    openai: OpenAIClient,
+    settings: Settings,
+    profile: Dict[str, Any],
+    audio_bytes: bytes,
+    filename: str = "audio.mp3",
+) -> tuple[TranscriptionResult, Dict[str, Any]]:
+    prompt_extra = settings.openai_transcription_prompt_extra
+    transcription_prompt = build_transcription_prompt(profile, extra_context=prompt_extra)
+    hint_terms = build_transcription_hint_terms(profile, extra_context=prompt_extra)
+    base_result = openai.transcribe_audio(
+        audio_bytes,
+        model=settings.openai_transcription_model,
+        filename=filename,
+        language=settings.openai_transcription_language,
+        prompt=transcription_prompt,
+        include_logprobs=True,
+        auto_chunking_min_seconds=settings.openai_transcription_chunking_min_seconds,
+    )
+    metadata: Dict[str, Any] = {
+        "audio_transcription_model": base_result.model,
+        "audio_transcription_confidence": base_result.average_confidence,
+        "audio_transcription_used_fallback": False,
+    }
+    if base_result.average_logprob is not None:
+        metadata["audio_transcription_avg_logprob"] = base_result.average_logprob
+
+    if (
+        not settings.openai_transcription_enable_fallback
+        or settings.openai_transcription_fallback_model == base_result.model
+    ):
+        return base_result, metadata
+
+    fallback_reason = choose_transcription_fallback_reason(
+        base_result.text,
+        average_confidence=base_result.average_confidence,
+        confidence_threshold=settings.openai_transcription_confidence_threshold,
+        critical_confidence_threshold=settings.openai_transcription_critical_confidence_threshold,
+        hint_terms=hint_terms,
+    )
+    if not fallback_reason:
+        return base_result, metadata
+
+    fallback_result = openai.transcribe_audio(
+        audio_bytes,
+        model=settings.openai_transcription_fallback_model,
+        filename=filename,
+        language=settings.openai_transcription_language,
+        prompt=transcription_prompt,
+        include_logprobs=True,
+        auto_chunking_min_seconds=settings.openai_transcription_chunking_min_seconds,
+    )
+    fallback_metadata: Dict[str, Any] = {
+        "audio_transcription_used_fallback": True,
+        "audio_transcription_fallback_reason": fallback_reason,
+        "audio_transcription_base_model": base_result.model,
+        "audio_transcription_base_confidence": base_result.average_confidence,
+        "audio_transcription_model": fallback_result.model,
+        "audio_transcription_confidence": fallback_result.average_confidence,
+    }
+    if fallback_result.average_logprob is not None:
+        fallback_metadata["audio_transcription_avg_logprob"] = fallback_result.average_logprob
+    return fallback_result, metadata | fallback_metadata
 
 
 def _derive_message_content(payload: Dict[str, Any], normalized: Dict[str, Any], *, image_description: str | None = None, audio_text: str | None = None) -> Optional[str]:
@@ -603,7 +675,13 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                 media_b64 = evolution.get_media_base64(instance_name, message_id)
             if media_b64:
                 mp3_bytes = _decode_b64_media(media_b64)
-                transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
+                transcription, transcription_meta = _transcribe_audio_with_fallback(
+                    openai=openai,
+                    settings=settings,
+                    profile=profile,
+                    audio_bytes=mp3_bytes,
+                )
+                transcript, duration_seconds = transcription.text, transcription.duration_seconds
                 # Extrai duração do payload em múltiplos caminhos (versões diferentes da Evolution)
                 seconds_from_payload = (
                     _get_in(payload, "body", "data", "message", "audioMessage", "seconds")
@@ -645,6 +723,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         "audio_media_source": media_source,
                     }
                 )
+                extra.update(transcription_meta)
 
                 send_on_reaction = _profile_bool(profile, "send_on_reaction", False)
                 can_send_based_on_origin = (
@@ -699,7 +778,13 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                             logger.warning("evolution_webhook.reaction_ignored reason=media_not_audio instance=%s target_id=%s", instance_name, target_id)
                             extra["reaction_media_not_audio"] = True
                         else:
-                            transcript, duration_seconds = openai.transcribe_mp3(mp3_bytes)
+                            transcription, transcription_meta = _transcribe_audio_with_fallback(
+                                openai=openai,
+                                settings=settings,
+                                profile=profile,
+                                audio_bytes=mp3_bytes,
+                            )
+                            transcript, duration_seconds = transcription.text, transcription.duration_seconds
                             final_text = transcript
                             audio_seconds = _safe_positive_int(duration_seconds)
                             resume_audio = _profile_bool(profile, "resume_audio", False)
@@ -717,6 +802,8 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                 )
                                 extra["reaction_audio_summarized"] = True
                             extra["reaction_audio_seconds"] = audio_seconds
+                            for key, value in transcription_meta.items():
+                                extra[f"reaction_{key}"] = value
                             processed_audio_seconds = audio_seconds
                             if final_text.strip():
                                 outbound = _send_aux_message(

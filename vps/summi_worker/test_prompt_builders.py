@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import types
 import unittest
 from pathlib import Path
 
@@ -9,11 +10,23 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+if "requests" not in sys.modules:
+    requests_stub = types.ModuleType("requests")
+    requests_stub.post = None
+    sys.modules["requests"] = requests_stub
+
+if "mutagen" not in sys.modules:
+    mutagen_stub = types.ModuleType("mutagen")
+    mutagen_stub.File = lambda *args, **kwargs: None
+    sys.modules["mutagen"] = mutagen_stub
+
 from summi_worker.analysis import build_audio_script, build_summary_text
 from summi_worker.prompt_builders import (
     SUMMI_HOUR_FALLBACK_AUDIO_SCRIPT,
     SUMMI_HOUR_FALLBACK_TEXT,
+    build_transcription_prompt,
     build_transcription_summary_prompt,
+    choose_transcription_fallback_reason,
     choose_transcription_summary_mode,
     is_empty_summi_hour,
     is_internal_summi_thread,
@@ -80,6 +93,44 @@ class PromptBuildersTest(unittest.TestCase):
         transcription = " ".join(["tema"] * 120)
         mode = choose_transcription_summary_mode(transcription, audio_seconds=180)
         self.assertEqual(mode, "structured")
+
+    def test_transcription_prompt_injects_business_context_without_losing_guardrails(self) -> None:
+        prompt = build_transcription_prompt(
+            {
+                "nome": "Lucas Imperial",
+                "temas_urgentes": "CNPJ, orçamento",
+                "temas_importantes": "DeWalt, prazo de entrega",
+            },
+            extra_context="Makita, nota fiscal",
+        )
+
+        self.assertIn("português do Brasil", prompt)
+        self.assertIn("Lucas Imperial", prompt)
+        self.assertIn("CNPJ", prompt)
+        self.assertIn("DeWalt", prompt)
+        self.assertIn("Makita", prompt)
+        self.assertIn("Não resuma", prompt)
+
+    def test_fallback_reason_prefers_critical_content_when_confidence_is_borderline(self) -> None:
+        reason = choose_transcription_fallback_reason(
+            "Me passa o CNPJ 12.345.678/0001-90 e o orçamento da DeWalt.",
+            average_confidence=0.71,
+            confidence_threshold=0.55,
+            critical_confidence_threshold=0.8,
+            hint_terms=["DeWalt"],
+        )
+
+        self.assertEqual(reason, "critical_content_low_confidence")
+
+    def test_fallback_reason_detects_suspicious_repetition(self) -> None:
+        reason = choose_transcription_fallback_reason(
+            "da da da Dewalt me manda o orçamento",
+            average_confidence=None,
+            confidence_threshold=0.55,
+            critical_confidence_threshold=0.8,
+        )
+
+        self.assertEqual(reason, "suspicious_repetition")
 
     def test_structured_transcription_prompt_omits_empty_action_instruction(self) -> None:
         system, user = build_transcription_summary_prompt(

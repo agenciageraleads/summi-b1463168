@@ -1,12 +1,28 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple
+import re
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 
 SUMMI_HOUR_FALLBACK_TEXT = (
     "✨ *Summi da Hora*\n\nVocê não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
 )
 SUMMI_HOUR_FALLBACK_AUDIO_SCRIPT = "Summi da Hora: não há nada de importante por agora."
+DEFAULT_CRITICAL_TRANSCRIPTION_TERMS = (
+    "cnpj",
+    "cpf",
+    "rg",
+    "inscricao estadual",
+    "ie",
+    "pix",
+    "orcamento",
+    "pedido",
+    "nota fiscal",
+    "telefone",
+    "whatsapp",
+    "email",
+    "cep",
+)
 
 
 def _compact_text(value: str | None) -> str:
@@ -15,6 +31,22 @@ def _compact_text(value: str | None) -> str:
 
 def _digits(value: str | None) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def _keyword_candidates(*values: Any) -> list[str]:
+    parts: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        for raw_part in re.split(r"[,;\n|]+", str(value or "")):
+            part = " ".join(raw_part.split()).strip()
+            if not part:
+                continue
+            key = part.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            parts.append(part)
+    return parts
 
 
 def is_internal_summi_thread(chat_remote_jid: str | None, ignore_remote_jid: str | None) -> bool:
@@ -52,6 +84,98 @@ def build_summi_audio_prompt(summary_text: str) -> Tuple[str, str]:
         "Retorne apenas o texto final."
     )
     return system, user
+
+
+def build_transcription_hint_terms(
+    profile: Mapping[str, Any],
+    *,
+    extra_context: str | None = None,
+    limit: int = 12,
+) -> list[str]:
+    return _keyword_candidates(
+        profile.get("temas_urgentes"),
+        profile.get("temas_importantes"),
+        extra_context,
+    )[:limit]
+
+
+def build_transcription_prompt(
+    profile: Mapping[str, Any],
+    *,
+    extra_context: str | None = None,
+) -> str:
+    owner_name = " ".join(str(profile.get("nome") or profile.get("name") or "").split()).strip()
+    hint_terms = build_transcription_hint_terms(profile, extra_context=extra_context)
+    parts = [
+        "Transcreva em português do Brasil com máxima fidelidade ao áudio.",
+        "Preserve exatamente nomes próprios, marcas, códigos de produto, números, valores, CNPJ, CPF, telefones, e-mails e prazos.",
+        "Não resuma, não traduza e não invente palavras, nomes ou contexto ausente.",
+    ]
+    if owner_name:
+        parts.append(f"O usuário dono da conta se chama {owner_name}.")
+    if hint_terms:
+        parts.append(f"Vocabulário e temas recorrentes deste usuário: {', '.join(hint_terms)}.")
+    return " ".join(parts)
+
+
+def transcription_has_suspicious_repetition(transcription: str) -> bool:
+    tokens = re.findall(r"\w+", transcription.casefold())
+    consecutive_repeats = 0
+    for index in range(1, len(tokens)):
+        current = tokens[index]
+        previous = tokens[index - 1]
+        if current == previous and len(current) <= 4:
+            consecutive_repeats += 1
+            if consecutive_repeats >= 2:
+                return True
+        else:
+            consecutive_repeats = 0
+    return False
+
+
+def transcription_has_critical_content(
+    transcription: str,
+    *,
+    hint_terms: Sequence[str] = (),
+) -> bool:
+    normalized = _compact_text(transcription)
+    if not normalized:
+        return False
+    if len(re.findall(r"\d", transcription)) >= 4:
+        return True
+    if re.search(r"\b[a-z]{2,}\d{2,}[a-z0-9-]*\b", normalized):
+        return True
+    for term in (*DEFAULT_CRITICAL_TRANSCRIPTION_TERMS, *hint_terms):
+        normalized_term = _compact_text(term)
+        if normalized_term and normalized_term in normalized:
+            return True
+    return False
+
+
+def choose_transcription_fallback_reason(
+    transcription: str,
+    *,
+    average_confidence: float | None,
+    confidence_threshold: float,
+    critical_confidence_threshold: float,
+    hint_terms: Sequence[str] = (),
+) -> str | None:
+    if not transcription.strip():
+        return "empty_transcript"
+    if average_confidence is not None and average_confidence < confidence_threshold:
+        return "low_confidence"
+    if (
+        transcription_has_suspicious_repetition(transcription)
+        and (average_confidence is None or average_confidence < critical_confidence_threshold)
+    ):
+        return "suspicious_repetition"
+    if (
+        average_confidence is not None
+        and average_confidence < critical_confidence_threshold
+        and transcription_has_critical_content(transcription, hint_terms=hint_terms)
+    ):
+        return "critical_content_low_confidence"
+    return None
 
 
 def choose_transcription_summary_mode(
