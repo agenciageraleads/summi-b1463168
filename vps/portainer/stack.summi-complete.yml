@@ -29,12 +29,13 @@ services:
 
   summi-worker-api:
     image: ghcr.io/agenciageraleads/summi-b1463168-worker:f067cb5d720ae207c8342e15a85ce050f0711f05
+    command: ["uvicorn", "summi_worker.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5).read()"]
+      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 8080), 5); s.close()"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      timeout: 15s
+      retries: 5
+      start_period: 45s
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
