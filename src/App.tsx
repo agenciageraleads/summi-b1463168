@@ -30,6 +30,8 @@ const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AdminBetaUsersPage = lazy(() => import("./pages/AdminBetaUsersPage"));
 const AdminAnnouncementsPage = lazy(() => import("./pages/AdminAnnouncementsPage"));
+const AdminBlogPage = lazy(() => import("./pages/AdminBlogPage"));
+const AdminBlogFormPage = lazy(() => import("./pages/AdminBlogFormPage"));
 const ReferralPage = lazy(() => import("./pages/ReferralPage"));
 const TermsPage = lazy(() => import("./pages/TermsPage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
@@ -195,6 +197,8 @@ function AppRoutes() {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/beta-users" element={<AdminBetaUsersPage />} />
           <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
+          <Route path="/admin/blog" element={<AdminBlogPage />} />
+          <Route path="/admin/blog/:id" element={<AdminBlogFormPage />} />
 
           <Route path="/convite/:referralCode" element={<ReferralPage />} />
           <Route path="/r/:referralCode" element={<ReferralPage />} />

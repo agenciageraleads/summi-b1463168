@@ -1,8 +1,10 @@
 import { useParams, Link, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, Calendar, ArrowLeft, ArrowRight } from "lucide-react";
-import { getBlogPostBySlug, blogPosts } from "@/data/blogPosts";
+import { useBlog, BlogPostRow } from "@/hooks/useBlogAdmin";
+import { blogPosts as staticPosts } from "@/data/blogPosts";
 import { SEO } from "@/components/SEO";
 
 function formatDate(dateStr: string): string {
@@ -17,27 +19,13 @@ function formatDate(dateStr: string): string {
 function renderMarkdown(content: string): string {
   return content
     .trim()
-    // H2
     .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold text-gray-900 mt-10 mb-4">$1</h2>')
-    // H3
     .replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold text-gray-800 mt-8 mb-3">$1</h3>')
-    // Bold
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    // Tables (basic)
-    .replace(/\|(.+)\|/g, (line) => {
-      const cells = line.split("|").filter(Boolean).map((c) => c.trim());
-      if (cells.every((c) => /^-+$/.test(c))) return ""; // separator row
-      return `<tr>${cells.map((c) => `<td class="border border-gray-200 px-3 py-2 text-sm">${c}</td>`).join("")}</tr>`;
-    })
-    // Unordered list items
     .replace(/^- (.+)$/gm, '<li class="mb-1">$1</li>')
-    // Wrap consecutive <li> blocks in <ul>
-    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => `<ul class="list-disc pl-6 my-4 space-y-1 text-gray-700">${match}</ul>`)
-    // Wrap consecutive <tr> in <table>
-    .replace(/(<tr>[\s\S]+?<\/tr>\n?)+/g, (match) =>
-      `<div class="overflow-x-auto my-6"><table class="w-full border-collapse border border-gray-200 text-sm">${match}</table></div>`
+    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) =>
+      `<ul class="list-disc pl-6 my-4 space-y-1 text-gray-700">${match}</ul>`
     )
-    // Paragraphs (lines that aren't tags or empty)
     .split("\n\n")
     .map((block) => {
       const trimmed = block.trim();
@@ -57,15 +45,69 @@ const categoryColors: Record<string, string> = {
 
 const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
-  const post = slug ? getBlogPostBySlug(slug) : undefined;
+  const { posts: dbPosts, isLoading: dbLoading, getPostBySlug } = useBlog();
+  const [post, setPost] = useState<BlogPostRow | null>(null);
+  const [allPosts, setAllPosts] = useState<BlogPostRow[]>([]);
+  const [notFound, setNotFound] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (!post) {
-    return <Navigate to="/blog" replace />;
+  useEffect(() => {
+    if (!slug) { setNotFound(true); setIsLoading(false); return; }
+
+    const loadPost = async () => {
+      const found = await getPostBySlug(slug);
+      if (found) {
+        setPost(found);
+      } else {
+        // fallback to static
+        const s = staticPosts.find(p => p.slug === slug);
+        if (s) {
+          setPost({
+            id: s.slug, slug: s.slug, title: s.title, excerpt: s.excerpt,
+            content: s.content, published_at: s.publishedAt, modified_at: s.modifiedAt,
+            author: s.author, reading_time: s.readingTime, keywords: s.keywords,
+            category: s.category, tags: s.tags, published: true,
+            created_at: s.publishedAt,
+          });
+        } else {
+          setNotFound(true);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    loadPost();
+  }, [slug]);
+
+  // Build ordered list for prev/next
+  useEffect(() => {
+    if (!dbLoading) {
+      if (dbPosts.length > 0) {
+        setAllPosts(dbPosts);
+      } else {
+        setAllPosts(staticPosts.map(p => ({
+          id: p.slug, slug: p.slug, title: p.title, excerpt: p.excerpt,
+          content: p.content, published_at: p.publishedAt, modified_at: p.modifiedAt,
+          author: p.author, reading_time: p.readingTime, keywords: p.keywords,
+          category: p.category, tags: p.tags, published: true, created_at: p.publishedAt,
+        })));
+      }
+    }
+  }, [dbPosts, dbLoading]);
+
+  if (notFound) return <Navigate to="/blog" replace />;
+
+  if (isLoading || !post) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+      </div>
+    );
   }
 
-  const currentIndex = blogPosts.findIndex((p) => p.slug === post.slug);
-  const prevPost = currentIndex > 0 ? blogPosts[currentIndex - 1] : null;
-  const nextPost = currentIndex < blogPosts.length - 1 ? blogPosts[currentIndex + 1] : null;
+  const currentIndex = allPosts.findIndex(p => p.slug === post.slug);
+  const prevPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
+  const nextPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
 
   const htmlContent = renderMarkdown(post.content);
 
@@ -74,10 +116,7 @@ const BlogPostPage = () => {
     "@type": "Article",
     headline: post.title,
     description: post.excerpt,
-    author: {
-      "@type": "Organization",
-      name: post.author,
-    },
+    author: { "@type": "Organization", name: post.author },
     publisher: {
       "@type": "Organization",
       name: "Summi",
@@ -86,8 +125,8 @@ const BlogPostPage = () => {
         url: "https://summi.com.br/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png",
       },
     },
-    datePublished: post.publishedAt,
-    dateModified: post.modifiedAt,
+    datePublished: post.published_at,
+    dateModified: post.modified_at,
     mainEntityOfPage: {
       "@type": "WebPage",
       "@id": `https://summi.com.br/blog/${post.slug}`,
@@ -104,12 +143,11 @@ const BlogPostPage = () => {
         keywords={post.keywords}
         canonicalPath={`/blog/${post.slug}`}
         ogType="article"
-        publishedAt={post.publishedAt}
-        modifiedAt={post.modifiedAt}
+        publishedAt={post.published_at}
+        modifiedAt={post.modified_at}
         author={post.author}
       />
 
-      {/* JSON-LD for article */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -161,11 +199,11 @@ const BlogPostPage = () => {
           </Badge>
           <span className="flex items-center gap-1 text-sm text-gray-500">
             <Clock className="w-3.5 h-3.5" />
-            {post.readingTime} min de leitura
+            {post.reading_time} min de leitura
           </span>
           <span className="flex items-center gap-1 text-sm text-gray-500">
             <Calendar className="w-3.5 h-3.5" />
-            {formatDate(post.publishedAt)}
+            {formatDate(post.published_at)}
           </span>
         </div>
 
@@ -174,7 +212,7 @@ const BlogPostPage = () => {
           {post.title}
         </h1>
 
-        {/* Excerpt / Lead */}
+        {/* Excerpt */}
         <p className="text-xl text-gray-600 leading-relaxed mb-8 pb-8 border-b border-gray-100">
           {post.excerpt}
         </p>
@@ -190,11 +228,11 @@ const BlogPostPage = () => {
           </div>
           <div>
             <p className="text-sm font-semibold text-gray-900">{post.author}</p>
-            <p className="text-xs text-gray-500">Atualizado em {formatDate(post.modifiedAt)}</p>
+            <p className="text-xs text-gray-500">Atualizado em {formatDate(post.modified_at)}</p>
           </div>
         </div>
 
-        {/* Article Body */}
+        {/* Body */}
         <div
           className="prose prose-green max-w-none"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
@@ -212,7 +250,7 @@ const BlogPostPage = () => {
           </div>
         </div>
 
-        {/* Prev / Next Navigation */}
+        {/* Prev / Next */}
         <div className="mt-12 grid grid-cols-2 gap-4">
           {prevPost ? (
             <Link to={`/blog/${prevPost.slug}`} className="group">
@@ -225,9 +263,7 @@ const BlogPostPage = () => {
                 </p>
               </div>
             </Link>
-          ) : (
-            <div />
-          )}
+          ) : <div />}
           {nextPost ? (
             <Link to={`/blog/${nextPost.slug}`} className="group col-start-2">
               <div className="p-4 rounded-lg border border-gray-200 hover:border-green-300 transition-all text-right h-full">
@@ -239,13 +275,11 @@ const BlogPostPage = () => {
                 </p>
               </div>
             </Link>
-          ) : (
-            <div />
-          )}
+          ) : <div />}
         </div>
       </article>
 
-      {/* CTA Section */}
+      {/* CTA */}
       <div className="bg-gradient-to-br from-green-50 to-white py-16 mt-8">
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
@@ -266,12 +300,8 @@ const BlogPostPage = () => {
         </div>
       </div>
 
-      {/* Back to blog */}
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <Link
-          to="/blog"
-          className="flex items-center gap-2 text-green-600 hover:text-green-700 transition-colors font-medium"
-        >
+        <Link to="/blog" className="flex items-center gap-2 text-green-600 hover:text-green-700 transition-colors font-medium">
           <ArrowLeft className="w-4 h-4" />
           Voltar para o Blog
         </Link>
@@ -281,11 +311,7 @@ const BlogPostPage = () => {
       <footer className="bg-emerald-950 text-white py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <img
-              src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png"
-              alt="Summi Logo"
-              className="w-7 h-7 object-contain"
-            />
+            <img src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" alt="Summi Logo" className="w-7 h-7 object-contain" />
             <span className="font-bold">Summi</span>
           </div>
           <p className="text-gray-400 text-sm">© 2026 Summi. Todos os direitos reservados.</p>
