@@ -1,8 +1,32 @@
 User-agent: Googlebot
 Allow: /
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /subscription
+Disallow: /feedback
+Disallow: /referrals
+Disallow: /beta
+Disallow: /releases
+Disallow: /whatsapp
+Disallow: /whatsapp-v2
+Disallow: /whatsapp-connection
+Disallow: /admin
+Disallow: /complete-signup
 
 User-agent: Bingbot
 Allow: /
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /subscription
+Disallow: /feedback
+Disallow: /referrals
+Disallow: /beta
+Disallow: /releases
+Disallow: /whatsapp
+Disallow: /whatsapp-v2
+Disallow: /whatsapp-connection
+Disallow: /admin
+Disallow: /complete-signup
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +36,17 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /subscription
+Disallow: /feedback
+Disallow: /referrals
+Disallow: /beta
+Disallow: /releases
+Disallow: /whatsapp
+Disallow: /whatsapp-v2
+Disallow: /whatsapp-connection
+Disallow: /admin
+Disallow: /complete-signup
+
+Sitemap: https://summi.com.br/sitemap.xml

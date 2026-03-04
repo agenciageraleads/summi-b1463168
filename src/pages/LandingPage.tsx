@@ -8,6 +8,7 @@ import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRigh
 import { Link } from "react-router-dom";
 import { createCheckoutSession } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
+import { SEO } from "@/components/SEO";
 
 const LandingPage = () => {
   const { toast } = useToast();
@@ -28,6 +29,12 @@ const LandingPage = () => {
     }
   };
   return <div className="min-h-screen bg-gradient-to-br from-green-50 to-white">
+    <SEO
+      title="Summi - Assistente de WhatsApp com IA | Transcrição e Resumo de Mensagens"
+      description="Summi é sua assistente de IA para WhatsApp. Transcreva áudios, receba resumos das conversas mais importantes e nunca mais perca uma mensagem relevante. Experimente grátis por 7 dias."
+      keywords="assistente whatsapp ia, automação whatsapp, transcrição áudio whatsapp, resumo mensagens whatsapp, whatsapp business ia"
+      canonicalPath="/"
+    />
     {/* Navigation */}
     <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,10 +55,12 @@ const LandingPage = () => {
             <a href="#como-funciona" className="text-gray-600 hover:text-green-600 transition-colors">
               Como Funciona
             </a>
-
             <a href="#faq" className="text-gray-600 hover:text-green-600 transition-colors">
               FAQ
             </a>
+            <Link to="/blog" className="text-gray-600 hover:text-green-600 transition-colors">
+              Blog
+            </Link>
           </div>
 
           {/* CTA Buttons */}
@@ -557,6 +566,7 @@ const LandingPage = () => {
               <li><a href="#recursos" className="hover:text-white transition-colors">Funcionalidades</a></li>
               <li><a href="#precos" className="hover:text-white transition-colors">Planos</a></li>
               <li><a href="#faq" className="hover:text-white transition-colors">FAQ</a></li>
+              <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
             </ul>
           </div>
 

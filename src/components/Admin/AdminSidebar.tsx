@@ -3,7 +3,7 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { BarChart3, Users, ArrowLeft, TestTube, MessageSquare } from 'lucide-react';
+import { BarChart3, Users, ArrowLeft, TestTube, MessageSquare, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navigation = [
@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Usuários', href: '/admin/users', icon: Users },
   { name: 'Usuários Beta', href: '/admin/beta-users', icon: TestTube },
   { name: 'Anúncios', href: '/admin/announcements', icon: MessageSquare },
+  { name: 'Blog', href: '/admin/blog', icon: FileText },
 ];
 
 export const AdminSidebar = () => {
@@ -39,7 +40,7 @@ export const AdminSidebar = () => {
               to={item.href}
               className={cn(
                 "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
-                location.pathname === item.href
+                (item.href === '/admin' ? location.pathname === '/admin' : location.pathname.startsWith(item.href))
                   ? "bg-red-600 text-white"
                   : "text-gray-300 hover:bg-gray-800 hover:text-white"
               )}

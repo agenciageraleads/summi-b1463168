@@ -5,12 +5,15 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SubscriptionGuard } from "./components/SubscriptionGuard";
 
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const SalesLandingPage = lazy(() => import("./pages/SalesLandingPage"));
+const BlogListPage = lazy(() => import("./pages/BlogListPage"));
+const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const CompleteSignupPage = lazy(() => import("./pages/CompleteSignupPage"));
@@ -27,6 +30,8 @@ const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AdminBetaUsersPage = lazy(() => import("./pages/AdminBetaUsersPage"));
 const AdminAnnouncementsPage = lazy(() => import("./pages/AdminAnnouncementsPage"));
+const AdminBlogPage = lazy(() => import("./pages/AdminBlogPage"));
+const AdminBlogFormPage = lazy(() => import("./pages/AdminBlogFormPage"));
 const ReferralPage = lazy(() => import("./pages/ReferralPage"));
 const TermsPage = lazy(() => import("./pages/TermsPage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
@@ -84,6 +89,8 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/landing" element={<SalesLandingPage />} />
+          <Route path="/blog" element={<BlogListPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/complete-signup" element={<CompleteSignupPage />} />
@@ -190,6 +197,8 @@ function AppRoutes() {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/beta-users" element={<AdminBetaUsersPage />} />
           <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
+          <Route path="/admin/blog" element={<AdminBlogPage />} />
+          <Route path="/admin/blog/:id" element={<AdminBlogFormPage />} />
 
           <Route path="/convite/:referralCode" element={<ReferralPage />} />
           <Route path="/r/:referralCode" element={<ReferralPage />} />
@@ -218,17 +227,19 @@ function AppRouter() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <div className="min-h-screen">
-            <AppRouter />
-          </div>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <div className="min-h-screen">
+              <AppRouter />
+            </div>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </HelmetProvider>
   );
 }
 
