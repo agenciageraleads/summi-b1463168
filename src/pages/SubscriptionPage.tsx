@@ -258,7 +258,7 @@ const SubscriptionPage = () => {
                   37% de desconto • R$ 358,80/ano
                 </div>
                 <CardDescription className="mt-2">
-                  Melhor custo-benefício + 30 dias grátis
+                  Melhor custo-benefício + 7 dias grátis
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -305,7 +305,7 @@ const SubscriptionPage = () => {
                   🎉 Complete seu cadastro
                 </h3>
                 <p className="text-sm text-summi-gray-600">
-                  Adicione seu cartão e ganhe <strong>7 dias grátis</strong> no plano mensal ou <strong>30 dias grátis</strong> no plano anual.
+                  Adicione seu cartão e ganhe <strong>7 dias grátis</strong> no plano mensal ou <strong>7 dias grátis</strong> no plano anual.
                   <br />
                   <strong>Cancele quando quiser, sem taxas ou compromisso.</strong>
                 </p>

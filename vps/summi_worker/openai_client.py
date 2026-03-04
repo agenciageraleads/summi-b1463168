@@ -15,6 +15,11 @@ class OpenAIError(RuntimeError):
     pass
 
 
+# Modelos que NÃO suportam include[]=logprobs na API de transcrição.
+# Whisper-1 usa endpoint legado e ignora/rejeita parâmetros extras.
+_TRANSCRIPTION_MODELS_WITHOUT_LOGPROBS: frozenset[str] = frozenset({"whisper-1"})
+
+
 @dataclass(frozen=True)
 class TranscriptionResult:
     text: str
@@ -162,7 +167,7 @@ class OpenAIClient:
         self,
         audio_bytes: bytes,
         *,
-        model: str = "gpt-4o-mini-transcribe",
+        model: str = "whisper-1",
         filename: str = "audio.mp3",
         language: str | None = None,
         prompt: str | None = None,
@@ -186,7 +191,8 @@ class OpenAIClient:
             data.append(("language", language))
         if prompt:
             data.append(("prompt", prompt))
-        if include_logprobs:
+        # Whisper-1 não suporta include[]=logprobs — apenas modelos gpt-4o-*-transcribe suportam.
+        if include_logprobs and model not in _TRANSCRIPTION_MODELS_WITHOUT_LOGPROBS:
             data.append(("include[]", "logprobs"))
         if (
             auto_chunking_min_seconds is not None

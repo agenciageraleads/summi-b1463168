@@ -108,11 +108,12 @@ serve(async (req) => {
         email: user.email,
         user_id: user.id,
         stripe_customer_id: null,
+        subscribed: false,
         subscription_status: 'inactive',
         stripe_price_id: null,
         subscription_end: null,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
+      }, { onConflict: 'user_id' });
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -166,11 +167,12 @@ serve(async (req) => {
       email: user.email,
       user_id: user.id,
       stripe_customer_id: customerId,
+      subscribed: subscriptionStatus === 'active' || subscriptionStatus === 'trialing',
       subscription_status: subscriptionStatus,
       stripe_price_id: stripePriceId,
       subscription_end: subscriptionEnd,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'email' });
+    }, { onConflict: 'user_id' });
 
     const subscribedStrict = (subscriptionStatus === 'active') || (subscriptionStatus === 'trialing');
 

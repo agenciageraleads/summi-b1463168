@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from summi_worker.app import _dispatch_analysis
+from summi_worker.app import _dispatch_analysis, _should_skip_transcription
 from summi_worker.config import Settings
 
 
@@ -55,6 +55,8 @@ def _settings(*, enable_analysis_queue: bool = False) -> Settings:
         business_hours_end=18,
         ignore_remote_jid="556293984600",
         enable_hourly_job=False,
+        enable_daily_job=False,
+        daily_summary_hour_utc=19,
         low_priority_cleanup_days=0,
         redis_url="redis://localhost:6379/0",
         webhook_dedupe_ttl_seconds=600,
@@ -139,6 +141,70 @@ class DispatchAnalysisTest(unittest.TestCase):
         self.assertEqual(fake_queue.calls[0][1]["message_id"], "ABC123")
         self.assertEqual(background_tasks.calls, [])
         analyze_user_chats.assert_not_called()
+
+
+class ShouldSkipTranscriptionTest(unittest.TestCase):
+    """Testa a lógica de pular re-transcrição de áudios já processados."""
+
+    def test_skip_when_message_already_transcribed(self) -> None:
+        """Deve pular se o message_id já existe no conversa com audio_transcribed=True."""
+        conversa = [
+            {"message_id": "ABC123", "text": "Texto transcrito", "audio_transcribed": True},
+            {"message_id": "DEF456", "text": "Outra mensagem", "audio_transcribed": True},
+        ]
+        self.assertTrue(_should_skip_transcription(conversa, "ABC123"))
+
+    def test_do_not_skip_new_message_id(self) -> None:
+        """Não deve pular se o message_id não existe no conversa."""
+        conversa = [
+            {"message_id": "ABC123", "text": "Texto transcrito", "audio_transcribed": True},
+        ]
+        self.assertFalse(_should_skip_transcription(conversa, "NOVO999"))
+
+    def test_do_not_skip_when_not_transcribed(self) -> None:
+        """Não deve pular se o message_id existe mas audio_transcribed=False."""
+        conversa = [
+            {"message_id": "ABC123", "text": None, "audio_transcribed": False},
+        ]
+        self.assertFalse(_should_skip_transcription(conversa, "ABC123"))
+
+    def test_do_not_skip_when_audio_transcribed_missing(self) -> None:
+        """Não deve pular se audio_transcribed não está presente no evento."""
+        conversa = [
+            {"message_id": "ABC123", "text": "Texto"},
+        ]
+        self.assertFalse(_should_skip_transcription(conversa, "ABC123"))
+
+    def test_do_not_skip_empty_conversa(self) -> None:
+        """Não deve pular se o conversa está vazio."""
+        self.assertFalse(_should_skip_transcription([], "ABC123"))
+
+    def test_do_not_skip_none_conversa(self) -> None:
+        """Não deve pular se conversa é None (conversa não iniciada)."""
+        self.assertFalse(_should_skip_transcription(None, "ABC123"))
+
+    def test_do_not_skip_none_message_id(self) -> None:
+        """Não deve pular se message_id é None."""
+        conversa = [
+            {"message_id": "ABC123", "audio_transcribed": True},
+        ]
+        self.assertFalse(_should_skip_transcription(conversa, None))
+
+    def test_do_not_skip_empty_message_id(self) -> None:
+        """Não deve pular se message_id é string vazia."""
+        conversa = [
+            {"message_id": "ABC123", "audio_transcribed": True},
+        ]
+        self.assertFalse(_should_skip_transcription(conversa, ""))
+
+    def test_skip_only_matching_message_id(self) -> None:
+        """Deve pular apenas o message_id correto, não outros."""
+        conversa = [
+            {"message_id": "ABC123", "text": "Transcrito", "audio_transcribed": True},
+            {"message_id": "DEF456", "text": None, "audio_transcribed": False},
+        ]
+        self.assertTrue(_should_skip_transcription(conversa, "ABC123"))
+        self.assertFalse(_should_skip_transcription(conversa, "DEF456"))
 
 
 if __name__ == "__main__":

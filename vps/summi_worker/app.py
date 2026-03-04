@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 
 from .config import Settings, load_settings
+from .cost_tracking import log_transcription_cost
 from .evolution_client import EvolutionClient, EvolutionError
 from .evolution_webhook import normalize_message_event
 from .openai_client import OpenAIClient, OpenAIError, TranscriptionResult
@@ -966,6 +967,12 @@ async def _handle_evolution_webhook(
                             transcription_meta.get("audio_transcription_used_fallback"),
                             transcription.average_confidence,
                         )
+                        # Log custo da transcrição (fire-and-forget)
+                        log_transcription_cost(
+                            supabase, user_id,
+                            model=transcription.model,
+                            duration_seconds=duration_seconds,
+                        )
 
                 # Extrai duração do payload em múltiplos caminhos (versões diferentes da Evolution)
                 seconds_from_payload = (
@@ -1092,6 +1099,12 @@ async def _handle_evolution_webhook(
                                 transcription.model,
                                 transcription_meta.get("audio_transcription_used_fallback"),
                                 transcription.average_confidence,
+                            )
+                            # Log custo da transcrição por reação (fire-and-forget)
+                            log_transcription_cost(
+                                supabase, user_id,
+                                model=transcription.model,
+                                duration_seconds=duration_seconds,
                             )
                             final_text = transcript
                             audio_seconds = _safe_positive_int(duration_seconds)

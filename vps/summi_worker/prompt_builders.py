@@ -8,6 +8,16 @@ SUMMI_HOUR_FALLBACK_TEXT = (
     "✨ *Summi da Hora*\n\nVocê não tem nenhuma demanda importante por agora, fique tranquilo. ✅"
 )
 SUMMI_HOUR_FALLBACK_AUDIO_SCRIPT = "Summi da Hora: não há nada de importante por agora."
+
+# Prompt estático passado ao Whisper para melhorar formatação pt-BR.
+# Não gera custo extra — Whisper cobra por minuto de áudio, não por token.
+# Usado como base em build_transcription_prompt() quando não há dados de perfil disponíveis.
+TRANSCRIPTION_STATIC_PROMPT = (
+    "Transcreva em português do Brasil com máxima fidelidade ao áudio. "
+    "Preserve exatamente nomes próprios, marcas, CPF, CNPJ, CEP, PIX, telefones, e-mails e valores. "
+    "Use pontuação correta e letras maiúsculas em nomes próprios. Não resuma nem invente palavras."
+)
+
 DEFAULT_CRITICAL_TRANSCRIPTION_TERMS = (
     "cnpj",
     "cpf",
@@ -104,13 +114,14 @@ def build_transcription_prompt(
     *,
     extra_context: str | None = None,
 ) -> str:
+    """
+    Monta o prompt de transcrição usando TRANSCRIPTION_STATIC_PROMPT como base.
+    Adiciona contexto personalizado do perfil (nome, temas) quando disponível.
+    O perfil já é carregado no processamento do webhook — sem custo extra de DB.
+    """
     owner_name = " ".join(str(profile.get("nome") or profile.get("name") or "").split()).strip()
     hint_terms = build_transcription_hint_terms(profile, extra_context=extra_context)
-    parts = [
-        "Transcreva em português do Brasil com máxima fidelidade ao áudio.",
-        "Preserve exatamente nomes próprios, marcas, códigos de produto, números, valores, CNPJ, CPF, telefones, e-mails e prazos.",
-        "Não resuma, não traduza e não invente palavras, nomes ou contexto ausente.",
-    ]
+    parts = [TRANSCRIPTION_STATIC_PROMPT]
     if owner_name:
         parts.append(f"O usuário dono da conta se chama {owner_name}.")
     if hint_terms:
