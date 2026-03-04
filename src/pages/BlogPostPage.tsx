@@ -116,6 +116,7 @@ const BlogPostPage = () => {
     "@type": "Article",
     headline: post.title,
     description: post.excerpt,
+    image: post.cover_image_url || undefined,
     author: { "@type": "Organization", name: post.author },
     publisher: {
       "@type": "Organization",
@@ -146,6 +147,7 @@ const BlogPostPage = () => {
         publishedAt={post.published_at}
         modifiedAt={post.modified_at}
         author={post.author}
+        ogImage={post.cover_image_url || undefined}
       />
 
       <script
@@ -211,6 +213,17 @@ const BlogPostPage = () => {
         <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 leading-tight mb-6">
           {post.title}
         </h1>
+
+        {/* Cover image */}
+        {post.cover_image_url && (
+          <div className="mb-8 rounded-xl overflow-hidden">
+            <img
+              src={post.cover_image_url}
+              alt={post.title}
+              className="w-full h-64 sm:h-80 object-cover"
+            />
+          </div>
+        )}
 
         {/* Excerpt */}
         <p className="text-xl text-gray-600 leading-relaxed mb-8 pb-8 border-b border-gray-100">

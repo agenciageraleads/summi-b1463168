@@ -636,6 +636,81 @@ def health() -> Dict[str, Any]:
     return {"ok": True}
 
 
+# ---------------------------------------------------------------------------
+# Social preview endpoint — called by nginx for social media bot requests.
+# Returns minimal HTML with og: / twitter: meta tags for a specific blog post
+# so that WhatsApp, Telegram, Facebook etc. show a rich link preview.
+# ---------------------------------------------------------------------------
+
+_SOCIAL_PREVIEW_HTML = """\
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>{title} | Summi</title>
+  <meta name="description" content="{excerpt}">
+  <meta property="og:title" content="{title} | Summi">
+  <meta property="og:description" content="{excerpt}">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="{site_url}/blog/{slug}">
+  <meta property="og:image" content="{image_url}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:site_name" content="Summi">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{title} | Summi">
+  <meta name="twitter:description" content="{excerpt}">
+  <meta name="twitter:image" content="{image_url}">
+  <meta property="article:published_time" content="{published_at}">
+  <link rel="canonical" href="{site_url}/blog/{slug}">
+</head>
+<body>
+  <h1>{title}</h1>
+  <p>{excerpt}</p>
+  <a href="{site_url}/blog/{slug}">Ler artigo completo</a>
+</body>
+</html>
+"""
+
+_DEFAULT_OG_IMAGE = "https://summi.gera-leads.com/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png"
+
+
+@app.get("/social/blog/{slug}")
+async def social_blog_preview(slug: str, request: Request):
+    from fastapi.responses import HTMLResponse
+    settings = _settings()
+    supabase = _supabase(settings)
+    site_url = os.getenv("SITE_URL", "https://summi.gera-leads.com").rstrip("/")
+
+    try:
+        rows = supabase.select(
+            "blog_posts",
+            select="slug,title,excerpt,published_at,cover_image_url",
+            filters=[("slug", f"eq.{slug}"), ("published", "eq.true")],
+            limit=1,
+        )
+    except Exception:
+        rows = []
+
+    if not rows:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=f"{site_url}/blog", status_code=302)
+
+    post = rows[0]
+    image_url = post.get("cover_image_url") or _DEFAULT_OG_IMAGE
+
+    html = _SOCIAL_PREVIEW_HTML.format(
+        title=post["title"].replace('"', "&quot;"),
+        excerpt=(post.get("excerpt") or "").replace('"', "&quot;"),
+        slug=post["slug"],
+        site_url=site_url,
+        image_url=image_url,
+        published_at=post.get("published_at", ""),
+    )
+    return HTMLResponse(content=html, status_code=200)
+
+
 @app.post("/api/analyze-messages")
 async def api_analyze_messages(
     request: Request,
