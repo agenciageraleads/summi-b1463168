@@ -436,7 +436,7 @@ serve(async (req) => {
                 subscription_end: new Date(subscription.current_period_end * 1000).toISOString(),
                 trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
                 updated_at: new Date().toISOString(),
-              }, { onConflict: 'email' });
+              }, { onConflict: 'user_id' });
 
               logWebhookEvent("Assinatura ativada com sucesso", { email, priceId, status: subscription.status });
 
@@ -503,7 +503,7 @@ serve(async (req) => {
             subscription_status: subscription.status,
             subscription_end: isActive ? new Date(subscription.current_period_end * 1000).toISOString() : null,
             updated_at: new Date().toISOString(),
-          }, { onConflict: 'email' });
+          }, { onConflict: 'user_id' });
 
           logWebhookEvent("Status da assinatura atualizado", {
             email: customer.email,
@@ -545,7 +545,7 @@ serve(async (req) => {
               subscribed: true,
               subscription_end: new Date(subscription.current_period_end * 1000).toISOString(),
               updated_at: new Date().toISOString(),
-            }, { onConflict: 'email' });
+            }, { onConflict: 'user_id' });
 
             logWebhookEvent("Data de renovação atualizada", { email: customer.email });
           }

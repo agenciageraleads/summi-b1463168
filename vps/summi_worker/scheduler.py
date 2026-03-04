@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 
 from .config import load_settings
@@ -10,7 +11,7 @@ from .evolution_client import EvolutionClient
 from .openai_client import OpenAIClient
 from .redis_queue import RedisQueueClient
 from .blog_writer import run_daily_blog_post
-from .summi_jobs import run_hourly_job
+from .summi_jobs import run_daily_summary_job, run_hourly_job
 from .supabase_rest import SupabaseRest
 
 
@@ -60,6 +61,26 @@ def main() -> None:
             misfire_grace_time=3600,
         )
         print(f"Blog auto-post scheduled daily at {settings.blog_post_hour:02d}:00")
+
+    # Job diário: resumo de conversas pendentes + Inbox Zero às DAILY_SUMMARY_HOUR_UTC (padrão 19:00 UTC)
+    if settings.enable_daily_job:
+        def _run_daily_summary() -> None:
+            print(f"Running daily summary job at {settings.daily_summary_hour_utc}:00 UTC")
+            try:
+                result = run_daily_summary_job(settings, supabase, openai, evolution)
+                print(f"Daily summary done: {result}")
+            except Exception as exc:
+                print(f"Daily summary job failed: {exc}")
+
+        scheduler.add_job(
+            _run_daily_summary,
+            CronTrigger(hour=settings.daily_summary_hour_utc, minute=0, timezone="UTC"),
+            id="daily_summary_job",
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=600,
+        )
+        print(f"Daily summary job scheduled for {settings.daily_summary_hour_utc}:00 UTC")
 
     scheduler.start()
     print("Scheduler started (hourly job enabled)")

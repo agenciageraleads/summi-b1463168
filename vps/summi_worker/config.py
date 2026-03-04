@@ -70,6 +70,8 @@ class Settings:
     ignore_remote_jid: str
 
     enable_hourly_job: bool
+    enable_daily_job: bool
+    daily_summary_hour_utc: int
     low_priority_cleanup_days: int
     redis_url: str | None
     webhook_dedupe_ttl_seconds: int
@@ -95,12 +97,12 @@ def load_settings() -> Settings:
         openai_model_summary=os.getenv("OPENAI_MODEL_SUMMARY", "gpt-4o-mini"),
         openai_tts_model=os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts"),
         openai_tts_voice=os.getenv("OPENAI_TTS_VOICE", "alloy"),
-        openai_transcription_model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe"),
+        openai_transcription_model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),  # era gpt-4o-mini-transcribe (40% mais caro)
         openai_transcription_fallback_model=os.getenv("OPENAI_TRANSCRIPTION_FALLBACK_MODEL", "gpt-4o-transcribe"),
         openai_transcription_language=os.getenv("OPENAI_TRANSCRIPTION_LANGUAGE", "pt"),
         openai_transcription_prompt_extra=os.getenv("OPENAI_TRANSCRIPTION_PROMPT_EXTRA"),
         openai_transcription_enable_fallback=_bool("OPENAI_TRANSCRIPTION_ENABLE_FALLBACK", True),
-        openai_transcription_confidence_threshold=_float("OPENAI_TRANSCRIPTION_CONFIDENCE_THRESHOLD", 0.55),
+        openai_transcription_confidence_threshold=_float("OPENAI_TRANSCRIPTION_CONFIDENCE_THRESHOLD", 0.65),  # era 0.55 — threshold mais agressivo para fallback
         openai_transcription_critical_confidence_threshold=_float(
             "OPENAI_TRANSCRIPTION_CRITICAL_CONFIDENCE_THRESHOLD",
             0.80,
@@ -113,6 +115,8 @@ def load_settings() -> Settings:
         business_hours_end=_int("BUSINESS_HOURS_END", 18),
         ignore_remote_jid=os.getenv("IGNORE_REMOTE_JID", "556293984600"),
         enable_hourly_job=_bool("ENABLE_HOURLY_JOB", True),
+        enable_daily_job=_bool("ENABLE_DAILY_JOB", True),
+        daily_summary_hour_utc=_int("DAILY_SUMMARY_HOUR_UTC", 19),
         low_priority_cleanup_days=_int("LOW_PRIORITY_CLEANUP_DAYS", 0),
         redis_url=os.getenv("REDIS_URL"),
         webhook_dedupe_ttl_seconds=_webhook_dedupe_ttl_seconds(),

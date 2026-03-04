@@ -29,7 +29,7 @@ const SalesLandingPage = () => {
         price: 'R$ 29,90',
         period: '/mês',
         billed: 'Cobrança anual (equivale a R$ 358,80/ano)',
-        trial: '30 dias grátis para testar',
+        trial: '7 dias grátis para testar',
         cta: 'Continuar com desconto',
       },
       monthly: {

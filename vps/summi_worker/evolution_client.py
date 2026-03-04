@@ -269,3 +269,61 @@ class EvolutionClient:
                 return cur.strip()
 
         raise EvolutionError(f"media base64 not found in response: {str(data)[:500]}")
+
+    def find_message_status(
+        self, instance: str, message_id: str, remote_jid: str
+    ) -> Optional[int]:
+        """
+        Consulta o status atual de uma mensagem na Evolution API.
+
+        Retorna o ACK code ou None se a mensagem não for encontrada / a API falhar.
+        Fail-open: nunca lança exceção — o chamador deve tratar None como "transcrever normalmente".
+
+        Códigos ACK (Baileys):
+          0 = PENDING, 1 = SERVER_ACK, 2 = DELIVERY_ACK, 3 = READ, 4 = PLAYED (áudio ouvido)
+        """
+        _log = logging.getLogger("summi_worker.evolution_client")
+
+        paths = [
+            f"/chat/findStatusMessage/{instance}",
+            f"/chat/findMessages/{instance}",
+        ]
+        payloads = [
+            {"where": {"id": message_id, "remoteJid": remote_jid}, "limit": 1},
+            {"where": {"key": {"id": message_id}}, "limit": 1},
+            {"where": {"id": message_id}, "limit": 1},
+        ]
+
+        try:
+            data = self._try_json_post(paths, payloads, timeout=5)
+        except Exception as exc:
+            _log.debug(
+                "evolution_client.find_message_status_failed instance=%s message_id=%s error=%s",
+                instance, message_id, exc,
+            )
+            return None
+
+        # Normaliza response: pode ser lista, dict com "messages", dict com "data", etc.
+        messages: Any = (
+            data.get("messages")
+            or data.get("data")
+            or (data if isinstance(data, list) else None)
+        )
+
+        if isinstance(messages, list) and messages:
+            status = messages[0].get("status")
+            _log.debug(
+                "evolution_client.find_message_status instance=%s message_id=%s status=%s",
+                instance, message_id, status,
+            )
+            return int(status) if status is not None else None
+
+        # Algumas versões retornam o objeto diretamente
+        if isinstance(data, dict) and "status" in data:
+            return int(data["status"])
+
+        _log.debug(
+            "evolution_client.find_message_status_no_data instance=%s message_id=%s",
+            instance, message_id,
+        )
+        return None

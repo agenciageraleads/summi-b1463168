@@ -198,7 +198,7 @@ serve(async (req) => {
           subscribed: false,
           subscription_status: 'inactive',
           updated_at: new Date().toISOString()
-        }, { onConflict: 'email' });
+        }, { onConflict: 'user_id' });
 
       if (subError) {
         logStep("Erro ao criar subscriber", { error: subError });

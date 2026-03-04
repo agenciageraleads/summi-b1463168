@@ -400,7 +400,7 @@ const LandingPage = () => {
                 </div>
                 <div className="flex items-center text-sm text-green-700 font-medium">
                   <Check className="w-4 h-4 text-green-600 mr-3" />
-                  <span>30 dias para testar</span>
+                  <span>7 dias para testar</span>
                 </div>
                 <div className="flex items-center text-sm text-green-700 font-medium">
                   <Check className="w-4 h-4 text-green-600 mr-3" />

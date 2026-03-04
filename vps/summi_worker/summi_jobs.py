@@ -206,6 +206,134 @@ def analyze_user_chats(
 
 import time
 
+
+def _daily_summary_sent_today(profile: Dict[str, Any], *, now_utc: dt.datetime) -> bool:
+    """Retorna True se o resumo diário já foi enviado hoje (mesmo dia UTC)."""
+    ultimo = profile.get("ultimo_summi_diario_em")
+    if not ultimo:
+        return False
+    try:
+        ultimo_dt = dt.datetime.fromisoformat(str(ultimo).replace("Z", "+00:00"))
+        if ultimo_dt.tzinfo is None:
+            ultimo_dt = ultimo_dt.replace(tzinfo=dt.timezone.utc)
+        return ultimo_dt.date() == now_utc.date()
+    except Exception:
+        return False
+
+
+def run_daily_summary_job(
+    settings: Settings,
+    supabase: SupabaseRest,
+    openai: OpenAIClient,
+    evolution: EvolutionClient,
+) -> Dict[str, Any]:
+    """
+    Job diário (19:00 UTC): envia resumo das conversas pendentes (prioridade >= 2)
+    e apaga todas as conversas do usuário após o envio.
+
+    Independente do job horário — roda mesmo se summi_frequencia=24h.
+    Conversas existentes no banco = não respondidas (Inbox Zero garante delete ao responder).
+    """
+    now_utc = dt.datetime.now(dt.timezone.utc)
+
+    subs = supabase.select(
+        "subscribers",
+        select="user_id,subscription_end,subscription_status,subscribed",
+        filters=[
+            ("subscribed", "eq.true"),
+            to_postgrest_filter_gte("subscription_end", _now_utc_iso()),
+        ],
+        limit=1000,
+    )
+
+    sent = 0
+    skipped_already_sent = 0
+    skipped_no_priority_chats = 0
+    errors = 0
+    user_ids = _unique_active_user_ids(subs)
+
+    for user_id in user_ids:
+        profiles = supabase.select("profiles", select="*", filters=[to_postgrest_filter_eq("id", user_id)], limit=1)
+        if not profiles:
+            continue
+        profile = profiles[0]
+
+        # Evita envio duplo no mesmo dia
+        if _daily_summary_sent_today(profile, now_utc=now_utc):
+            skipped_already_sent += 1
+            continue
+
+        numero_usuario = "".join(c for c in str(profile.get("numero") or "") if c.isdigit())
+        if not numero_usuario:
+            continue
+
+        try:
+            # Buscar conversas pendentes com prioridade >= 2 (não respondidas)
+            chats = supabase.select(
+                "chats",
+                select="id,nome,remote_jid,prioridade,contexto,criado_em,analisado_em",
+                filters=[
+                    to_postgrest_filter_eq("id_usuario", user_id),
+                    to_postgrest_filter_neq("remote_jid", settings.ignore_remote_jid),
+                    ("contexto", "not.is.null"),
+                    ("prioridade", "gte.2"),
+                ],
+                order="prioridade.desc,analisado_em.desc",
+                limit=50,
+            )
+
+            if not chats:
+                skipped_no_priority_chats += 1
+                continue
+
+            items = _build_summary_items(chats)
+            summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
+            evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
+            sent += 1
+
+            # Marcar timestamp do envio
+            try:
+                supabase.patch(
+                    "profiles",
+                    data={"ultimo_summi_diario_em": _now_utc_iso()},
+                    filters=[to_postgrest_filter_eq("id", user_id)],
+                )
+            except Exception:
+                pass
+
+            # Inbox Zero diário: apagar todas as conversas após o resumo
+            # O usuário já foi informado. Isso limpa para o próximo dia.
+            try:
+                supabase.delete(
+                    "chats",
+                    filters=[to_postgrest_filter_eq("id_usuario", user_id)],
+                )
+            except Exception as exc:
+                print(f"daily_summary: delete_chats_failed user={user_id} error={exc}")
+
+            # Enviar áudio se habilitado
+            if profile.get("Summi em Audio?") is True:
+                try:
+                    audio_script = build_audio_script(openai, settings.openai_model_summary, summary_text=summary_text)
+                    mp3 = openai.tts_mp3(settings.openai_tts_model, settings.openai_tts_voice, audio_script)
+                    evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, mp3)
+                except Exception as exc:
+                    print(f"daily_summary: audio_failed user={user_id} error={exc}")
+
+        except Exception as exc:
+            errors += 1
+            print(f"daily_summary: user_failed user={user_id} error={exc}")
+
+    return {
+        "success": True,
+        "unique_subscribers": len(user_ids),
+        "sent": sent,
+        "skipped_already_sent_today": skipped_already_sent,
+        "skipped_no_priority_chats": skipped_no_priority_chats,
+        "errors": errors,
+    }
+
+
 def send_onboarding_messages(evolution: EvolutionClient, instance: str, numero: str, nome: str):
     """Envia a sequência de 3 mensagens de onboarding no WhatsApp."""
     nome_salut = nome.split()[0] if nome else "usuário"
