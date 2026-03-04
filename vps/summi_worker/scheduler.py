@@ -9,6 +9,7 @@ from .config import load_settings
 from .evolution_client import EvolutionClient
 from .openai_client import OpenAIClient
 from .redis_queue import RedisQueueClient
+from .blog_writer import run_daily_blog_post
 from .summi_jobs import run_hourly_job
 from .supabase_rest import SupabaseRest
 
@@ -44,6 +45,21 @@ def main() -> None:
         coalesce=True,
         misfire_grace_time=300,
     )
+
+    if settings.blog_auto_post_enabled:
+        def _run_blog_post() -> None:
+            run_daily_blog_post(settings, supabase)
+
+        scheduler.add_job(
+            _run_blog_post,
+            "cron",
+            hour=settings.blog_post_hour,
+            minute=0,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        print(f"Blog auto-post scheduled daily at {settings.blog_post_hour:02d}:00")
 
     scheduler.start()
     print("Scheduler started (hourly job enabled)")
