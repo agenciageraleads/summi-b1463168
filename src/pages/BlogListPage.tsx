@@ -112,15 +112,6 @@ const BlogListPage = () => {
               </h2>
               <Link to={`/blog/${featuredPost.slug}`} className="group block">
                 <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-200 group-hover:border-green-300">
-                  {featuredPost.cover_image_url && (
-                    <div className="h-56 overflow-hidden">
-                      <img
-                        src={featuredPost.cover_image_url}
-                        alt={featuredPost.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-                  )}
                   <div className="p-8">
                     <div className="flex items-center gap-3 mb-4">
                       <Badge className={categoryColors[featuredPost.category] || "bg-gray-100 text-gray-700"}>
@@ -162,16 +153,7 @@ const BlogListPage = () => {
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {otherPosts.map((post) => (
                     <Link key={post.slug} to={`/blog/${post.slug}`} className="group block">
-                      <Card className="h-full hover:shadow-lg transition-all duration-300 border-gray-200 group-hover:border-green-300 overflow-hidden">
-                        {post.cover_image_url && (
-                          <div className="h-40 overflow-hidden">
-                            <img
-                              src={post.cover_image_url}
-                              alt={post.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                          </div>
-                        )}
+                      <Card className="h-full hover:shadow-lg transition-all duration-300 border-gray-200 group-hover:border-green-300">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-2 mb-3">
                             <Badge
