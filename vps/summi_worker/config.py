@@ -78,6 +78,12 @@ class Settings:
     queue_analysis_name: str
     queue_summary_name: str
 
+    # Blog auto-posting
+    blog_auto_post_enabled: bool
+    blog_post_hour: int
+    unsplash_access_key: str
+    site_url: str
+
 
 def load_settings() -> Settings:
     return Settings(
@@ -114,4 +120,8 @@ def load_settings() -> Settings:
         enable_summary_queue=_bool("ENABLE_SUMMARY_QUEUE", False),
         queue_analysis_name=os.getenv("QUEUE_ANALYSIS_NAME", "summi:queue:analysis"),
         queue_summary_name=os.getenv("QUEUE_SUMMARY_NAME", "summi:queue:summary"),
+        blog_auto_post_enabled=_bool("BLOG_AUTO_POST_ENABLED", False),
+        blog_post_hour=_int("BLOG_POST_HOUR", 9),
+        unsplash_access_key=os.getenv("UNSPLASH_ACCESS_KEY", ""),
+        site_url=os.getenv("SITE_URL", "https://summi.gera-leads.com"),
     )

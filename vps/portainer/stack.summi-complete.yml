@@ -63,6 +63,7 @@ services:
       - QUEUE_SUMMARY_NAME=${QUEUE_SUMMARY_NAME:-summi:queue:summary}
       - ENABLE_HOURLY_JOB=false
       - INTERNAL_TOKEN=${INTERNAL_TOKEN}
+      - SITE_URL=${SITE_URL:-https://summi.gera-leads.com}
     networks:
       - Portainer
     deploy:
@@ -111,6 +112,10 @@ services:
       - QUEUE_SUMMARY_NAME=${QUEUE_SUMMARY_NAME:-summi:queue:summary}
       - ENABLE_HOURLY_JOB=true
       - INTERNAL_TOKEN=${INTERNAL_TOKEN}
+      - BLOG_AUTO_POST_ENABLED=${BLOG_AUTO_POST_ENABLED:-false}
+      - BLOG_POST_HOUR=${BLOG_POST_HOUR:-9}
+      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY:-}
+      - SITE_URL=${SITE_URL:-https://summi.gera-leads.com}
     networks:
       - Portainer
     deploy:
