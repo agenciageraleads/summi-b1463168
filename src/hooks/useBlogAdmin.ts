@@ -17,6 +17,7 @@ export interface BlogPostRow {
   tags: string[];
   published: boolean;
   created_at: string;
+  cover_image_url?: string | null;
 }
 
 export type BlogPostInput = Omit<BlogPostRow, 'id' | 'created_at'>;
