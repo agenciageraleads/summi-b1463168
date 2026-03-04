@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   summi-frontend:
-    image: ghcr.io/agenciageraleads/summi-b1463168-frontend:2fc4148b07097461a55b8eecd611fff53074820f
+    image: ghcr.io/agenciageraleads/summi-b1463168-frontend:ef1fdeeee9294d5417990ddbd61dfe2b7e6588a3
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
