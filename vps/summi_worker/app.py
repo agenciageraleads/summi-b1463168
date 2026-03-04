@@ -4,10 +4,11 @@ import base64
 import json
 import logging
 import os
+import time
 from typing import Any, Dict, Optional, Tuple
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 
 from .config import Settings, load_settings
 from .evolution_client import EvolutionClient, EvolutionError
@@ -63,6 +64,135 @@ def _redis_queue(settings: Settings) -> Optional[RedisQueueClient]:
     except Exception:
         logger.exception("redis_queue.init_failed")
         return None
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)
+
+
+def _run_deferred_analysis(
+    *,
+    settings: Settings,
+    user_id: str,
+    instance_name: str,
+    remote_jid: str,
+    message_id: str,
+) -> None:
+    started_at = time.perf_counter()
+    try:
+        result = analyze_user_chats(
+            settings,
+            _supabase(settings),
+            _openai(settings),
+            user_id=user_id,
+        )
+        logger.info(
+            "evolution_webhook.analysis_background_done instance=%s user_id=%s remote_jid=%s message_id=%s analyzed_count=%s elapsed_ms=%s",
+            instance_name,
+            user_id,
+            remote_jid,
+            message_id,
+            result.get("analyzed_count"),
+            _elapsed_ms(started_at),
+        )
+    except Exception as exc:
+        logger.exception(
+            "evolution_webhook.analysis_background_error instance=%s user_id=%s remote_jid=%s message_id=%s elapsed_ms=%s error=%s",
+            instance_name,
+            user_id,
+            remote_jid,
+            message_id,
+            _elapsed_ms(started_at),
+            exc,
+        )
+
+
+def _dispatch_analysis(
+    *,
+    settings: Settings,
+    user_id: str,
+    instance_name: str,
+    remote_jid: str,
+    message_id: str,
+    supabase: SupabaseRest,
+    openai: OpenAIClient,
+    background_tasks: BackgroundTasks | None,
+) -> Tuple[bool, bool, bool, Optional[str]]:
+    analyze_ok = False
+    analysis_enqueued = False
+    analysis_deferred = False
+    analyze_error: Optional[str] = None
+
+    queue = _redis_queue(settings)
+    if settings.enable_analysis_queue and queue is not None:
+        try:
+            queue.enqueue(
+                settings.queue_analysis_name,
+                {
+                    "type": "analyze_user",
+                    "user_id": user_id,
+                    "instance_name": instance_name,
+                    "remote_jid": remote_jid,
+                    "message_id": message_id,
+                },
+            )
+            analysis_enqueued = True
+        except Exception as exc:
+            analyze_error = f"analysis_queue_enqueue_failed: {str(exc)[:240]}"
+            logger.exception(
+                "evolution_webhook.analyze_enqueue_error instance=%s user_id=%s remote_jid=%s message_id=%s error=%s",
+                instance_name,
+                user_id,
+                remote_jid,
+                message_id,
+                exc,
+            )
+
+    if not analysis_enqueued and background_tasks is not None:
+        background_tasks.add_task(
+            _run_deferred_analysis,
+            settings=settings,
+            user_id=user_id,
+            instance_name=instance_name,
+            remote_jid=remote_jid,
+            message_id=message_id,
+        )
+        analysis_deferred = True
+        logger.info(
+            "evolution_webhook.analysis_background_scheduled instance=%s user_id=%s remote_jid=%s message_id=%s",
+            instance_name,
+            user_id,
+            remote_jid,
+            message_id,
+        )
+        return analyze_ok, analysis_enqueued, analysis_deferred, analyze_error
+
+    if not analysis_enqueued:
+        started_at = time.perf_counter()
+        try:
+            analyze_user_chats(settings, supabase, openai, user_id=user_id)
+            analyze_ok = True
+            logger.info(
+                "evolution_webhook.analysis_inline_done instance=%s user_id=%s remote_jid=%s message_id=%s elapsed_ms=%s",
+                instance_name,
+                user_id,
+                remote_jid,
+                message_id,
+                _elapsed_ms(started_at),
+            )
+        except Exception as exc:
+            analyze_error = str(exc)[:300]
+            logger.exception(
+                "evolution_webhook.analyze_error instance=%s user_id=%s remote_jid=%s message_id=%s elapsed_ms=%s error=%s",
+                instance_name,
+                user_id,
+                remote_jid,
+                message_id,
+                _elapsed_ms(started_at),
+                exc,
+            )
+
+    return analyze_ok, analysis_enqueued, analysis_deferred, analyze_error
 
 def _unwrap(val: Any) -> Any:
     if isinstance(val, list) and len(val) > 0:
@@ -217,17 +347,24 @@ def _transcribe_audio_with_fallback(
         include_logprobs=True,
         auto_chunking_min_seconds=settings.openai_transcription_chunking_min_seconds,
     )
-    fallback_metadata: Dict[str, Any] = {
-        "audio_transcription_used_fallback": True,
-        "audio_transcription_fallback_reason": fallback_reason,
-        "audio_transcription_base_model": base_result.model,
-        "audio_transcription_base_confidence": base_result.average_confidence,
-        "audio_transcription_model": fallback_result.model,
-        "audio_transcription_confidence": fallback_result.average_confidence,
-    }
-    if fallback_result.average_logprob is not None:
-        fallback_metadata["audio_transcription_avg_logprob"] = fallback_result.average_logprob
-    return fallback_result, metadata | fallback_metadata
+    metadata.update(
+        {
+            "audio_transcription_fallback_attempted": True,
+            "audio_transcription_fallback_reason": fallback_reason,
+            "audio_transcription_base_model": base_result.model,
+            "audio_transcription_base_confidence": base_result.average_confidence,
+        }
+    )
+    chosen_result = fallback_result if fallback_result.text.strip() or not base_result.text.strip() else base_result
+    if chosen_result is fallback_result:
+        metadata["audio_transcription_used_fallback"] = True
+    metadata["audio_transcription_model"] = chosen_result.model
+    metadata["audio_transcription_confidence"] = chosen_result.average_confidence
+    if chosen_result.average_logprob is not None:
+        metadata["audio_transcription_avg_logprob"] = chosen_result.average_logprob
+    else:
+        metadata.pop("audio_transcription_avg_logprob", None)
+    return chosen_result, metadata
 
 
 def _derive_message_content(payload: Dict[str, Any], normalized: Dict[str, Any], *, image_description: str | None = None, audio_text: str | None = None) -> Optional[str]:
@@ -240,16 +377,6 @@ def _derive_message_content(payload: Dict[str, Any], normalized: Dict[str, Any],
     if text:
         return text
     return None
-
-
-def _event_for_storage(normalized_event: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:
-    if not extra:
-        return dict(normalized_event)
-    event = dict(normalized_event)
-    for key, value in extra.items():
-        if value is not None:
-            event[key] = value
-    return event
 
 
 def _append_legacy_line(existing: str, author_name: str, text: str) -> str:
@@ -457,6 +584,26 @@ def _decode_b64_media(media_b64: str) -> bytes:
     return base64.b64decode(raw)
 
 
+def _should_skip_transcription(conversa: Any, message_id: Optional[str]) -> bool:
+    """
+    Verifica se a transcrição do áudio deve ser pulada.
+
+    Pula se o message_id já existe no conversa com audio_transcribed=True,
+    indicando que este áudio já foi processado em um webhook anterior.
+    Evita re-transcrição e gastos desnecessários com OpenAI.
+    """
+    if not message_id or not isinstance(conversa, list):
+        return False
+
+    for event in conversa:
+        if isinstance(event, dict) and event.get("message_id") == message_id:
+            # Mensagem já existe no conversa e foi transcrita: pula
+            if event.get("audio_transcribed"):
+                return True
+
+    return False
+
+
 def _is_audio(media_bytes: bytes) -> bool:
     if not media_bytes:
         return False
@@ -486,81 +633,6 @@ def _get_inline_media_base64(payload: Dict[str, Any]) -> Optional[str]:
 @app.get("/health")
 def health() -> Dict[str, Any]:
     return {"ok": True}
-
-
-# ---------------------------------------------------------------------------
-# Social preview endpoint — called by nginx for social media bot requests.
-# Returns minimal HTML with og: / twitter: meta tags for a specific blog post
-# so that WhatsApp, Telegram, Facebook etc. show a rich link preview.
-# ---------------------------------------------------------------------------
-
-_SOCIAL_PREVIEW_HTML = """\
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>{title} | Summi</title>
-  <meta name="description" content="{excerpt}">
-  <meta property="og:title" content="{title} | Summi">
-  <meta property="og:description" content="{excerpt}">
-  <meta property="og:type" content="article">
-  <meta property="og:url" content="{site_url}/blog/{slug}">
-  <meta property="og:image" content="{image_url}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:locale" content="pt_BR">
-  <meta property="og:site_name" content="Summi">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{title} | Summi">
-  <meta name="twitter:description" content="{excerpt}">
-  <meta name="twitter:image" content="{image_url}">
-  <meta property="article:published_time" content="{published_at}">
-  <link rel="canonical" href="{site_url}/blog/{slug}">
-</head>
-<body>
-  <h1>{title}</h1>
-  <p>{excerpt}</p>
-  <a href="{site_url}/blog/{slug}">Ler artigo completo</a>
-</body>
-</html>
-"""
-
-_DEFAULT_OG_IMAGE = "https://summi.gera-leads.com/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png"
-
-
-@app.get("/social/blog/{slug}")
-async def social_blog_preview(slug: str, request: Request):
-    from fastapi.responses import HTMLResponse
-    settings = _settings()
-    supabase = _supabase(settings)
-    site_url = os.getenv("SITE_URL", "https://summi.gera-leads.com").rstrip("/")
-
-    try:
-        rows = supabase.select(
-            "blog_posts",
-            select="slug,title,excerpt,published_at,cover_image_url",
-            filters=[("slug", f"eq.{slug}"), ("published", "eq.true")],
-            limit=1,
-        )
-    except Exception:
-        rows = []
-
-    if not rows:
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=f"{site_url}/blog", status_code=302)
-
-    post = rows[0]
-    image_url = post.get("cover_image_url") or _DEFAULT_OG_IMAGE
-
-    html = _SOCIAL_PREVIEW_HTML.format(
-        title=post["title"].replace('"', "&quot;"),
-        excerpt=(post.get("excerpt") or "").replace('"', "&quot;"),
-        slug=post["slug"],
-        site_url=site_url,
-        image_url=image_url,
-        published_at=post.get("published_at", ""),
-    )
-    return HTMLResponse(content=html, status_code=200)
 
 
 @app.post("/api/analyze-messages")
@@ -623,7 +695,13 @@ def internal_run_hourly(x_internal_token: Optional[str] = Header(default=None)) 
     return run_hourly_job(settings, supabase, openai, evolution)
 
 
-async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) -> Dict[str, Any]:
+async def _handle_evolution_webhook(
+    request: Request,
+    *,
+    analyze_after: bool,
+    background_tasks: BackgroundTasks | None = None,
+) -> Dict[str, Any]:
+    request_started_at = time.perf_counter()
     settings = _settings()
     supabase = _supabase(settings)
     openai = _openai(settings)
@@ -744,6 +822,22 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
     processed_audio_seconds: Optional[int] = None
     extra: Dict[str, Any] = {}
 
+    # Fetch existing chat early if we need to check for audio playback status
+    # This helps us skip re-transcribing audio that user has already played
+    existing_chat = None
+    if message_kind == "audio":
+        chats = supabase.select(
+            "chats",
+            select="id,conversa",
+            filters=[
+                to_postgrest_filter_eq("id_usuario", user_id),
+                to_postgrest_filter_eq("remote_jid", chat_remote_jid),
+            ],
+            limit=1,
+        )
+        if chats:
+            existing_chat = chats[0]
+
     try:
         if message_kind == "text":
             text_for_chat = _derive_message_content(payload, normalized)
@@ -764,25 +858,115 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             media_b64 = _get_inline_media_base64(payload)
             media_source = "inline" if media_b64 else "evolution"
             if not media_b64 and message_id:
+                media_started_at = time.perf_counter()
                 media_b64 = evolution.get_media_base64(instance_name, message_id)
-            if media_b64:
-                mp3_bytes = _decode_b64_media(media_b64)
-                transcription, transcription_meta = _transcribe_audio_with_fallback(
-                    openai=openai,
-                    settings=settings,
-                    profile=profile,
-                    audio_bytes=mp3_bytes,
-                )
-                transcript, duration_seconds = transcription.text, transcription.duration_seconds
                 logger.info(
-                    "evolution_webhook.audio_transcribed instance=%s message_id=%s transcript_chars=%s model=%s fallback=%s confidence=%s",
+                    "evolution_webhook.audio_media_fetched instance=%s message_id=%s source=%s elapsed_ms=%s",
                     instance_name,
                     message_id,
-                    len(transcript),
-                    transcription.model,
-                    transcription_meta.get("audio_transcription_used_fallback"),
-                    transcription.average_confidence,
+                    media_source,
+                    _elapsed_ms(media_started_at),
                 )
+            if media_b64:
+                mp3_bytes = _decode_b64_media(media_b64)
+
+                # --- Camada 1: Consulta Evolution API para checar se áudio já foi ouvido ---
+                # Fail-open: se a API falhar, transcreve normalmente (nunca bloqueia).
+                evo_audio_played = False
+                if message_id and remote_jid:
+                    try:
+                        evo_status = evolution.find_message_status(
+                            instance_name, message_id, f"{remote_jid_digits}@s.whatsapp.net"
+                        )
+                        if evo_status == 4:  # Baileys ACK_PLAYED: áudio foi ouvido
+                            evo_audio_played = True
+                            logger.info(
+                                "evolution_webhook.audio_skipped_already_played instance=%s message_id=%s evo_status=%s",
+                                instance_name, message_id, evo_status,
+                            )
+                    except Exception as exc:
+                        logger.debug(
+                            "evolution_webhook.audio_status_check_failed instance=%s message_id=%s error=%s",
+                            instance_name, message_id, exc,
+                        )
+
+                # --- Camada 2: Verificar se já foi transcrito anteriormente (webhook duplicado) ---
+                conversa = existing_chat.get("conversa") if existing_chat else None
+                already_transcribed = _should_skip_transcription(conversa, message_id)
+
+                should_skip = evo_audio_played or already_transcribed
+
+                # --- Camada 3: Verificar se config do usuário permite transcrever ---
+                can_send_based_on_origin = (
+                    _profile_bool(profile, "transcreve_audio_enviado", True)
+                    if from_me
+                    else _profile_bool(profile, "transcreve_audio_recebido", True)
+                )
+                should_transcribe_based_on_config = can_send_based_on_origin
+
+                transcript: Optional[str] = None
+                transcription_meta: Dict[str, Any] = {}
+                duration_seconds: Optional[float] = None
+
+                if should_skip:
+                    skip_reason = "already_played" if evo_audio_played else "already_transcribed"
+                    logger.info(
+                        "evolution_webhook.audio_skipped instance=%s message_id=%s reason=%s",
+                        instance_name, message_id, skip_reason,
+                    )
+                    # Mark that we skipped transcription
+                    extra["audio_transcription_skipped"] = True
+                    extra["audio_transcription_skip_reason"] = skip_reason
+                    # Try to find the existing transcription in conversa to use it
+                    if conversa and isinstance(conversa, list):
+                        for event in conversa:
+                            if isinstance(event, dict) and event.get("message_id") == message_id:
+                                existing_text = event.get("text")
+                                if existing_text:
+                                    transcript = existing_text
+                                    # Reuse audio metadata from existing event
+                                    for key, value in event.items():
+                                        if key.startswith("audio_"):
+                                            transcription_meta[key] = value
+                                break
+                    if not transcript:
+                        transcript = ""
+                else:
+                    # --- Camada 4: Respeitar config do usuário antes de transcrever ---
+                    if not should_transcribe_based_on_config:
+                        # Config do usuário desabilita transcrição
+                        transcript = ""
+                        extra["audio_transcription_skipped"] = True
+                        extra["audio_transcription_skip_reason"] = "config_disabled"
+                        logger.info(
+                            "evolution_webhook.audio_transcription_skipped instance=%s message_id=%s reason=config_disabled from_me=%s transcreve_audio_enviado=%s transcreve_audio_recebido=%s",
+                            instance_name,
+                            message_id,
+                            from_me,
+                            _profile_bool(profile, "transcreve_audio_enviado", True) if from_me else "N/A",
+                            _profile_bool(profile, "transcreve_audio_recebido", True) if not from_me else "N/A",
+                        )
+                    else:
+                        transcribe_started_at = time.perf_counter()
+                        transcription, transcription_meta = _transcribe_audio_with_fallback(
+                            openai=openai,
+                            settings=settings,
+                            profile=profile,
+                            audio_bytes=mp3_bytes,
+                        )
+                        transcript = transcription.text
+                        duration_seconds = transcription.duration_seconds
+                        logger.info(
+                            "evolution_webhook.audio_transcribed instance=%s message_id=%s elapsed_ms=%s transcript_chars=%s model=%s fallback=%s confidence=%s",
+                            instance_name,
+                            message_id,
+                            _elapsed_ms(transcribe_started_at),
+                            len(transcript),
+                            transcription.model,
+                            transcription_meta.get("audio_transcription_used_fallback"),
+                            transcription.average_confidence,
+                        )
+
                 # Extrai duração do payload em múltiplos caminhos (versões diferentes da Evolution)
                 seconds_from_payload = (
                     _get_in(payload, "body", "data", "message", "audioMessage", "seconds")
@@ -804,9 +988,10 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                     "evolution_webhook.audio_duration instance=%s message_id=%s seconds_payload=%s duration_openai=%s audio_seconds=%s should_summarize=%s",
                     instance_name, message_id, seconds_from_payload, duration_seconds, audio_seconds, should_summarize,
                 )
-                final_audio_text = transcript
+                final_audio_text = transcript or ""
                 processed_audio_seconds = audio_seconds
-                if should_summarize and transcript.strip():
+                if should_summarize and transcript and transcript.strip():
+                    summarize_started_at = time.perf_counter()
                     final_audio_text = _summarize_transcription(
                         openai,
                         settings.openai_model_summary,
@@ -814,11 +999,18 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         profile,
                         audio_seconds=audio_seconds,
                     )
+                    logger.info(
+                        "evolution_webhook.audio_summarized instance=%s message_id=%s elapsed_ms=%s summary_chars=%s",
+                        instance_name,
+                        message_id,
+                        _elapsed_ms(summarize_started_at),
+                        len(final_audio_text),
+                    )
 
                 text_for_chat = final_audio_text.strip() if final_audio_text.strip() else None
                 extra.update(
                     {
-                        "audio_transcribed": bool(transcript.strip()),
+                        "audio_transcribed": bool(transcript and transcript.strip()),
                         "audio_summarized": should_summarize,
                         "audio_seconds": audio_seconds,
                         "audio_media_source": media_source,
@@ -827,17 +1019,12 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                 extra.update(transcription_meta)
 
                 send_on_reaction = _profile_bool(profile, "send_on_reaction", False)
-                can_send_based_on_origin = (
-                    _profile_bool(profile, "transcreve_audio_enviado", True)
-                    if from_me
-                    else _profile_bool(profile, "transcreve_audio_recebido", True)
-                )
-                # O resumo automático deve ser enviado se o áudio for longo, mesmo que a transcrição
-                # de áudios curtos (originada por can_send_based_on_origin) esteja desativada.
-                # Exceto se o usuário configurou para enviar APENAS na reação.
-                should_send_now = (can_send_based_on_origin or should_summarize) and (not send_on_reaction)
-                
-                if should_send_now and text_for_chat:
+                # Config já foi verificada na Camada 4: se desabilitada, transcript="" e text_for_chat=None
+                # Então só envia se houver conteúdo e não estejamos esperando reação
+                should_send_now = bool(text_for_chat and not send_on_reaction)
+
+                if should_send_now:
+                    send_started_at = time.perf_counter()
                     outbound = _send_aux_message(
                         evolution=evolution,
                         settings=settings,
@@ -849,6 +1036,14 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                         quoted_message_id=message_id or None,
                         quoted_text="Áudio",
                         source_author_name=author_name,
+                    )
+                    logger.info(
+                        "evolution_webhook.audio_reply_sent instance=%s message_id=%s sent=%s elapsed_ms=%s destination=%s",
+                        instance_name,
+                        message_id,
+                        outbound.get("sent"),
+                        _elapsed_ms(send_started_at),
+                        outbound.get("destination"),
                     )
 
         elif message_kind == "reaction":
@@ -879,17 +1074,20 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                             logger.warning("evolution_webhook.reaction_ignored reason=media_not_audio instance=%s target_id=%s", instance_name, target_id)
                             extra["reaction_media_not_audio"] = True
                         else:
+                            transcribe_started_at = time.perf_counter()
                             transcription, transcription_meta = _transcribe_audio_with_fallback(
                                 openai=openai,
                                 settings=settings,
                                 profile=profile,
                                 audio_bytes=mp3_bytes,
                             )
-                            transcript, duration_seconds = transcription.text, transcription.duration_seconds
+                            transcript = transcription.text
+                            duration_seconds = transcription.duration_seconds
                             logger.info(
-                                "evolution_webhook.reaction_audio_transcribed instance=%s target_id=%s transcript_chars=%s model=%s fallback=%s confidence=%s",
+                                "evolution_webhook.reaction_audio_transcribed instance=%s target_id=%s elapsed_ms=%s transcript_chars=%s model=%s fallback=%s confidence=%s",
                                 instance_name,
                                 target_id,
+                                _elapsed_ms(transcribe_started_at),
                                 len(transcript),
                                 transcription.model,
                                 transcription_meta.get("audio_transcription_used_fallback"),
@@ -903,6 +1101,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                 resume_audio and audio_seconds is not None and audio_seconds > segundos_para_resumir
                             )
                             if should_summarize_reaction and transcript.strip():
+                                summarize_started_at = time.perf_counter()
                                 final_text = _summarize_transcription(
                                     openai,
                                     settings.openai_model_summary,
@@ -911,11 +1110,19 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                     audio_seconds=audio_seconds,
                                 )
                                 extra["reaction_audio_summarized"] = True
+                                logger.info(
+                                    "evolution_webhook.reaction_audio_summarized instance=%s target_id=%s elapsed_ms=%s summary_chars=%s",
+                                    instance_name,
+                                    target_id,
+                                    _elapsed_ms(summarize_started_at),
+                                    len(final_text),
+                                )
                             extra["reaction_audio_seconds"] = audio_seconds
                             for key, value in transcription_meta.items():
                                 extra[f"reaction_{key}"] = value
                             processed_audio_seconds = audio_seconds
                             if final_text.strip():
+                                send_started_at = time.perf_counter()
                                 outbound = _send_aux_message(
                                     evolution=evolution,
                                     settings=settings,
@@ -929,6 +1136,14 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
                                     source_author_name=author_name,
                                 )
                                 extra["reaction_audio_transcribed"] = True
+                                logger.info(
+                                    "evolution_webhook.reaction_audio_reply_sent instance=%s target_id=%s sent=%s elapsed_ms=%s destination=%s",
+                                    instance_name,
+                                    target_id,
+                                    outbound.get("sent"),
+                                    _elapsed_ms(send_started_at),
+                                    outbound.get("destination"),
+                                )
                     else:
                         logger.warning(
                             "evolution_webhook.reaction_no_media instance=%s target_id=%s",
@@ -982,6 +1197,10 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
 
     should_store = bool((text_for_chat or "").strip()) and message_kind in ("text", "audio", "image")
     if should_store and text_for_chat:
+        # Merge extra metadata (audio_transcribed, audio_seconds, etc.) no evento antes de salvar
+        event_to_store = dict(normalized)
+        event_to_store.update(extra)
+
         chat_id = _upsert_chat_message(
             supabase,
             user_id=user_id,
@@ -989,62 +1208,37 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
             display_name=author_name or remote_jid_digits,
             is_group=is_group,
             author_name=author_name,
-            normalized_event=_event_for_storage(normalized, extra),
+            normalized_event=event_to_store,
             message_text_for_chat=text_for_chat,
         )
 
     analyze_ok = False
     analysis_enqueued = False
+    analysis_deferred = False
     analyze_error: Optional[str] = None
     if analyze_after:
-        queue = _redis_queue(settings)
-        if settings.enable_analysis_queue and queue is not None:
-            try:
-                queue.enqueue(
-                    settings.queue_analysis_name,
-                    {
-                        "type": "analyze_user",
-                        "user_id": user_id,
-                        "instance_name": instance_name,
-                        "remote_jid": remote_jid,
-                        "message_id": normalized.get("message_id"),
-                    },
-                )
-                analysis_enqueued = True
-            except Exception as exc:
-                analyze_error = f"analysis_queue_enqueue_failed: {str(exc)[:240]}"
-                logger.exception(
-                    "evolution_webhook.analyze_enqueue_error instance=%s user_id=%s remote_jid=%s message_id=%s error=%s",
-                    instance_name,
-                    user_id,
-                    remote_jid,
-                    normalized.get("message_id"),
-                    exc,
-                )
-
-        if not analysis_enqueued:
-            try:
-                analyze_user_chats(settings, supabase, openai, user_id=user_id)
-                analyze_ok = True
-            except Exception as exc:
-                analyze_error = str(exc)[:300]
-                logger.exception(
-                    "evolution_webhook.analyze_error instance=%s user_id=%s remote_jid=%s message_id=%s error=%s",
-                    instance_name,
-                    user_id,
-                    remote_jid,
-                    normalized.get("message_id"),
-                    exc,
-                )
+        analyze_ok, analysis_enqueued, analysis_deferred, analyze_error = _dispatch_analysis(
+            settings=settings,
+            user_id=user_id,
+            instance_name=instance_name,
+            remote_jid=remote_jid,
+            message_id=str(normalized.get("message_id") or ""),
+            supabase=supabase,
+            openai=openai,
+            background_tasks=background_tasks,
+        )
 
     logger.info(
-        "evolution_webhook.stored chat_id=%s user_id=%s instance=%s remote_jid=%s message_id=%s analyzed=%s",
+        "evolution_webhook.completed chat_id=%s user_id=%s instance=%s remote_jid=%s message_id=%s analyzed=%s analysis_enqueued=%s analysis_deferred=%s total_ms=%s",
         chat_id,
         user_id,
         instance_name,
         remote_jid,
         normalized.get("message_id"),
         analyze_ok if analyze_after else False,
+        analysis_enqueued,
+        analysis_deferred,
+        _elapsed_ms(request_started_at),
     )
     return {
         "ok": True,
@@ -1054,6 +1248,7 @@ async def _handle_evolution_webhook(request: Request, *, analyze_after: bool) ->
         "message_kind": message_kind,
         "outbound": outbound,
         **({"analysis_enqueued": True} if analysis_enqueued else {}),
+        **({"analysis_deferred": True} if analysis_deferred else {}),
         **({"analyze_error": analyze_error} if analyze_error else {}),
         **extra,
     }
@@ -1068,9 +1263,9 @@ async def webhook_evolution(request: Request) -> Dict[str, Any]:
 
 
 @app.post("/webhooks/evolution-analyze")
-async def webhook_evolution_analyze(request: Request) -> Dict[str, Any]:
+async def webhook_evolution_analyze(request: Request, background_tasks: BackgroundTasks) -> Dict[str, Any]:
     """
     Webhook para receber eventos da Evolution API e disparar analise.
     Use esse endpoint para o fluxo "beta" (equivalente ao n8n).
     """
-    return await _handle_evolution_webhook(request, analyze_after=True)
+    return await _handle_evolution_webhook(request, analyze_after=True, background_tasks=background_tasks)
