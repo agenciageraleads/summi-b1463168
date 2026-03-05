@@ -137,6 +137,15 @@ BUSINESS_HOURS_END=18         # 6:00 PM
 # Habilitar job horário?
 ENABLE_HOURLY_JOB=true
 
+# Habilitar job diário?
+ENABLE_DAILY_JOB=true
+
+# Horário do resumo diário (interpretado no timezone abaixo)
+DAILY_SUMMARY_HOUR_UTC=22
+
+# Timezone do resumo diário (opcional; padrão UTC)
+DAILY_SUMMARY_TIMEZONE=UTC
+
 # Cleanup de mensagens antigas (dias)
 LOW_PRIORITY_CLEANUP_DAYS=30   # Delete normal messages > 30 days
 ```
@@ -212,6 +221,9 @@ BUSINESS_HOURS_END=18
 
 # ============ JOBS ============
 ENABLE_HOURLY_JOB=true
+ENABLE_DAILY_JOB=true
+DAILY_SUMMARY_HOUR_UTC=22
+DAILY_SUMMARY_TIMEZONE=UTC
 LOW_PRIORITY_CLEANUP_DAYS=30
 
 # ============ REDIS/DEDUPE ============

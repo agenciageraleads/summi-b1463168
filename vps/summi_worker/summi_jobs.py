@@ -96,6 +96,30 @@ def _summary_is_due(profile: Dict[str, Any], *, now_utc: dt.datetime) -> bool:
     return elapsed_hours >= _summary_frequency_hours(profile)
 
 
+def _parse_iso_datetime(value: Any) -> dt.datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed
+
+
+def _chat_has_new_event_since_analysis(chat: Dict[str, Any]) -> bool:
+    analyzed_dt = _parse_iso_datetime(chat.get("analisado_em"))
+    if analyzed_dt is None:
+        return True
+
+    event_dt = _parse_iso_datetime(chat.get("ultimo_evento_em")) or _parse_iso_datetime(chat.get("modificado_em"))
+    if event_dt is None:
+        return False
+    return event_dt > analyzed_dt
+
+
 def analyze_user_chats(
     settings: Settings,
     supabase: SupabaseRest,
@@ -110,7 +134,7 @@ def analyze_user_chats(
         return {"success": False, "error": "profile_not_found"}
     profile = profiles[0]
 
-    # Carrega chats que precisam ser analisados: analisado_em is null OR modificado_em > analisado_em
+    # Carrega chats que precisam ser analisados: analisado_em is null OR ultimo_evento_em > analisado_em
     # PostgREST nao suporta comparacao coluna-coluna direto; fazemos 2 consultas e unimos.
     chats_to_analyze: List[Dict[str, Any]] = []
 
@@ -118,7 +142,7 @@ def analyze_user_chats(
     chats_to_analyze.extend(
         supabase.select(
             "chats",
-            select="id,id_usuario,remote_jid,nome,criado_em,modificado_em,contexto,analisado_em,conversa,prioridade",
+            select="id,id_usuario,remote_jid,nome,criado_em,modificado_em,ultimo_evento_em,contexto,analisado_em,conversa,prioridade",
             filters=[
                 to_postgrest_filter_eq("id_usuario", user_id),
                 to_postgrest_filter_neq("remote_jid", settings.ignore_remote_jid),
@@ -129,22 +153,24 @@ def analyze_user_chats(
         )
     )
 
-    # 2) modificado_em > analisado_em (aproximacao): modificado_em >= now-30d AND analisado_em not null
+    # 2) ultimo_evento_em > analisado_em (aproximacao): ultimo_evento_em >= now-30d AND analisado_em not null
     # Depois filtramos em memoria.
     since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=30)).isoformat()
     recently = supabase.select(
         "chats",
-        select="id,id_usuario,remote_jid,nome,criado_em,modificado_em,contexto,analisado_em,conversa,prioridade",
+        select="id,id_usuario,remote_jid,nome,criado_em,modificado_em,ultimo_evento_em,contexto,analisado_em,conversa,prioridade",
         filters=[
             to_postgrest_filter_eq("id_usuario", user_id),
             to_postgrest_filter_neq("remote_jid", settings.ignore_remote_jid),
-            to_postgrest_filter_gte("modificado_em", since),
+            ("analisado_em", "not.is.null"),
+            ("ultimo_evento_em", "not.is.null"),
+            to_postgrest_filter_gte("ultimo_evento_em", since),
         ],
-        order="modificado_em.desc",
+        order="ultimo_evento_em.desc",
         limit=200,
     )
     for c in recently:
-        if c.get("analisado_em") and c.get("modificado_em") and c["modificado_em"] > c["analisado_em"]:
+        if _chat_has_new_event_since_analysis(c):
             chats_to_analyze.append(c)
 
     # Dedup por id
@@ -170,7 +196,7 @@ def analyze_user_chats(
             nome=chat.get("nome") or chat.get("Nome") or "",
             remote_jid=chat.get("remote_jid") or "",
             criado_em=chat.get("criado_em"),
-            modificado_em=chat.get("modificado_em"),
+            modificado_em=chat.get("ultimo_evento_em") or chat.get("modificado_em"),
             temas_urgentes=temas_urgentes,
             temas_importantes=temas_importantes,
             blacklist=blacklist,
@@ -394,6 +420,7 @@ def run_hourly_job(
     analyzed_users = 0
     analyze_errors = 0
     low_priority_deleted = 0
+    skipped_no_priority_items = 0
     user_ids = _unique_active_user_ids(subs)
     deduplicated_rows = len(subs) - len(user_ids)
     for user_id in user_ids:
@@ -452,6 +479,9 @@ def run_hourly_job(
         )
 
         items = _build_summary_items(chats)
+        if not items:
+            skipped_no_priority_items += 1
+            continue
 
         summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
         evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
@@ -506,4 +536,5 @@ def run_hourly_job(
         "analyzed_users_before_summary": analyzed_users,
         "analyze_errors": analyze_errors,
         "low_priority_deleted": low_priority_deleted,
+        "skipped_no_priority_items": skipped_no_priority_items,
     }

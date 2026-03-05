@@ -20,12 +20,14 @@ CREATE TABLE IF NOT EXISTS public.blog_posts (
 ALTER TABLE public.blog_posts ENABLE ROW LEVEL SECURITY;
 
 -- Public users can read published posts
+DROP POLICY IF EXISTS "Public read published posts" ON public.blog_posts;
 CREATE POLICY "Public read published posts"
   ON public.blog_posts
   FOR SELECT
   USING (published = true);
 
 -- Admin users have full access (uses the existing profiles.role check)
+DROP POLICY IF EXISTS "Admin full access" ON public.blog_posts;
 CREATE POLICY "Admin full access"
   ON public.blog_posts
   FOR ALL
@@ -130,4 +132,5 @@ VALUES
   'Produtividade',
   ARRAY['Resumo', 'WhatsApp', 'IA', 'Grupos', 'Produtividade'],
   true
-);
+)
+ON CONFLICT (slug) DO NOTHING;

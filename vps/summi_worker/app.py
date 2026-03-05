@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import datetime as dt
 import json
 import logging
 import os
@@ -69,6 +70,10 @@ def _redis_queue(settings: Settings) -> Optional[RedisQueueClient]:
 
 def _elapsed_ms(started_at: float) -> int:
     return int((time.perf_counter() - started_at) * 1000)
+
+
+def _now_utc_iso() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
 def _run_deferred_analysis(
@@ -440,6 +445,7 @@ def _upsert_chat_message(
     normalized_event: Dict[str, Any],
     message_text_for_chat: str,
 ) -> str:
+    now_event_iso = _now_utc_iso()
     chats = supabase.select(
         "chats",
         select="id,id_usuario,remote_jid,nome,conversa",
@@ -457,14 +463,26 @@ def _upsert_chat_message(
             event_copy = dict(normalized_event)
             event_copy["text"] = message_text_for_chat
             conversa.append(event_copy)
-            supabase.patch("chats", {"conversa": conversa}, filters=[to_postgrest_filter_eq("id", chat["id"])])
+            supabase.patch(
+                "chats",
+                {"conversa": conversa, "ultimo_evento_em": now_event_iso},
+                filters=[to_postgrest_filter_eq("id", chat["id"])],
+            )
         elif isinstance(conversa, str):
             new_conversa = _append_legacy_line(conversa, author_name, message_text_for_chat)
-            supabase.patch("chats", {"conversa": new_conversa}, filters=[to_postgrest_filter_eq("id", chat["id"])])
+            supabase.patch(
+                "chats",
+                {"conversa": new_conversa, "ultimo_evento_em": now_event_iso},
+                filters=[to_postgrest_filter_eq("id", chat["id"])],
+            )
         else:
             event_copy = dict(normalized_event)
             event_copy["text"] = message_text_for_chat
-            supabase.patch("chats", {"conversa": [event_copy]}, filters=[to_postgrest_filter_eq("id", chat["id"])])
+            supabase.patch(
+                "chats",
+                {"conversa": [event_copy], "ultimo_evento_em": now_event_iso},
+                filters=[to_postgrest_filter_eq("id", chat["id"])],
+            )
         return str(chat["id"])
 
     event_copy = dict(normalized_event)
@@ -479,6 +497,7 @@ def _upsert_chat_message(
                 "grupo": f"{remote_jid}@g.us" if is_group and not str(remote_jid).endswith("@g.us") else (remote_jid if is_group else None),
                 "prioridade": "0",
                 "conversa": [event_copy],
+                "ultimo_evento_em": now_event_iso,
             }
         ],
     )

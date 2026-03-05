@@ -35,7 +35,8 @@ def main() -> None:
             queue.enqueue(settings.queue_summary_name, {"type": "run_hourly", "trigger": "scheduler"})
             print("Enqueued hourly summary job")
             return
-        run_hourly_job(settings, supabase, openai, evolution)
+        result = run_hourly_job(settings, supabase, openai, evolution)
+        print(f"Hourly summary done: {result}")
 
     # Executa a cada 1 hora (na VPS voce pode trocar por systemd timer/cron se preferir).
     scheduler.add_job(
@@ -62,10 +63,13 @@ def main() -> None:
         )
         print(f"Blog auto-post scheduled daily at {settings.blog_post_hour:02d}:00")
 
-    # Job diário: resumo de conversas pendentes + Inbox Zero às DAILY_SUMMARY_HOUR_UTC (padrão 19:00 UTC)
+    # Job diário: resumo de conversas pendentes + Inbox Zero no horário configurado.
     if settings.enable_daily_job:
         def _run_daily_summary() -> None:
-            print(f"Running daily summary job at {settings.daily_summary_hour_utc}:00 UTC")
+            print(
+                "Running daily summary job at "
+                f"{settings.daily_summary_hour_utc:02d}:00 ({settings.daily_summary_timezone})"
+            )
             try:
                 result = run_daily_summary_job(settings, supabase, openai, evolution)
                 print(f"Daily summary done: {result}")
@@ -74,13 +78,20 @@ def main() -> None:
 
         scheduler.add_job(
             _run_daily_summary,
-            CronTrigger(hour=settings.daily_summary_hour_utc, minute=0, timezone="UTC"),
+            CronTrigger(
+                hour=settings.daily_summary_hour_utc,
+                minute=0,
+                timezone=settings.daily_summary_timezone,
+            ),
             id="daily_summary_job",
             max_instances=1,
             coalesce=True,
             misfire_grace_time=600,
         )
-        print(f"Daily summary job scheduled for {settings.daily_summary_hour_utc}:00 UTC")
+        print(
+            "Daily summary job scheduled for "
+            f"{settings.daily_summary_hour_utc:02d}:00 ({settings.daily_summary_timezone})"
+        )
 
     scheduler.start()
     print("Scheduler started (hourly job enabled)")

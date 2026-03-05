@@ -72,6 +72,7 @@ class Settings:
     enable_hourly_job: bool
     enable_daily_job: bool
     daily_summary_hour_utc: int
+    daily_summary_timezone: str
     low_priority_cleanup_days: int
     redis_url: str | None
     webhook_dedupe_ttl_seconds: int
@@ -117,6 +118,7 @@ def load_settings() -> Settings:
         enable_hourly_job=_bool("ENABLE_HOURLY_JOB", True),
         enable_daily_job=_bool("ENABLE_DAILY_JOB", True),
         daily_summary_hour_utc=_int("DAILY_SUMMARY_HOUR_UTC", 19),
+        daily_summary_timezone=os.getenv("DAILY_SUMMARY_TIMEZONE", "UTC"),
         low_priority_cleanup_days=_int("LOW_PRIORITY_CLEANUP_DAYS", 0),
         redis_url=os.getenv("REDIS_URL"),
         webhook_dedupe_ttl_seconds=_webhook_dedupe_ttl_seconds(),

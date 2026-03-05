@@ -3,6 +3,7 @@ import sys
 import types
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 if "requests" not in sys.modules:
     requests_stub = types.ModuleType("requests")
@@ -17,16 +18,20 @@ if "mutagen" not in sys.modules:
 try:
     from .summi_jobs import (
         _build_summary_items,
+        _chat_has_new_event_since_analysis,
         _summary_chat_filters,
         _summary_is_due,
         _unique_active_user_ids,
+        run_hourly_job,
     )
 except ImportError:
     from summi_jobs import (
         _build_summary_items,
+        _chat_has_new_event_since_analysis,
         _summary_chat_filters,
         _summary_is_due,
         _unique_active_user_ids,
+        run_hourly_job,
     )
 
 
@@ -113,6 +118,102 @@ class SummiJobsTest(unittest.TestCase):
             _summary_is_due(
                 profile,
                 now_utc=datetime.datetime(2026, 3, 2, 11, 5, tzinfo=datetime.timezone.utc),
+            )
+        )
+
+    def test_chat_has_new_event_since_analysis_uses_ultimo_evento_em(self) -> None:
+        self.assertTrue(
+            _chat_has_new_event_since_analysis(
+                {
+                    "analisado_em": "2026-03-05T10:00:00+00:00",
+                    "ultimo_evento_em": "2026-03-05T10:01:00+00:00",
+                    "modificado_em": "2026-03-05T10:10:00+00:00",
+                }
+            )
+        )
+        self.assertFalse(
+            _chat_has_new_event_since_analysis(
+                {
+                    "analisado_em": "2026-03-05T10:01:00+00:00",
+                    "ultimo_evento_em": "2026-03-05T10:00:00+00:00",
+                    "modificado_em": "2026-03-05T10:30:00+00:00",
+                }
+            )
+        )
+
+    def test_run_hourly_job_skips_send_when_no_priority_items(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            business_hours_start=8,
+            business_hours_end=18,
+            summi_sender_instance="Summi",
+        )
+        profile = {
+            "id": "user-1",
+            "numero": "5562999999999",
+            "summi_frequencia": "1h",
+            "ultimo_summi_em": "2026-03-05T09:00:00+00:00",
+            "onboarding_completed": True,
+            "Summi em Audio?": False,
+        }
+        summary_chats = [
+            {
+                "id": "chat-1",
+                "nome": "Contato",
+                "remote_jid": "5562911111111",
+                "prioridade": "1",
+                "contexto": "Pode esperar",
+                "criado_em": "2026-03-05T09:10:00+00:00",
+                "modificado_em": "2026-03-05T09:10:00+00:00",
+                "analisado_em": "2026-03-05T09:10:00+00:00",
+            }
+        ]
+
+        class _SupabaseFake:
+            def __init__(self) -> None:
+                self.patch_calls = []
+
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "subscribers":
+                    return [{"user_id": "user-1", "subscription_end": "2099-01-01T00:00:00+00:00", "subscribed": True}]
+                if table == "profiles":
+                    return [profile]
+                if table == "chats":
+                    return summary_chats
+                return []
+
+            def patch(self, table, data, filters=None):
+                self.patch_calls.append((table, data, filters))
+
+            def delete(self, table, filters=None):
+                return None
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        class _EvolutionFake:
+            def __init__(self) -> None:
+                self.sent_text = 0
+
+            def send_text(self, *args, **kwargs):
+                self.sent_text += 1
+
+        supabase = _SupabaseFake()
+        evolution = _EvolutionFake()
+
+        with patch.dict(
+            run_hourly_job.__globals__,
+            {"analyze_user_chats": lambda *args, **kwargs: {"success": True, "analyzed_count": 0}},
+        ):
+            result = run_hourly_job(settings, supabase, openai=object(), evolution=evolution)
+
+        self.assertEqual(result["sent"], 0)
+        self.assertEqual(result["skipped_no_priority_items"], 1)
+        self.assertEqual(evolution.sent_text, 0)
+        self.assertFalse(
+            any(
+                table == "profiles" and "ultimo_summi_em" in data
+                for table, data, _filters in supabase.patch_calls
             )
         )
 

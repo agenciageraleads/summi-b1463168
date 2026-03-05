@@ -57,6 +57,7 @@ def _settings(*, enable_analysis_queue: bool = False) -> Settings:
         enable_hourly_job=False,
         enable_daily_job=False,
         daily_summary_hour_utc=19,
+        daily_summary_timezone="UTC",
         low_priority_cleanup_days=0,
         redis_url="redis://localhost:6379/0",
         webhook_dedupe_ttl_seconds=600,
@@ -64,6 +65,10 @@ def _settings(*, enable_analysis_queue: bool = False) -> Settings:
         enable_summary_queue=False,
         queue_analysis_name="summi:queue:analysis",
         queue_summary_name="summi:queue:summary",
+        blog_auto_post_enabled=False,
+        blog_post_hour=9,
+        unsplash_access_key="",
+        site_url="https://summi.gera-leads.com",
     )
 
 
