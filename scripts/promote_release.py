@@ -19,6 +19,22 @@ WORKER_REPO = "ghcr.io/agenciageraleads/summi-b1463168-worker"
 FRONTEND_WORKFLOW = "Build & Push Summi Frontend"
 WORKER_WORKFLOW = "Build & Push Summi Worker"
 
+FRONTEND_PATHS = (
+    "src/",
+    "public/",
+    "frontend/",
+    "package.json",
+    "package-lock.json",
+    "vite.config.ts",
+    "index.html",
+    ".github/workflows/frontend-ghcr.yml",
+)
+
+WORKER_PATHS = (
+    "vps/summi_worker/",
+    ".github/workflows/worker-ghcr.yml",
+)
+
 SERVICE_IMAGES = {
     "summi-frontend": FRONTEND_REPO,
     "summi-worker-api": WORKER_REPO,
@@ -41,6 +57,26 @@ DEPLOY_IMAGE = {
     "summi_summi-worker-scheduler": WORKER_REPO,
     "summi_summi-worker-queue-analysis": WORKER_REPO,
     "summi_summi-worker-queue-summary": WORKER_REPO,
+}
+
+WORKFLOW_STACK_SERVICES = {
+    FRONTEND_WORKFLOW: {"summi-frontend"},
+    WORKER_WORKFLOW: {
+        "summi-worker-api",
+        "summi-worker-scheduler",
+        "summi-worker-queue-analysis",
+        "summi-worker-queue-summary",
+    },
+}
+
+WORKFLOW_DEPLOY_SERVICES = {
+    FRONTEND_WORKFLOW: ["summi_summi-frontend"],
+    WORKER_WORKFLOW: [
+        "summi_summi-worker-api",
+        "summi_summi-worker-scheduler",
+        "summi_summi-worker-queue-analysis",
+        "summi_summi-worker-queue-summary",
+    ],
 }
 
 
@@ -86,21 +122,48 @@ def fetch_runs(sha: str) -> list[dict]:
     return json.loads(result.stdout)
 
 
-def verify_required_workflows(sha: str) -> None:
+def list_changed_files(sha: str) -> list[str]:
+    result = run(["git", "-C", str(ROOT), "diff-tree", "--no-commit-id", "--name-only", "-r", sha])
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def matches_any_path(path: str, patterns: tuple[str, ...]) -> bool:
+    for pattern in patterns:
+        if pattern.endswith("/"):
+            if path.startswith(pattern):
+                return True
+            continue
+        if path == pattern:
+            return True
+    return False
+
+
+def detect_release_workflows(sha: str) -> list[str]:
+    changed_files = list_changed_files(sha)
+    workflows = []
+    if any(matches_any_path(path, FRONTEND_PATHS) for path in changed_files):
+        workflows.append(FRONTEND_WORKFLOW)
+    if any(matches_any_path(path, WORKER_PATHS) for path in changed_files):
+        workflows.append(WORKER_WORKFLOW)
+    if not workflows:
+        raise SystemExit(
+            f"O SHA {sha[:7]} nao altera frontend nem worker; nada para promover na stack."
+        )
+    return workflows
+
+
+def verify_required_workflows(sha: str, required: list[str]) -> None:
     runs = fetch_runs(sha)
-    required = {
-        FRONTEND_WORKFLOW: False,
-        WORKER_WORKFLOW: False,
-    }
+    status_by_workflow = {name: False for name in required}
     for run_info in runs:
         name = run_info.get("workflowName")
-        if name not in required:
+        if name not in status_by_workflow:
             continue
         if run_info.get("headSha") != sha:
             continue
         if run_info.get("status") == "completed" and run_info.get("conclusion") == "success":
-            required[name] = True
-    missing = [name for name, ok in required.items() if not ok]
+            status_by_workflow[name] = True
+    missing = [name for name, ok in status_by_workflow.items() if not ok]
     if missing:
         raise SystemExit(
             "Workflows obrigatorios ainda nao concluiram com sucesso para "
@@ -108,8 +171,13 @@ def verify_required_workflows(sha: str) -> None:
         )
 
 
-def rewrite_stack(sha: str) -> bool:
+def rewrite_stack(sha: str, workflows: list[str]) -> bool:
     lines = STACK_PATH.read_text().splitlines()
+    services_to_update = {
+        service
+        for workflow in workflows
+        for service in WORKFLOW_STACK_SERVICES[workflow]
+    }
     current_service = None
     changed = False
     for index, line in enumerate(lines):
@@ -120,6 +188,9 @@ def rewrite_stack(sha: str) -> bool:
         if stripped == "networks:":
             current_service = None
         if current_service and stripped.startswith("image:"):
+            if current_service not in services_to_update:
+                current_service = None
+                continue
             target = f"    image: {SERVICE_IMAGES[current_service]}:{sha}"
             if line != target:
                 lines[index] = target
@@ -152,12 +223,17 @@ def build_ssh_prefix() -> list[str]:
     return base
 
 
-def deploy_sha(sha: str) -> None:
+def deploy_sha(sha: str, workflows: list[str]) -> None:
     token = get_gh_token()
+    services = []
+    for workflow in workflows:
+        services.extend(WORKFLOW_DEPLOY_SERVICES[workflow])
     remote_lines = [
         f"printf %s {shlex.quote(token)} | docker login ghcr.io -u agenciageraleads --password-stdin >/dev/null",
     ]
     for service in DEPLOY_ORDER:
+        if service not in services:
+            continue
         image = f"{DEPLOY_IMAGE[service]}:{sha}"
         if service in {"summi_summi-frontend", "summi_summi-worker-api", "summi_summi-worker-scheduler"}:
             remote_lines.append(
@@ -199,15 +275,19 @@ def main() -> None:
     args = parser.parse_args()
 
     sha = resolve_full_sha(args.sha)
+    workflows = detect_release_workflows(sha)
     if not args.skip_workflow_check:
         require_gh_auth()
-        verify_required_workflows(sha)
+        verify_required_workflows(sha, workflows)
 
-    changed = rewrite_stack(sha)
-    print(f"Stack atualizada para {sha}. changed={str(changed).lower()}")
+    changed = rewrite_stack(sha, workflows)
+    print(
+        "Stack atualizada para "
+        f"{sha}. workflows={','.join(workflows)} changed={str(changed).lower()}"
+    )
 
     if args.deploy:
-        deploy_sha(sha)
+        deploy_sha(sha, workflows)
 
     print(
         "Proximo passo: revisar o diff, rodar smoke test e commitar/pushar a stack se este SHA virar a referencia oficial."

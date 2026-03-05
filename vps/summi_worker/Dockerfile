@@ -12,5 +12,4 @@ COPY . /app/summi_worker
 
 EXPOSE 8080
 
-CMD ["uvicorn", "summi_worker.app:app", "--host", "0.0.0.0", "--port", "8080"]
-
+CMD ["sh", "-c", "uvicorn summi_worker.app:app --host 0.0.0.0 --port 8080 --workers ${UVICORN_WORKERS:-4}"]
