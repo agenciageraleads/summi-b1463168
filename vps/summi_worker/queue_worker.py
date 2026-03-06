@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import sys
 import time
@@ -9,8 +10,8 @@ from dotenv import load_dotenv
 from .config import load_settings
 from .evolution_client import EvolutionClient
 from .openai_client import OpenAIClient
-from .redis_queue import RedisQueueClient
-from .summi_jobs import analyze_user_chats, run_hourly_job
+from .redis_queue import RedisQueueClient, run_now_result_key
+from .summi_jobs import run_hourly_job, run_user_summi_now
 from .supabase_rest import SupabaseRest
 
 
@@ -45,17 +46,29 @@ def main() -> None:
             logger.info("queue_worker.job_received kind=%s type=%s", queue_kind, job_type)
 
             if queue_kind == "analysis" and job_type == "analyze_user":
-                user_id = str(job.get("user_id") or "")
-                if not user_id:
-                    logger.warning("queue_worker.job_invalid missing_user_id")
-                    continue
-                result = analyze_user_chats(settings, supabase, openai, user_id=user_id)
-                logger.info("queue_worker.analysis_done user_id=%s result=%s", user_id, result)
+                logger.info("queue_worker.analysis_disabled payload=%s", job)
                 continue
 
             if queue_kind == "summary" and job_type == "run_hourly":
                 result = run_hourly_job(settings, supabase, openai, evolution)
                 logger.info("queue_worker.summary_done result=%s", result)
+                continue
+
+            if queue_kind == "summary" and job_type == "run_user_summi_now":
+                user_id = str(job.get("user_id") or "")
+                job_id = str(job.get("job_id") or "")
+                if not user_id or not job_id:
+                    logger.warning("queue_worker.job_invalid missing_user_or_job_id payload=%s", job)
+                    continue
+                result = run_user_summi_now(settings, supabase, openai, evolution, user_id=user_id)
+                payload = {
+                    **result,
+                    "job_id": job_id,
+                    "user_id": user_id,
+                    "completed_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+                }
+                queue.set_json(run_now_result_key(job_id), payload, settings.run_now_result_ttl_seconds)
+                logger.info("queue_worker.run_now_done user_id=%s job_id=%s result=%s", user_id, job_id, result)
                 continue
 
             logger.warning("queue_worker.unsupported_job kind=%s type=%s payload=%s", queue_kind, job_type, job)

@@ -83,38 +83,41 @@ X-Evolution-Signature: <hmac>  # (opcional, para validação)
 
 ---
 
-### 2. **Ingestão + Análise**
+### 2. **Ingestão (Alias Legado)**
 
 ```bash
 POST /webhooks/evolution-analyze
 ```
 
-Mesmo body que acima, mas dispara análise imediatamente.
+Mesmo body do webhook padrão, mas sem análise por mensagem.
+Resposta inclui `analysis_disabled=true` para indicar compatibilidade legada.
 
 ---
 
-### 3. **Análise Manual**
+### 3. **Summi da Hora Manual (Run-Now)**
 
 ```bash
 POST /api/analyze-messages
 Authorization: Bearer <JWT>
 ```
 
-**Body:**
-```json
-{
-  "limit": 10,
-  "priority": null
-}
-```
-
 **Response:**
 ```json
 {
-  "analyzed": 8,
-  "skipped": 2,
-  "errors": []
+  "success": true,
+  "status": "completed",
+  "summary_sent": true,
+  "fallback_sent": false,
+  "onboarding_sent": false,
+  "analyzed_count": 8,
+  "job_id": "optional-uuid"
 }
+```
+
+**Status polling (quando `status=processing`):**
+```bash
+GET /api/analyze-messages/status/{job_id}
+Authorization: Bearer <JWT>
 ```
 
 ---
@@ -203,19 +206,17 @@ docker run -p 8080:8080 --env-file .env summi-worker
 1. Evolution Webhook → POST /webhooks/evolution
    ├─ Parse JSON
    ├─ Redis dedupe check
+   ├─ (audio) Whisper transcription / resumo de áudio
    └─ INSERT public.chats
 
-2. (Optional) Analysis
-   ├─ Check if audio → Whisper transcription
-   ├─ OpenAI GPT-4o analysis
-   ├─ Determine priority
-   └─ UPDATE public.chats
-
-3. Hourly Job (summi_jobs.py)
-   ├─ SELECT chats (last 24h, priority=IMPORTANTE/URGENTE)
+2. Summi da Hora (scheduled ou run-now)
+   ├─ analyze_user_chats (priorização)
    ├─ GPT-4o summarization
    ├─ (Optional) TTS to audio
    └─ Evolution API send to WhatsApp
+
+3. Alias legado
+   └─ POST /webhooks/evolution-analyze → ingestão/transcrição sem análise por mensagem
 ```
 
 ---
@@ -228,7 +229,7 @@ Main FastAPI server. Rotas, middleware, error handling.
 
 **Key functions:**
 - `handle_evolution_webhook()` - Recebe mensagens
-- `analyze_messages()` - Análise manual
+- `api_analyze_messages()` - Run-now do Summi da Hora
 - `run_hourly_job()` - Job manual
 
 ### `openai_client.py`
@@ -364,4 +365,3 @@ Verifique logs:
 - [`ENVIRONMENT_VARS.md`](./ENVIRONMENT_VARS.md) - Configuração detalhada
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) - Fluxo geral
 - [`AUDIO_TRANSCRIPTION.md`](./AUDIO_TRANSCRIPTION.md) - Detalhes de transcrição
-

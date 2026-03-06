@@ -6,10 +6,11 @@
 
 ### Webhooks
 - `POST /webhooks/evolution` - Ingest mensagens
-- `POST /webhooks/evolution-analyze` - Ingest + analyze
+- `POST /webhooks/evolution-analyze` - Alias legado de ingestão (sem análise por mensagem)
 
 ### API
-- `POST /api/analyze-messages` - Análise manual (auth required)
+- `POST /api/analyze-messages` - Run-now do Summi da Hora (auth required)
+- `GET /api/analyze-messages/status/{job_id}` - Status do run-now
 - `POST /internal/run-hourly` - Trigger job
 
 ### Health
@@ -32,8 +33,13 @@
 ```json
 {
   "success": true,
-  "data": { ... },
-  "error": null
+  "status": "completed",
+  "summary_sent": true,
+  "fallback_sent": false,
+  "onboarding_sent": false,
+  "analyzed_count": 4,
+  "job_id": "optional-uuid",
+  "reason": "optional_reason"
 }
 ```
 

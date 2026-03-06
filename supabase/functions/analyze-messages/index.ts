@@ -49,56 +49,50 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Ler o corpo da requisição
-    const body = await req.json();
-    console.log(`[ANALYZE] Body recebido:`, body);
-    
-    const { userId } = body;
-    
-    if (!userId) {
-      console.error('[ANALYZE] userId não fornecido');
-      return new Response(
-        JSON.stringify({ 
-          error: 'userId é obrigatório',
-          success: false 
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    let body: Record<string, unknown> = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
     }
-
-    // Preparar payload para o webhook
-    const webhookPayload = {
-      id_usuario: userId
-    };
-
-    console.log(`[ANALYZE] Enviando para destino:`, webhookPayload);
+    console.log(`[ANALYZE] Body recebido:`, body);
 
     // Encaminhar o Authorization do usuario (quando existir), para permitir validacao no worker.
     const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
+    const jobId = typeof body.jobId === "string" ? body.jobId.trim() : "";
 
-    // Chamar o worker (ou webhook legado)
-    const webhookResponse = await fetch(workerUrl, {
-      method: 'POST',
+    const targetUrl = jobId
+      ? `${workerUrl.replace(/\/+$/, "")}/status/${encodeURIComponent(jobId)}`
+      : workerUrl;
+    const method = jobId ? "GET" : "POST";
+
+    const webhookResponse = await fetch(targetUrl, {
+      method,
       headers: {
         'Content-Type': 'application/json',
         ...(authHeader ? { 'Authorization': authHeader } : {}),
       },
-      body: JSON.stringify(webhookPayload),
+      ...(jobId ? {} : { body: JSON.stringify({}) }),
     });
 
     console.log(`[ANALYZE] Resposta do webhook - Status: ${webhookResponse.status}`);
 
+    const responseText = await webhookResponse.text();
+    let responsePayload: Record<string, unknown> = {};
+    try {
+      responsePayload = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      responsePayload = { raw: responseText };
+    }
+
     if (!webhookResponse.ok) {
-      const errorText = await webhookResponse.text();
-      console.error(`[ANALYZE] Erro no webhook: ${webhookResponse.status} - ${errorText}`);
+      console.error(`[ANALYZE] Erro no webhook: ${webhookResponse.status} - ${responseText}`);
       return new Response(
         JSON.stringify({ 
           error: 'Falha ao chamar webhook',
           success: false,
-          details: `Status: ${webhookResponse.status}`
+          details: `Status: ${webhookResponse.status}`,
+          worker: responsePayload,
         }),
         {
           status: 500,
@@ -107,14 +101,10 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`[ANALYZE] Webhook chamado com sucesso para usuário: ${userId}`);
+    console.log(`[ANALYZE] Worker respondeu com sucesso`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Análise iniciada com sucesso',
-        userId: userId 
-      }),
+      JSON.stringify(responsePayload),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

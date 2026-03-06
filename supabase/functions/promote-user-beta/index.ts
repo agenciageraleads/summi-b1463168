@@ -198,9 +198,7 @@ serve(async (req) => {
         const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
 
         if (evolutionApiUrl && evolutionApiKey) {
-          const webhookUrl = newRole === 'beta'
-            ? Deno.env.get('WEBHOOK_ANALISA_MENSAGENS')
-            : Deno.env.get('WEBHOOK_RECEBE_MENSAGEM');
+          const webhookUrl = Deno.env.get('WEBHOOK_RECEBE_MENSAGEM');
 
           const response = await fetch(`${evolutionApiUrl}/webhook/set/${targetUser.instance_name}`, {
             method: 'POST',

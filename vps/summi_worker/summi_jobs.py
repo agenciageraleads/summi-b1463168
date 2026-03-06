@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from .analysis import AnalyzedChat, analyze_single_chat, build_audio_script, build_summary_text
@@ -15,6 +16,9 @@ from .supabase_rest import (
     to_postgrest_filter_lt,
     to_postgrest_filter_neq,
 )
+
+
+logger = logging.getLogger("summi_worker.summi_jobs")
 
 
 def _now_utc_iso() -> str:
@@ -71,6 +75,54 @@ def _unique_active_user_ids(subscribers: List[Dict[str, Any]]) -> List[str]:
         seen.add(user_id)
         user_ids.append(user_id)
     return user_ids
+
+
+def _extract_phone_digits(value: Any) -> str:
+    return "".join(c for c in str(value or "") if c.isdigit())
+
+
+def _has_active_subscription(supabase: SupabaseRest, *, user_id: str) -> bool:
+    rows = supabase.select(
+        "subscribers",
+        select="id,user_id,subscribed,subscription_end",
+        filters=[
+            to_postgrest_filter_eq("user_id", user_id),
+            ("subscribed", "eq.true"),
+            to_postgrest_filter_gte("subscription_end", _now_utc_iso()),
+        ],
+        limit=1,
+    )
+    return bool(rows)
+
+
+def _should_auto_delete_low_priority(profile: Dict[str, Any]) -> bool:
+    return str(profile.get("Apaga Mensagens Não Importantes Automaticamente?", "")).strip().lower() == "sim"
+
+
+def _delete_low_priority_chats(
+    supabase: SupabaseRest,
+    *,
+    user_id: str,
+) -> int:
+    low_chats = supabase.select(
+        "chats",
+        select="id",
+        filters=[
+            to_postgrest_filter_eq("id_usuario", user_id),
+            to_postgrest_filter_lt("prioridade", "2"),
+        ],
+        limit=1000,
+    )
+    if not low_chats:
+        return 0
+    supabase.delete(
+        "chats",
+        filters=[
+            to_postgrest_filter_eq("id_usuario", user_id),
+            to_postgrest_filter_lt("prioridade", "2"),
+        ],
+    )
+    return len(low_chats)
 
 
 def _summary_frequency_hours(profile: Dict[str, Any]) -> int:
@@ -395,6 +447,146 @@ def send_onboarding_messages(evolution: EvolutionClient, instance: str, numero: 
         print(f"Error sending onboarding to {numero}: {e}")
 
 
+def run_user_summi_now(
+    settings: Settings,
+    supabase: SupabaseRest,
+    openai: OpenAIClient,
+    evolution: EvolutionClient,
+    *,
+    user_id: str,
+) -> Dict[str, Any]:
+    """
+    Disparo manual do Summi da Hora para um único usuário.
+
+    Regras:
+    - ignora janela de horário comercial e frequência;
+    - exige assinatura ativa e número de telefone válido;
+    - executa onboarding+resumo quando for o primeiro envio;
+    - analisa chats e envia resumo (ou fallback quando não há prioridade 2/3).
+    """
+    logger.info("run_now.started user_id=%s", user_id)
+
+    base_response: Dict[str, Any] = {
+        "success": True,
+        "status": "completed",
+        "summary_sent": False,
+        "fallback_sent": False,
+        "onboarding_sent": False,
+        "analyzed_count": 0,
+        "low_priority_deleted": 0,
+    }
+
+    try:
+        profiles = supabase.select("profiles", select="*", filters=[to_postgrest_filter_eq("id", user_id)], limit=1)
+        if not profiles:
+            return {
+                **base_response,
+                "success": False,
+                "status": "error",
+                "reason": "profile_not_found",
+            }
+        profile = profiles[0]
+
+        if not _has_active_subscription(supabase, user_id=user_id):
+            logger.info("run_now.skipped user_id=%s reason=no_active_subscription", user_id)
+            return {
+                **base_response,
+                "status": "skipped",
+                "reason": "no_active_subscription",
+            }
+
+        numero_usuario = _extract_phone_digits(profile.get("numero"))
+        if not numero_usuario:
+            logger.info("run_now.skipped user_id=%s reason=missing_phone_number", user_id)
+            return {
+                **base_response,
+                "status": "skipped",
+                "reason": "missing_phone_number",
+            }
+
+        # Primeiro envio manual também respeita onboarding.
+        ultimo_summi = profile.get("ultimo_summi_em")
+        onboarding_done = profile.get("onboarding_completed")
+        if not ultimo_summi and not onboarding_done:
+            send_onboarding_messages(evolution, settings.summi_sender_instance, numero_usuario, profile.get("nome", ""))
+            base_response["onboarding_sent"] = True
+            try:
+                supabase.patch(
+                    "profiles",
+                    data={"onboarding_completed": True},
+                    filters=[to_postgrest_filter_eq("id", user_id)],
+                )
+            except Exception:
+                pass
+
+        analyze_result = analyze_user_chats(settings, supabase, openai, user_id=user_id)
+        if not analyze_result.get("success"):
+            return {
+                **base_response,
+                "success": False,
+                "status": "error",
+                "reason": str(analyze_result.get("error") or "analyze_failed"),
+            }
+        base_response["analyzed_count"] = int(analyze_result.get("analyzed_count") or 0)
+
+        chats = supabase.select(
+            "chats",
+            select="id,nome,remote_jid,prioridade,contexto,criado_em,modificado_em,analisado_em",
+            filters=_summary_chat_filters(settings, user_id=user_id, ultimo_summi=ultimo_summi),
+            order="analisado_em.desc",
+            limit=50,
+        )
+        items = _build_summary_items(chats)
+
+        summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
+        evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
+        base_response["summary_sent"] = True
+        base_response["fallback_sent"] = not bool(items)
+
+        try:
+            supabase.patch(
+                "profiles",
+                data={"ultimo_summi_em": _now_utc_iso()},
+                filters=[to_postgrest_filter_eq("id", user_id)],
+            )
+        except Exception:
+            pass
+
+        if profile.get("Summi em Audio?") is True:
+            try:
+                audio_script = build_audio_script(openai, settings.openai_model_summary, summary_text=summary_text)
+                mp3 = openai.tts_mp3(settings.openai_tts_model, settings.openai_tts_voice, audio_script)
+                evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, mp3)
+            except Exception as exc:
+                logger.warning("run_now.audio_failed user_id=%s error=%s", user_id, exc)
+
+        if _should_auto_delete_low_priority(profile):
+            try:
+                base_response["low_priority_deleted"] = _delete_low_priority_chats(supabase, user_id=user_id)
+            except Exception as exc:
+                logger.warning("run_now.cleanup_failed user_id=%s error=%s", user_id, exc)
+
+        logger.info(
+            "run_now.completed user_id=%s analyzed_count=%s summary_sent=%s fallback_sent=%s onboarding_sent=%s low_priority_deleted=%s",
+            user_id,
+            base_response["analyzed_count"],
+            base_response["summary_sent"],
+            base_response["fallback_sent"],
+            base_response["onboarding_sent"],
+            base_response["low_priority_deleted"],
+        )
+        return base_response
+    except Exception as exc:
+        logger.exception("run_now.error user_id=%s error=%s", user_id, exc)
+        return {
+            **base_response,
+            "success": False,
+            "status": "error",
+            "reason": "unexpected_error",
+            "error": str(exc)[:300],
+        }
+
+
 def run_hourly_job(
     settings: Settings,
     supabase: SupabaseRest,
@@ -435,8 +627,7 @@ def run_hourly_job(
             continue
 
         # Numero do usuario e usado tanto no onboarding quanto no envio regular.
-        numero_usuario = (profile.get("numero") or "").strip()
-        numero_usuario = "".join([c for c in numero_usuario if c.isdigit()])
+        numero_usuario = _extract_phone_digits(profile.get("numero"))
         if not numero_usuario:
             continue
 
@@ -505,26 +696,11 @@ def run_hourly_job(
             except Exception as exc:
                 print(f"Audio summary failed for user {user_id}: {exc}")
 
-        auto_delete_low = str(profile.get("Apaga Mensagens Não Importantes Automaticamente?", "")).strip().lower() == "sim"
-        if auto_delete_low:
-            low_chats = supabase.select(
-                "chats",
-                select="id",
-                filters=[
-                    to_postgrest_filter_eq("id_usuario", user_id),
-                    to_postgrest_filter_lt("prioridade", "2"),
-                ],
-                limit=1000,
-            )
-            if low_chats:
-                supabase.delete(
-                    "chats",
-                    filters=[
-                        to_postgrest_filter_eq("id_usuario", user_id),
-                        to_postgrest_filter_lt("prioridade", "2"),
-                    ],
-                )
-                low_priority_deleted += len(low_chats)
+        if _should_auto_delete_low_priority(profile):
+            try:
+                low_priority_deleted += _delete_low_priority_chats(supabase, user_id=user_id)
+            except Exception:
+                pass
 
     return {
         "success": True,

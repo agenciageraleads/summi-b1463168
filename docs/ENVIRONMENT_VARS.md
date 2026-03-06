@@ -230,6 +230,8 @@ LOW_PRIORITY_CLEANUP_DAYS=30
 WEBHOOK_DEDUPE_TTL_SECONDS=86400
 REDIS_URL=redis://localhost:6379
 REDIS_DB=0
+RUN_NOW_WAIT_SECONDS=12
+RUN_NOW_RESULT_TTL_SECONDS=600
 
 # ============ LOGGING ============
 LOG_LEVEL=INFO
@@ -253,6 +255,7 @@ EVOLUTION_REQUEST_TIMEOUT=30
 ```bash
 # Webhook URLs (aponta para VPS worker)
 WEBHOOK_RECEBE_MENSAGEM=https://api.summi.com/webhooks/evolution
+# LEGADO: manter apenas para compatibilidade; endpoint não executa análise por mensagem
 WEBHOOK_ANALISA_MENSAGENS=https://api.summi.com/webhooks/evolution-analyze
 SUMMI_WORKER_ANALYZE_URL=https://api.summi.com/api/analyze-messages
 

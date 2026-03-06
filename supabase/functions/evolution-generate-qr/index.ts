@@ -118,12 +118,10 @@ serve(async (req) => {
         throw new Error("User phone number not found in profile");
       }
 
-      // Determinar webhook baseado no role do usuário.
-      const webhookUrl = profile.role === 'beta'
-        ? Deno.env.get("WEBHOOK_ANALISA_MENSAGENS")
-        : Deno.env.get("WEBHOOK_RECEBE_MENSAGEM");
+      // Webhook único para ingestão de mensagens.
+      const webhookUrl = Deno.env.get("WEBHOOK_RECEBE_MENSAGEM");
       
-      logStep("Webhook selecionado baseado no role", { role: profile.role, webhookUrl });
+      logStep("Webhook de ingestão selecionado", { webhookUrl });
       
       const createPayload = {
         instanceName,

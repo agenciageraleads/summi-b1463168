@@ -80,6 +80,8 @@ class Settings:
     enable_summary_queue: bool
     queue_analysis_name: str
     queue_summary_name: str
+    run_now_wait_seconds: int
+    run_now_result_ttl_seconds: int
 
     # Blog auto-posting
     blog_auto_post_enabled: bool
@@ -126,6 +128,8 @@ def load_settings() -> Settings:
         enable_summary_queue=_bool("ENABLE_SUMMARY_QUEUE", False),
         queue_analysis_name=os.getenv("QUEUE_ANALYSIS_NAME", "summi:queue:analysis"),
         queue_summary_name=os.getenv("QUEUE_SUMMARY_NAME", "summi:queue:summary"),
+        run_now_wait_seconds=_int("RUN_NOW_WAIT_SECONDS", 12),
+        run_now_result_ttl_seconds=_int("RUN_NOW_RESULT_TTL_SECONDS", 600),
         blog_auto_post_enabled=_bool("BLOG_AUTO_POST_ENABLED", False),
         blog_post_hour=_int("BLOG_POST_HOUR", 9),
         unsplash_access_key=os.getenv("UNSPLASH_ACCESS_KEY", ""),

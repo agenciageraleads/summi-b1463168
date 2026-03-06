@@ -53,6 +53,8 @@ ENABLE_HOURLY_JOB="true"
 ENABLE_DAILY_JOB="true"
 DAILY_SUMMARY_HOUR_UTC="22"     # 19:00 America/Sao_Paulo quando timezone=UTC
 DAILY_SUMMARY_TIMEZONE="UTC"
+RUN_NOW_WAIT_SECONDS="12"
+RUN_NOW_RESULT_TTL_SECONDS="600"
 
 # Cleanup (opcional)
 LOW_PRIORITY_CLEANUP_DAYS="0"
@@ -85,15 +87,16 @@ uvicorn app:app --host 0.0.0.0 --port 8080
 
 ## Endpoints
 - `POST /webhooks/evolution` (Evolution -> Summi): ingestao
-- `POST /webhooks/evolution-analyze` (Evolution -> Summi): ingestao + analise (ideal para "beta")
-- `POST /api/analyze-messages` (frontend/supabase -> Summi): inicia analise do usuario autenticado
+- `POST /webhooks/evolution-analyze` (Evolution -> Summi): alias legado de ingestao (sem analise por mensagem)
+- `POST /api/analyze-messages` (frontend/supabase -> Summi): executa Summi da Hora run-now do usuario autenticado
+- `GET /api/analyze-messages/status/{job_id}`: consulta status do run-now
 - `POST /internal/run-hourly` (manual/admin): executa o job horario uma vez
 
 ## Migracao (n8n -> VPS)
 No Supabase (env vars das Edge Functions):
 - `SUMMI_WORKER_ANALYZE_URL`: aponte para `https://<sua-vps>/api/analyze-messages`
 - `WEBHOOK_RECEBE_MENSAGEM`: aponte para `https://<sua-vps>/webhooks/evolution`
-- `WEBHOOK_ANALISA_MENSAGENS`: aponte para `https://<sua-vps>/webhooks/evolution-analyze`
+- `WEBHOOK_ANALISA_MENSAGENS`: legado (opcional), endpoint sem analise por mensagem
 
 ## Dedupe do webhook
 - `WEBHOOK_DEDUPE_TTL_SECONDS`: mantenha pelo menos `86400` segundos.

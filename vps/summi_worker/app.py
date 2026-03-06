@@ -5,7 +5,9 @@ import datetime as dt
 import json
 import logging
 import os
+import threading
 import time
+import uuid
 from typing import Any, Dict, Optional, Tuple
 
 from dotenv import load_dotenv
@@ -24,8 +26,8 @@ from .prompt_builders import (
     is_internal_summi_thread,
 )
 from .redis_dedupe import RedisDedupe
-from .redis_queue import RedisQueueClient
-from .summi_jobs import analyze_user_chats, run_hourly_job
+from .redis_queue import RedisQueueClient, run_now_result_key
+from .summi_jobs import analyze_user_chats, run_hourly_job, run_user_summi_now
 from .supabase_rest import SupabaseRest, to_postgrest_filter_eq
 
 
@@ -35,6 +37,10 @@ app = FastAPI(title="Summi Worker")
 logger = logging.getLogger("summi_worker")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+
+_RUN_NOW_RESULT_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_RUN_NOW_RESULT_CACHE_LOCK = threading.Lock()
 
 
 def _settings() -> Settings:
@@ -74,6 +80,152 @@ def _elapsed_ms(started_at: float) -> int:
 
 def _now_utc_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def _prune_run_now_cache(now_ts: float) -> None:
+    expired = [job_id for job_id, (expires_at, _) in _RUN_NOW_RESULT_CACHE.items() if expires_at <= now_ts]
+    for job_id in expired:
+        _RUN_NOW_RESULT_CACHE.pop(job_id, None)
+
+
+def _set_run_now_result(
+    *,
+    settings: Settings,
+    job_id: str,
+    payload: Dict[str, Any],
+) -> None:
+    queue = _redis_queue(settings)
+    if queue is not None:
+        try:
+            queue.set_json(run_now_result_key(job_id), payload, settings.run_now_result_ttl_seconds)
+            return
+        except Exception:
+            logger.exception("run_now.result_store_redis_failed job_id=%s", job_id)
+
+    now_ts = time.time()
+    with _RUN_NOW_RESULT_CACHE_LOCK:
+        _prune_run_now_cache(now_ts)
+        _RUN_NOW_RESULT_CACHE[job_id] = (now_ts + settings.run_now_result_ttl_seconds, payload)
+
+
+def _get_run_now_result(
+    *,
+    settings: Settings,
+    job_id: str,
+) -> Optional[Dict[str, Any]]:
+    queue = _redis_queue(settings)
+    if queue is not None:
+        try:
+            cached = queue.get_json(run_now_result_key(job_id))
+            if isinstance(cached, dict):
+                return cached
+        except Exception:
+            logger.exception("run_now.result_read_redis_failed job_id=%s", job_id)
+
+    now_ts = time.time()
+    with _RUN_NOW_RESULT_CACHE_LOCK:
+        _prune_run_now_cache(now_ts)
+        item = _RUN_NOW_RESULT_CACHE.get(job_id)
+        if not item:
+            return None
+        expires_at, payload = item
+        if expires_at <= now_ts:
+            _RUN_NOW_RESULT_CACHE.pop(job_id, None)
+            return None
+        return payload
+
+
+def _poll_run_now_result(
+    *,
+    settings: Settings,
+    job_id: str,
+    timeout_seconds: int,
+    interval_seconds: float = 0.35,
+) -> Optional[Dict[str, Any]]:
+    deadline = time.perf_counter() + max(0, timeout_seconds)
+    while time.perf_counter() < deadline:
+        result = _get_run_now_result(settings=settings, job_id=job_id)
+        if result and str(result.get("status") or "") != "processing":
+            return result
+        time.sleep(interval_seconds)
+    result = _get_run_now_result(settings=settings, job_id=job_id)
+    if result and str(result.get("status") or "") != "processing":
+        return result
+    return None
+
+
+def _extract_user_id_from_authorization(settings: Settings, authorization: Optional[str]) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing Authorization bearer token")
+
+    token = authorization.split(" ", 1)[1].strip()
+
+    apikey = settings.supabase_anon_key or settings.supabase_service_role_key
+    auth_url = f"{settings.supabase_url}/auth/v1/user"
+    import requests
+
+    resp = requests.get(
+        auth_url,
+        headers={"apikey": apikey, "Authorization": f"Bearer {token}"},
+        timeout=20,
+    )
+    if not resp.ok:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {resp.status_code}")
+    user = resp.json()
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token (no user id)")
+    return str(user_id)
+
+
+def _run_user_summi_now_job(
+    *,
+    settings: Settings,
+    user_id: str,
+    job_id: str,
+) -> None:
+    started_at = time.perf_counter()
+    supabase = _supabase(settings)
+    openai = _openai(settings)
+    evolution = _evolution(settings)
+
+    try:
+        result = run_user_summi_now(settings, supabase, openai, evolution, user_id=user_id)
+    except Exception as exc:
+        logger.exception("run_now.job_error user_id=%s job_id=%s error=%s", user_id, job_id, exc)
+        result = {
+            "success": False,
+            "status": "error",
+            "summary_sent": False,
+            "fallback_sent": False,
+            "onboarding_sent": False,
+            "analyzed_count": 0,
+            "reason": "unexpected_error",
+            "error": str(exc)[:300],
+        }
+
+    payload = {
+        **result,
+        "job_id": job_id,
+        "user_id": user_id,
+        "completed_at": _now_utc_iso(),
+        "elapsed_ms": _elapsed_ms(started_at),
+    }
+    _set_run_now_result(settings=settings, job_id=job_id, payload=payload)
+
+
+def _spawn_local_run_now_thread(
+    *,
+    settings: Settings,
+    user_id: str,
+    job_id: str,
+) -> None:
+    thread = threading.Thread(
+        target=_run_user_summi_now_job,
+        kwargs={"settings": settings, "user_id": user_id, "job_id": job_id},
+        daemon=True,
+    )
+    thread.start()
 
 
 def _run_deferred_analysis(
@@ -732,43 +884,83 @@ async def social_blog_preview(slug: str, request: Request):
 
 @app.post("/api/analyze-messages")
 async def api_analyze_messages(
-    request: Request,
     authorization: Optional[str] = Header(default=None),
 ) -> Dict[str, Any]:
     """
-    Substitui o webhook do n8n "Analisa-Mensagens".
-
-    Espera um JWT do Supabase em Authorization: Bearer <token>.
-    O corpo pode estar vazio; o userId e derivado do token.
+    Executa o Summi da Hora sob demanda para o usuário autenticado.
+    O endpoint mantém compatibilidade de rota, mas agora dispara análise+resumo.
     """
     settings = _settings()
-    supabase = _supabase(settings)
-    openai = _openai(settings)
+    user_id = _extract_user_id_from_authorization(settings, authorization)
+    job_id = str(uuid.uuid4())
 
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Missing Authorization bearer token")
+    processing_payload: Dict[str, Any] = {
+        "success": True,
+        "status": "processing",
+        "summary_sent": False,
+        "fallback_sent": False,
+        "onboarding_sent": False,
+        "analyzed_count": 0,
+        "job_id": job_id,
+        "user_id": user_id,
+        "reason": "queued",
+        "queued_at": _now_utc_iso(),
+    }
+    _set_run_now_result(settings=settings, job_id=job_id, payload=processing_payload)
 
-    token = authorization.split(" ", 1)[1].strip()
+    queue = _redis_queue(settings)
+    started_mode = "local_thread"
+    if settings.enable_summary_queue and queue is not None:
+        try:
+            queue.enqueue(
+                settings.queue_summary_name,
+                {
+                    "type": "run_user_summi_now",
+                    "user_id": user_id,
+                    "job_id": job_id,
+                },
+            )
+            started_mode = "queue"
+        except Exception:
+            logger.exception("run_now.enqueue_failed user_id=%s job_id=%s", user_id, job_id)
+            _spawn_local_run_now_thread(settings=settings, user_id=user_id, job_id=job_id)
+    else:
+        _spawn_local_run_now_thread(settings=settings, user_id=user_id, job_id=job_id)
 
-    # Validar usuario via Supabase Auth API (usa anon key se fornecida; caso nao, tenta via service role).
-    apikey = settings.supabase_anon_key or settings.supabase_service_role_key
-    auth_url = f"{settings.supabase_url}/auth/v1/user"
-    import requests
+    logger.info("run_now.started user_id=%s job_id=%s mode=%s", user_id, job_id, started_mode)
 
-    resp = requests.get(
-        auth_url,
-        headers={"apikey": apikey, "Authorization": f"Bearer {token}"},
-        timeout=20,
+    result = _poll_run_now_result(
+        settings=settings,
+        job_id=job_id,
+        timeout_seconds=settings.run_now_wait_seconds,
     )
-    if not resp.ok:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {resp.status_code}")
-    user = resp.json()
-    user_id = user.get("id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token (no user id)")
+    if result and result.get("status") != "processing":
+        return result
 
-    # Executa analise imediatamente
-    result = analyze_user_chats(settings, supabase, openai, user_id=user_id)
+    logger.info("run_now.processing user_id=%s job_id=%s mode=%s", user_id, job_id, started_mode)
+    return {
+        **processing_payload,
+        "reason": "processing_timeout",
+        "processing_via": started_mode,
+    }
+
+
+@app.get("/api/analyze-messages/status/{job_id}")
+async def api_analyze_messages_status(
+    job_id: str,
+    authorization: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    settings = _settings()
+    user_id = _extract_user_id_from_authorization(settings, authorization)
+    result = _get_run_now_result(settings=settings, job_id=job_id)
+    if not result:
+        return {
+            "success": True,
+            "status": "processing",
+            "job_id": job_id,
+        }
+    if str(result.get("user_id") or "") != user_id:
+        raise HTTPException(status_code=404, detail="job_not_found")
     return result
 
 
@@ -793,8 +985,7 @@ def internal_run_hourly(x_internal_token: Optional[str] = Header(default=None)) 
 async def _handle_evolution_webhook(
     request: Request,
     *,
-    analyze_after: bool,
-    background_tasks: BackgroundTasks | None = None,
+    analysis_disabled: bool = False,
 ) -> Dict[str, Any]:
     request_started_at = time.perf_counter()
     settings = _settings()
@@ -806,7 +997,7 @@ async def _handle_evolution_webhook(
     payload = await request.json()
     normalized = normalize_message_event(payload)
     logger.info(
-        "evolution_webhook.received path=%s event=%s instance=%s remote_jid=%s message_id=%s message_type=%s from_me=%s analyze_after=%s",
+        "evolution_webhook.received path=%s event=%s instance=%s remote_jid=%s message_id=%s message_type=%s from_me=%s analysis_disabled=%s",
         request.url.path,
         normalized.get("event"),
         normalized.get("instance_name"),
@@ -814,7 +1005,7 @@ async def _handle_evolution_webhook(
         normalized.get("message_id"),
         normalized.get("message_type"),
         normalized.get("from_me"),
-        analyze_after,
+        analysis_disabled,
     )
 
     # Evolution costuma enviar eventos em formatos diferentes ("MESSAGES_UPSERT" vs "messages.upsert").
@@ -1319,44 +1510,24 @@ async def _handle_evolution_webhook(
             message_text_for_chat=text_for_chat,
         )
 
-    analyze_ok = False
-    analysis_enqueued = False
-    analysis_deferred = False
-    analyze_error: Optional[str] = None
-    if analyze_after:
-        analyze_ok, analysis_enqueued, analysis_deferred, analyze_error = _dispatch_analysis(
-            settings=settings,
-            user_id=user_id,
-            instance_name=instance_name,
-            remote_jid=remote_jid,
-            message_id=str(normalized.get("message_id") or ""),
-            supabase=supabase,
-            openai=openai,
-            background_tasks=background_tasks,
-        )
-
     logger.info(
-        "evolution_webhook.completed chat_id=%s user_id=%s instance=%s remote_jid=%s message_id=%s analyzed=%s analysis_enqueued=%s analysis_deferred=%s total_ms=%s",
+        "evolution_webhook.completed chat_id=%s user_id=%s instance=%s remote_jid=%s message_id=%s analysis_disabled=%s total_ms=%s",
         chat_id,
         user_id,
         instance_name,
         remote_jid,
         normalized.get("message_id"),
-        analyze_ok if analyze_after else False,
-        analysis_enqueued,
-        analysis_deferred,
+        analysis_disabled,
         _elapsed_ms(request_started_at),
     )
     return {
         "ok": True,
         "stored": bool(chat_id),
         "chat_id": chat_id,
-        "analyzed": analyze_ok,
+        "analyzed": False,
+        "analysis_disabled": analysis_disabled,
         "message_kind": message_kind,
         "outbound": outbound,
-        **({"analysis_enqueued": True} if analysis_enqueued else {}),
-        **({"analysis_deferred": True} if analysis_deferred else {}),
-        **({"analyze_error": analyze_error} if analyze_error else {}),
         **extra,
     }
 
@@ -1366,13 +1537,14 @@ async def webhook_evolution(request: Request) -> Dict[str, Any]:
     """
     Webhook para receber eventos da Evolution API (apenas ingestao).
     """
-    return await _handle_evolution_webhook(request, analyze_after=False)
+    return await _handle_evolution_webhook(request, analysis_disabled=False)
 
 
 @app.post("/webhooks/evolution-analyze")
-async def webhook_evolution_analyze(request: Request, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+async def webhook_evolution_analyze(request: Request) -> Dict[str, Any]:
     """
-    Webhook para receber eventos da Evolution API e disparar analise.
-    Use esse endpoint para o fluxo "beta" (equivalente ao n8n).
+    Endpoint legado mantido por compatibilidade.
+    Processa apenas ingestão/transcrição, sem análise por mensagem.
     """
-    return await _handle_evolution_webhook(request, analyze_after=True, background_tasks=background_tasks)
+    logger.info("webhook.analysis_disabled path=/webhooks/evolution-analyze")
+    return await _handle_evolution_webhook(request, analysis_disabled=True)

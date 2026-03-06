@@ -13,7 +13,7 @@ headers = {
 }
 
 data = {
-    "url": "https://worker-summi.gera-leads.com/webhooks/evolution-analyze",
+    "url": "https://worker-summi.gera-leads.com/webhooks/evolution",
     "webhookByEvents": False,
     "webhookBase64": True,
     "events": [

@@ -2,8 +2,8 @@ import json
 import urllib.request
 import os
 
-# Usamos a URL pública do worker
-url = "https://worker-summi.gera-leads.com/webhooks/evolution-analyze"
+# Usamos a URL pública do worker (ingestão)
+url = "https://worker-summi.gera-leads.com/webhooks/evolution"
 instance = "lucasborges_5286"
 
 # Payload simulado de mensagem recebida (formato Evolution v2)

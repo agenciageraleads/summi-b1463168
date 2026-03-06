@@ -398,12 +398,10 @@ const createInstanceWithPairingSupport = async (instanceName: string, phoneNumbe
   console.log(`[CREATE-INSTANCE] 🏗️ Criando instância com suporte a pairing code: ${instanceName}`);
   console.log(`[CREATE-INSTANCE] 👤 Role do usuário: ${userRole}`);
   
-  // Determinar webhook baseado no role do usuário.
-  const finalWebhookUrl = userRole === 'beta'
-    ? (Deno.env.get("WEBHOOK_ANALISA_MENSAGENS") ?? webhookUrl)
-    : webhookUrl;
+  // Webhook único para ingestão de mensagens.
+  const finalWebhookUrl = webhookUrl;
   
-  console.log(`[CREATE-INSTANCE] 🎯 Webhook selecionado: ${finalWebhookUrl} (role: ${userRole})`);
+  console.log(`[CREATE-INSTANCE] 🎯 Webhook de ingestão selecionado: ${finalWebhookUrl}`);
   
   try {
     // CORREÇÃO: Usar endpoint correto com parâmetro number para garantir pairing code

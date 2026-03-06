@@ -23,6 +23,7 @@ try:
         _summary_is_due,
         _unique_active_user_ids,
         run_hourly_job,
+        run_user_summi_now,
     )
 except ImportError:
     from summi_jobs import (
@@ -32,6 +33,7 @@ except ImportError:
         _summary_is_due,
         _unique_active_user_ids,
         run_hourly_job,
+        run_user_summi_now,
     )
 
 
@@ -216,6 +218,197 @@ class SummiJobsTest(unittest.TestCase):
                 for table, data, _filters in supabase.patch_calls
             )
         )
+
+    def test_run_user_summi_now_skips_without_active_subscription(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            summi_sender_instance="Summi",
+            openai_model_summary="gpt-4o-mini",
+            openai_tts_model="gpt-4o-mini-tts",
+            openai_tts_voice="alloy",
+        )
+        profile = {
+            "id": "user-1",
+            "numero": "5562999999999",
+            "ultimo_summi_em": "2026-03-05T09:00:00+00:00",
+            "onboarding_completed": True,
+            "Summi em Audio?": False,
+            "Apaga Mensagens Não Importantes Automaticamente?": "nao",
+        }
+
+        class _SupabaseFake:
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "profiles":
+                    return [profile]
+                if table == "subscribers":
+                    return []
+                return []
+
+            def patch(self, table, data, filters=None):
+                return None
+
+            def delete(self, table, filters=None):
+                return None
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        class _EvolutionFake:
+            def __init__(self) -> None:
+                self.sent_text = 0
+
+            def send_text(self, *args, **kwargs):
+                self.sent_text += 1
+
+        result = run_user_summi_now(settings, _SupabaseFake(), openai=object(), evolution=_EvolutionFake(), user_id="user-1")
+        self.assertEqual(result["status"], "skipped")
+        self.assertEqual(result["reason"], "no_active_subscription")
+        self.assertEqual(result["summary_sent"], False)
+
+    def test_run_user_summi_now_sends_fallback_when_no_priority_items(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            summi_sender_instance="Summi",
+            openai_model_summary="gpt-4o-mini",
+            openai_tts_model="gpt-4o-mini-tts",
+            openai_tts_voice="alloy",
+        )
+        profile = {
+            "id": "user-1",
+            "numero": "5562999999999",
+            "ultimo_summi_em": "2026-03-05T09:00:00+00:00",
+            "onboarding_completed": True,
+            "Summi em Audio?": False,
+            "Apaga Mensagens Não Importantes Automaticamente?": "nao",
+        }
+
+        class _SupabaseFake:
+            def __init__(self) -> None:
+                self.patch_calls = []
+
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "profiles":
+                    return [profile]
+                if table == "subscribers":
+                    return [{"id": "sub-1"}]
+                if table == "chats":
+                    return []
+                return []
+
+            def patch(self, table, data, filters=None):
+                self.patch_calls.append((table, data, filters))
+                return None
+
+            def delete(self, table, filters=None):
+                return None
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        class _EvolutionFake:
+            def __init__(self) -> None:
+                self.sent_messages = []
+
+            def send_text(self, _instance, _numero, message):
+                self.sent_messages.append(message)
+
+        supabase = _SupabaseFake()
+        evolution = _EvolutionFake()
+        with patch.dict(
+            run_user_summi_now.__globals__,
+            {"analyze_user_chats": lambda *args, **kwargs: {"success": True, "analyzed_count": 2}},
+        ):
+            result = run_user_summi_now(settings, supabase, openai=object(), evolution=evolution, user_id="user-1")
+
+        self.assertEqual(result["status"], "completed")
+        self.assertTrue(result["summary_sent"])
+        self.assertTrue(result["fallback_sent"])
+        self.assertEqual(result["analyzed_count"], 2)
+        self.assertEqual(len(evolution.sent_messages), 1)
+        self.assertTrue(
+            any(table == "profiles" and "ultimo_summi_em" in data for table, data, _filters in supabase.patch_calls)
+        )
+
+    def test_run_user_summi_now_runs_onboarding_and_cleanup(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            summi_sender_instance="Summi",
+            openai_model_summary="gpt-4o-mini",
+            openai_tts_model="gpt-4o-mini-tts",
+            openai_tts_voice="alloy",
+        )
+        profile = {
+            "id": "user-1",
+            "nome": "Lucas",
+            "numero": "5562999999999",
+            "ultimo_summi_em": None,
+            "onboarding_completed": False,
+            "Summi em Audio?": False,
+            "Apaga Mensagens Não Importantes Automaticamente?": "sim",
+        }
+
+        class _SupabaseFake:
+            def __init__(self) -> None:
+                self.patch_calls = []
+                self.delete_calls = []
+
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "profiles":
+                    return [profile]
+                if table == "subscribers":
+                    return [{"id": "sub-1"}]
+                if table == "chats":
+                    if select == "id":
+                        return [{"id": "chat-low-1"}, {"id": "chat-low-2"}]
+                    return [
+                        {
+                            "id": "chat-1",
+                            "nome": "Contato",
+                            "remote_jid": "5562911111111",
+                            "prioridade": "3",
+                            "contexto": "Precisa responder hoje",
+                            "criado_em": "2026-03-05T09:10:00+00:00",
+                            "analisado_em": "2026-03-05T09:12:00+00:00",
+                        }
+                    ]
+                return []
+
+            def patch(self, table, data, filters=None):
+                self.patch_calls.append((table, data, filters))
+                return None
+
+            def delete(self, table, filters=None):
+                self.delete_calls.append((table, filters))
+                return None
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        class _EvolutionFake:
+            def __init__(self) -> None:
+                self.sent_messages = []
+
+            def send_text(self, _instance, _numero, message):
+                self.sent_messages.append(message)
+
+        supabase = _SupabaseFake()
+        evolution = _EvolutionFake()
+        onboarding_calls = []
+
+        with patch.dict(
+            run_user_summi_now.__globals__,
+            {
+                "analyze_user_chats": lambda *args, **kwargs: {"success": True, "analyzed_count": 1},
+                "send_onboarding_messages": lambda *args, **kwargs: onboarding_calls.append(True),
+            },
+        ):
+            result = run_user_summi_now(settings, supabase, openai=object(), evolution=evolution, user_id="user-1")
+
+        self.assertEqual(result["status"], "completed")
+        self.assertTrue(result["onboarding_sent"])
+        self.assertEqual(result["low_priority_deleted"], 2)
+        self.assertEqual(len(onboarding_calls), 1)
+        self.assertTrue(any(table == "chats" for table, _filters in supabase.delete_calls))
 
 
 if __name__ == "__main__":

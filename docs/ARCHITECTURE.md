@@ -229,8 +229,8 @@ vps/summi_worker/
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `POST` | `/webhooks/evolution` | Ingestão de mensagens |
-| `POST` | `/webhooks/evolution-analyze` | Ingestão + análise |
-| `POST` | `/api/analyze-messages` | Análise manual (user autenticado) |
+| `POST` | `/webhooks/evolution-analyze` | Alias legado de ingestão (sem análise por mensagem) |
+| `POST` | `/api/analyze-messages` | Run-now do Summi da Hora (user autenticado) |
 | `POST` | `/internal/run-hourly` | Trigger job manual |
 | `GET` | `/health` | Health check |
 
