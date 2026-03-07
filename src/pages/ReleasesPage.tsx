@@ -7,6 +7,29 @@ import { Rocket, Zap, Bug, Sparkles, Clock } from 'lucide-react';
 
 const releases = [
     {
+        version: 'v1.2.3',
+        date: '7 de Março, 2026',
+        title: 'Lembrete de WhatsApp e Onboarding Pós-Checkout',
+        type: 'major',
+        changes: [
+            {
+                type: 'feature',
+                text: 'Lembrete Pós-Checkout: Agora você recebe uma mensagem no WhatsApp logo após o pagamento confirmando seu cadastro e com link para conectar sua conta.',
+                icon: Rocket
+            },
+            {
+                type: 'improvement',
+                text: 'Integração Direta: O webhook do Stripe agora se comunica diretamente com o Worker para garantir que você não perca tempo e comece a usar a Summi na hora.',
+                icon: Zap
+            },
+            {
+                type: 'improvement',
+                text: 'Fluxo de Onboarding Refinado: Mensagens de boas-vindas otimizadas para explicar melhor o poder da sua nova secretária invisível.',
+                icon: Sparkles
+            }
+        ]
+    },
+    {
         version: 'v1.2.2',
         date: '1 de Março, 2026',
         title: 'Blindagem do Summi da Hora e Resumo de Áudio',
@@ -181,8 +204,8 @@ const ReleasesPage = () => {
                                         return (
                                             <li key={i} className="flex items-start space-x-3">
                                                 <div className={`mt-0.5 p-1 rounded-full ${change.type === 'feature' ? 'bg-blue-100 text-blue-600' :
-                                                        change.type === 'improvement' ? 'bg-amber-100 text-amber-600' :
-                                                            'bg-red-100 text-red-600'
+                                                    change.type === 'improvement' ? 'bg-amber-100 text-amber-600' :
+                                                        'bg-red-100 text-red-600'
                                                     }`}>
                                                     <Icon className="w-3.5 h-3.5" />
                                                 </div>

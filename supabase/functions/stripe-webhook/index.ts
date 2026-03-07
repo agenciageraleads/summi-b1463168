@@ -347,6 +347,39 @@ const applyReferralRewardsIfEligible = async (
   return results;
 };
 
+const sendOnboardingReminder = async (phone: string, name?: string) => {
+  const workerUrl = Deno.env.get('SUMMI_WORKER_ANALYZE_URL');
+  const internalToken = Deno.env.get('INTERNAL_TOKEN');
+
+  if (!workerUrl) {
+    console.error("[STRIPE-WEBHOOK] SUMMI_WORKER_ANALYZE_URL não configurado");
+    return;
+  }
+
+  try {
+    const targetUrl = `${workerUrl.replace(/\/+$/, "").replace(/\/analyze$/, "")}/internal/send-onboarding-reminder`;
+    logWebhookEvent("Enviando lembrete de onboarding via worker", { targetUrl, phone });
+
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(internalToken ? { "x-internal-token": internalToken } : {}),
+      },
+      body: JSON.stringify({ phone, name }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logWebhookEvent("Erro ao enviar lembrete de onboarding", { status: response.status, error: errorText });
+    } else {
+      logWebhookEvent("Lembrete de onboarding enviado com sucesso");
+    }
+  } catch (error) {
+    logWebhookEvent("Exceção ao enviar lembrete de onboarding", { error: String(error) });
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -394,7 +427,7 @@ serve(async (req) => {
           const sessionMeta = (session.metadata || {}) as Record<string, string>;
           const email = session.customer_details?.email || session.customer_email;
           const phone = session.customer_details?.phone || session.phone_number_collection?.toString() || null;
-          
+
           // Extrair nome do custom_fields
           let customerName: string | null = null;
           if (session.custom_fields && session.custom_fields.length > 0) {
@@ -419,9 +452,9 @@ serve(async (req) => {
 
           if (!userId) {
             logWebhookEvent("Usuário não existe, criando conta via Admin API...", { email });
-            
+
             const tempPassword = generateTempPassword();
-            
+
             const { data: newUser, error: createUserError } = await supabaseClient.auth.admin.createUser({
               email: email,
               password: tempPassword,
@@ -549,6 +582,14 @@ serve(async (req) => {
                 });
               }
             }
+          }
+
+          // Enviar lembrete de onboarding (WhatsApp)
+          if (phone) {
+            // Executa em "background" (não bloqueia a resposta do webhook)
+            sendOnboardingReminder(phone, customerName || undefined).catch(e =>
+              logWebhookEvent("Erro na promise do lembrete", { error: String(e) })
+            );
           }
         }
         break;

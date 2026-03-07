@@ -1,5 +1,14 @@
 # Changelog Interno VPS
 
+## 2026-03-07 (v1.2.3)
+
+### Lembrete Automático de WhatsApp
+
+- Implementado envio automático de mensagem de boas-vindas logo após o checkout via Stripe.
+- Novo endpoint interno no worker `/internal/send-onboarding-reminder` para integração com serviços externos.
+- Integração direta no `stripe-webhook` do Supabase para disparo imediato pós-pagamento.
+- Bump de versão para `1.2.3`.
+
 ## 2026-03-07
 
 ### Deploy de Unificação e Fixes

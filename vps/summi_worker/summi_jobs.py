@@ -484,6 +484,26 @@ def send_onboarding_messages(evolution: EvolutionClient, instance: str, numero: 
         print(f"Error sending onboarding to {numero}: {e}")
 
 
+def send_checkout_reminder(evolution: EvolutionClient, instance: str, numero: str, nome: str):
+    """Envia mensagem lembrando o usuário de conectar o WhatsApp após o checkout."""
+    nome_salut = nome.split()[0] if nome else "usuário"
+    
+    link = "https://summi.gera-leads.com/settings"
+    msg = (
+        f"Olá, {nome_salut}! 🎉\n\n"
+        "Notamos que você finalizou seu cadastro na Summi! Para que eu possa começar a priorizar suas conversas e gerar seus resumos, você precisa conectar seu WhatsApp no nosso painel.\n\n"
+        "É rapidinho! Só escanear o QR Code aqui:\n"
+        f"{link}\n\n"
+        "Qualquer dúvida, é só chamar! 🚀"
+    )
+
+    try:
+        evolution.send_text(instance, numero, msg)
+        print(f"Checkout reminder sent to {numero}")
+    except Exception as e:
+        print(f"Error sending checkout reminder to {numero}: {e}")
+
+
 def run_user_summi_now(
     settings: Settings,
     supabase: SupabaseRest,

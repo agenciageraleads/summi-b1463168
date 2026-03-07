@@ -29,7 +29,13 @@ from .prompt_builders import (
 )
 from .redis_dedupe import RedisDedupe
 from .redis_queue import RedisQueueClient, run_now_result_key
-from .summi_jobs import analyze_user_chats, run_hourly_job, run_user_summi_now
+from .summi_jobs import (
+    analyze_user_chats,
+    run_daily_summary_job,
+    run_hourly_job,
+    run_user_summi_now,
+    send_checkout_reminder,
+)
 from .supabase_rest import SupabaseRest, to_postgrest_filter_eq
 
 
@@ -1031,6 +1037,40 @@ def internal_run_hourly(x_internal_token: Optional[str] = Header(default=None)) 
     evolution = _evolution(settings)
 
     return run_hourly_job(settings, supabase, openai, evolution)
+
+
+class OnboardingReminderRequest(BaseModel):
+    phone: str
+    name: Optional[str] = None
+
+
+@app.post("/internal/send-onboarding-reminder")
+def internal_send_onboarding_reminder(
+    req_data: OnboardingReminderRequest,
+    x_internal_token: Optional[str] = Header(default=None)
+) -> Dict[str, Any]:
+    """
+    Envia manualmente uma mensagem de lembrete de onboarding (pós-checkout).
+    """
+    internal_token = os.getenv("INTERNAL_TOKEN")
+    if internal_token and x_internal_token != internal_token:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    settings = _settings()
+    evolution = _evolution(settings)
+    
+    numero = "".join(c for c in req_data.phone if c.isdigit())
+    if not numero:
+        raise HTTPException(status_code=400, detail="invalid_phone")
+
+    send_checkout_reminder(
+        evolution, 
+        settings.summi_sender_instance, 
+        numero, 
+        req_data.name or ""
+    )
+    
+    return {"success": True}
 
 
 async def _handle_evolution_webhook(
