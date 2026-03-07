@@ -33,6 +33,7 @@ class _FakeResponse:
         self._payload = payload
         self.status_code = status_code
         self.text = ""
+        self.content = b""
         self.ok = 200 <= status_code < 300
 
     def json(self) -> dict[str, object]:
@@ -99,6 +100,41 @@ class OpenAIClientTranscriptionTest(unittest.TestCase):
         self.assertEqual(result.text, "audio curto")
         self.assertEqual(result.duration_seconds, 8.0)
         self.assertIsNone(result.average_confidence)
+
+    def test_chat_text_response_exposes_usage(self) -> None:
+        client = OpenAIClient("key")
+
+        with patch(
+            REQUESTS_POST_TARGET,
+            return_value=_FakeResponse(
+                {
+                    "choices": [{"message": {"content": "Resumo pronto"}}],
+                    "usage": {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150},
+                }
+            ),
+        ):
+            result = client.chat_text_response(
+                model="gpt-4o-mini",
+                system="system",
+                user="user",
+                temperature=0.2,
+            )
+
+        self.assertEqual(result.text, "Resumo pronto")
+        self.assertIsNotNone(result.usage)
+        self.assertEqual(result.usage.prompt_tokens, 120)
+        self.assertEqual(result.usage.completion_tokens, 30)
+        self.assertEqual(result.usage.total_tokens, 150)
+
+    def test_tts_mp3_response_tracks_char_count(self) -> None:
+        client = OpenAIClient("key")
+
+        with patch(REQUESTS_POST_TARGET, return_value=_FakeResponse({}, status_code=200)) as post:
+            post.return_value.content = b"fake-mp3"
+            result = client.tts_mp3_response("gpt-4o-mini-tts", "alloy", "Resumo em audio")
+
+        self.assertEqual(result.audio_bytes, b"fake-mp3")
+        self.assertEqual(result.char_count, len("Resumo em audio"))
 
 
 if __name__ == "__main__":

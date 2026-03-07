@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { normalizePlanType, type PlanType } from '@/lib/subscriptionPlans';
+import { getLeadContext } from '@/lib/growthTracking';
 
 export interface Subscription {
   subscribed: boolean;
@@ -14,7 +15,14 @@ export interface Subscription {
   cancel_at_period_end: boolean;
 }
 
+type ManageSubscriptionOptions = {
+  intent?: 'manage' | 'cancel';
+  cancelReason?: string;
+  cancelReasonDetails?: string;
+};
+
 export const createCheckoutSession = async (planType: 'monthly' | 'annual', referralCode?: string) => {
+  const leadContext = getLeadContext();
   const { data: sessionData } = await supabase.auth.getSession();
   const headers: Record<string, string> = {};
 
@@ -24,7 +32,16 @@ export const createCheckoutSession = async (planType: 'monthly' | 'annual', refe
 
   const { data, error } = await supabase.functions.invoke('create-checkout', {
     headers,
-    body: { planType, ...(referralCode ? { referralCode } : {}) },
+    body: {
+      planType,
+      leadKey: leadContext.leadKey,
+      source: leadContext.source,
+      medium: leadContext.medium,
+      campaign: leadContext.campaign,
+      content: leadContext.content,
+      term: leadContext.term,
+      referralCode: referralCode ?? leadContext.referralCode ?? undefined,
+    },
   });
 
   if (error) throw error;
@@ -93,7 +110,7 @@ export const useSubscription = () => {
   };
 
   // Gerenciar assinatura via portal do cliente (requer login)
-  const manageSubscription = async () => {
+  const manageSubscription = async (options: ManageSubscriptionOptions = {}) => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) throw new Error('Usuário não autenticado');
@@ -101,6 +118,11 @@ export const useSubscription = () => {
       const { data, error } = await supabase.functions.invoke('customer-portal', {
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: {
+          intent: options.intent ?? 'manage',
+          cancelReason: options.cancelReason,
+          cancelReasonDetails: options.cancelReasonDetails,
         },
       });
 

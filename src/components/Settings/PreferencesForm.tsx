@@ -21,14 +21,15 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
   onSave,
   isUpdating,
 }) => {
+  const summiAudioDisabled = true;
   const [formData, setFormData] = useState({
     transcreve_audio_recebido: profile.transcreve_audio_recebido ?? true,
     transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
-    resume_audio: profile.resume_audio ?? false,
-    segundos_para_resumir: profile.segundos_para_resumir ?? 45,
+    resume_audio: profile.resume_audio ?? true,
+    segundos_para_resumir: profile.segundos_para_resumir ?? 90,
     send_on_reaction: profile.send_on_reaction ?? false,
     send_private_only: profile.send_private_only ?? false,
-    'Summi em Audio?': profile['Summi em Audio?'] ?? false,
+    'Summi em Audio?': false,
     apenas_horario_comercial: profile.apenas_horario_comercial ?? true,
     summi_frequencia: profile.summi_frequencia || '1h',
   });
@@ -37,11 +38,11 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
     setFormData({
       transcreve_audio_recebido: profile.transcreve_audio_recebido ?? true,
       transcreve_audio_enviado: profile.transcreve_audio_enviado ?? true,
-      resume_audio: profile.resume_audio ?? false,
-      segundos_para_resumir: profile.segundos_para_resumir ?? 45,
+      resume_audio: profile.resume_audio ?? true,
+      segundos_para_resumir: profile.segundos_para_resumir ?? 90,
       send_on_reaction: profile.send_on_reaction ?? false,
       send_private_only: profile.send_private_only ?? false,
-      'Summi em Audio?': profile['Summi em Audio?'] ?? false,
+      'Summi em Audio?': false,
       apenas_horario_comercial: profile.apenas_horario_comercial ?? true,
       summi_frequencia: profile.summi_frequencia || '1h',
     });
@@ -70,7 +71,7 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
             <AlertDescription>
               <ul className="list-disc space-y-1 pl-5">
                 <li>
-                  <span className="font-medium">Summi em Áudio</span> envia o resumo também em áudio (além do texto).
+                  <span className="font-medium">Summi em Áudio</span> está pausado na onda 1 para segurar custo.
                 </li>
                 <li>
                   <span className="font-medium">Horário Comercial</span> afeta o envio automático do resumo. Fora do horário, a Summi não envia o “Summi da Hora”.
@@ -84,14 +85,16 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
             <div className="space-y-0.5">
               <Label>Summi em Áudio</Label>
               <p className="text-sm text-muted-foreground">
-                Além do texto, você recebe o “Summi da Hora” em áudio (bom para ouvir rapidamente).
+                Recurso temporariamente pausado para reduzir custo sem afetar os automáticos de áudio.
               </p>
             </div>
             <Switch
               checked={formData['Summi em Audio?']}
-              onCheckedChange={(checked) => handleInputChange('Summi em Audio?', checked)}
+              onCheckedChange={() => undefined}
+              disabled={summiAudioDisabled}
             />
           </div>
+          <p className="text-xs text-amber-600">Em breve: o Summi em áudio volta quando o custo estiver estabilizado.</p>
 
           <Separator />
 
@@ -157,7 +160,7 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
                   <span className="font-medium">Automático</span>: a Summi transcreve assim que o áudio chega (recebido/enviado).
                 </li>
                 <li>
-                  <span className="font-medium">Por reação ⚡</span>: a Summi só transcreve quando você reagir com ⚡ ao áudio (economiza processamento).
+                  <span className="font-medium">Por reação ⚡</span>: a Summi só transcreve quando você reagir com ⚡ ao áudio.
                 </li>
                 <li>
                   <span className="font-medium">Enviar no privado</span>: ideal para grupos — você recebe no seu WhatsApp privado, citando a mensagem original.
@@ -272,6 +275,7 @@ export const PreferencesForm: React.FC<PreferencesFormProps> = ({
                 <Info className="w-3.5 h-3.5 text-slate-400" />
                 Áudios com mais de <span className="font-bold text-slate-700 underline decoration-primary/30">{formData.segundos_para_resumir} segundos</span> receberão um resumo.
               </p>
+              <p className="text-xs text-slate-500">Padrão recomendado da onda 1: 90 segundos.</p>
             </div>
           )}
 

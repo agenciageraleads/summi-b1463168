@@ -121,3 +121,9 @@ verify_jwt = true
 
 [functions.admin-cleanup-admins]
 verify_jwt = true
+
+[functions.admin-billing-costs]
+verify_jwt = true
+
+[functions.track-growth-event]
+verify_jwt = false

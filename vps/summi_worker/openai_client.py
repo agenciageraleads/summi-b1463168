@@ -29,6 +29,37 @@ class TranscriptionResult:
     average_confidence: Optional[float] = None
 
 
+@dataclass(frozen=True)
+class OpenAIUsage:
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class ChatJsonResult:
+    data: Dict[str, Any]
+    usage: Optional[OpenAIUsage]
+
+
+@dataclass(frozen=True)
+class ChatTextResult:
+    text: str
+    usage: Optional[OpenAIUsage]
+
+
+@dataclass(frozen=True)
+class TTSResult:
+    audio_bytes: bytes
+    char_count: int
+
+
+@dataclass(frozen=True)
+class VisionResult:
+    text: str
+    usage: Optional[OpenAIUsage]
+
+
 def _extract_json_object(text: str) -> Dict[str, Any]:
     """
     Best-effort extraction of a JSON object from a model response.
@@ -66,6 +97,20 @@ def _extract_logprob_values(node: Any) -> list[float]:
     return values
 
 
+def _extract_usage(payload: Dict[str, Any]) -> Optional[OpenAIUsage]:
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    prompt_tokens = int(_to_float(usage.get("prompt_tokens")) or 0)
+    completion_tokens = int(_to_float(usage.get("completion_tokens")) or 0)
+    total_tokens = int(_to_float(usage.get("total_tokens")) or (prompt_tokens + completion_tokens))
+    return OpenAIUsage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
+    )
+
+
 class OpenAIClient:
     def __init__(self, api_key: str):
         self._api_key = api_key
@@ -76,7 +121,7 @@ class OpenAIClient:
             "Content-Type": "application/json",
         }
 
-    def chat_json(self, model: str, system: str, user: str, temperature: float = 0.2) -> Dict[str, Any]:
+    def chat_json_response(self, model: str, system: str, user: str, temperature: float = 0.2) -> ChatJsonResult:
         url = "https://api.openai.com/v1/chat/completions"
         payload = {
             "model": model,
@@ -91,9 +136,12 @@ class OpenAIClient:
             raise OpenAIError(f"chat failed: {resp.status_code} {resp.text}")
         data = resp.json()
         text = data["choices"][0]["message"].get("content", "")
-        return _extract_json_object(text)
+        return ChatJsonResult(data=_extract_json_object(text), usage=_extract_usage(data))
 
-    def chat_text(self, model: str, system: str, user: str, temperature: float = 0.4) -> str:
+    def chat_json(self, model: str, system: str, user: str, temperature: float = 0.2) -> Dict[str, Any]:
+        return self.chat_json_response(model=model, system=system, user=user, temperature=temperature).data
+
+    def chat_text_response(self, model: str, system: str, user: str, temperature: float = 0.4) -> ChatTextResult:
         url = "https://api.openai.com/v1/chat/completions"
         payload = {
             "model": model,
@@ -107,15 +155,24 @@ class OpenAIClient:
         if not resp.ok:
             raise OpenAIError(f"chat failed: {resp.status_code} {resp.text}")
         data = resp.json()
-        return data["choices"][0]["message"].get("content", "").strip()
+        return ChatTextResult(
+            text=data["choices"][0]["message"].get("content", "").strip(),
+            usage=_extract_usage(data),
+        )
 
-    def tts_mp3(self, model: str, voice: str, text: str) -> bytes:
+    def chat_text(self, model: str, system: str, user: str, temperature: float = 0.4) -> str:
+        return self.chat_text_response(model=model, system=system, user=user, temperature=temperature).text
+
+    def tts_mp3_response(self, model: str, voice: str, text: str) -> TTSResult:
         url = "https://api.openai.com/v1/audio/speech"
         payload = {"model": model, "voice": voice, "input": text, "format": "mp3"}
         resp = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=120)
         if not resp.ok:
             raise OpenAIError(f"tts failed: {resp.status_code} {resp.text}")
-        return resp.content
+        return TTSResult(audio_bytes=resp.content, char_count=len(text))
+
+    def tts_mp3(self, model: str, voice: str, text: str) -> bytes:
+        return self.tts_mp3_response(model=model, voice=voice, text=text).audio_bytes
 
     def _detect_audio_upload_meta(self, audio_bytes: bytes, default_filename: str = "audio.mp3") -> Tuple[str, str]:
         """
@@ -226,7 +283,12 @@ class OpenAIClient:
         result = self.transcribe_audio(mp3_bytes, filename=filename)
         return result.text, result.duration_seconds
 
-    def describe_image_base64(self, model: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
+    def describe_image_base64_response(
+        self,
+        model: str,
+        image_bytes: bytes,
+        mime_type: str = "image/jpeg",
+    ) -> VisionResult:
         mime_type = self._detect_image_mime(image_bytes, default_mime=mime_type)
         b64 = base64.b64encode(image_bytes).decode("ascii")
         data_url = f"data:{mime_type};base64,{b64}"
@@ -254,4 +316,10 @@ class OpenAIClient:
         if not resp.ok:
             raise OpenAIError(f"vision failed: {resp.status_code} {resp.text}")
         data = resp.json()
-        return data["choices"][0]["message"].get("content", "").strip()
+        return VisionResult(
+            text=data["choices"][0]["message"].get("content", "").strip(),
+            usage=_extract_usage(data),
+        )
+
+    def describe_image_base64(self, model: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
+        return self.describe_image_base64_response(model=model, image_bytes=image_bytes, mime_type=mime_type).text

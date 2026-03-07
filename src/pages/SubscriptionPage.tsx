@@ -1,7 +1,11 @@
 
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Check, Crown, Calendar, CreditCard, AlertTriangle } from 'lucide-react';
@@ -11,6 +15,10 @@ import { getPlanActivePriceLabel, getPlanLabel, normalizePlanType } from '@/lib/
 const SubscriptionPage = () => {
   const { subscription, isLoading, createCheckout, manageSubscription } = useSubscription();
   const { toast } = useToast();
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('caro_para_momento');
+  const [cancelReasonDetails, setCancelReasonDetails] = useState('');
+  const [isCancelLoading, setIsCancelLoading] = useState(false);
   const currentPlanType = normalizePlanType(subscription.plan_type, subscription.stripe_price_id);
   const currentPlanLabel = getPlanLabel(currentPlanType);
   const currentPlanPriceLabel = getPlanActivePriceLabel(currentPlanType);
@@ -36,6 +44,31 @@ const SubscriptionPage = () => {
         description: 'Não foi possível abrir o portal de gerenciamento',
         variant: 'destructive'
       });
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    try {
+      setIsCancelLoading(true);
+      await manageSubscription({
+        intent: 'cancel',
+        cancelReason,
+        cancelReasonDetails,
+      });
+      setIsCancelDialogOpen(false);
+      setCancelReasonDetails('');
+      toast({
+        title: 'Portal aberto',
+        description: 'Seu motivo foi registrado. Se quiser, conclua o cancelamento no Stripe.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível abrir o portal de cancelamento',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsCancelLoading(false);
     }
   };
 
@@ -96,8 +129,8 @@ const SubscriptionPage = () => {
                 <div className="flex items-start space-x-3">
                   <Check className="w-4 h-4 text-summi-green mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-summi-gray-900 text-sm">Resumo em áudio</p>
-                    <p className="text-xs text-summi-gray-600">Ouça o resumo das conversas importantes</p>
+                    <p className="font-medium text-summi-gray-900 text-sm">Resumo de áudios longos</p>
+                    <p className="text-xs text-summi-gray-600">Condense áudios extensos sem perder o contexto</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
@@ -185,6 +218,13 @@ const SubscriptionPage = () => {
               >
                 <CreditCard className="w-4 h-4 mr-2" />
                 Gerenciar Assinatura
+              </Button>
+              <Button
+                onClick={() => setIsCancelDialogOpen(true)}
+                variant="ghost"
+                className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                Cancelar Assinatura
               </Button>
             </CardContent>
           </Card>
@@ -313,6 +353,62 @@ const SubscriptionPage = () => {
             </CardContent>
           </Card>
         )}
+
+        <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Antes de cancelar</DialogTitle>
+              <DialogDescription>
+                Registre o principal motivo. Isso ajuda a melhorar o produto e medir churn com mais precisão.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-summi-gray-900">Motivo principal</p>
+                <Select value={cancelReason} onValueChange={setCancelReason}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um motivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="caro_para_momento">Ficou caro para este momento</SelectItem>
+                    <SelectItem value="nao_uso_frequente">Não estou usando com frequência</SelectItem>
+                    <SelectItem value="faltou_recurso">Faltou algum recurso importante</SelectItem>
+                    <SelectItem value="problema_tecnico">Tive problema técnico</SelectItem>
+                    <SelectItem value="outro">Outro motivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-summi-gray-900">Detalhes opcionais</p>
+                <Textarea
+                  value={cancelReasonDetails}
+                  onChange={(e) => setCancelReasonDetails(e.target.value)}
+                  placeholder="Se quiser, explique melhor o contexto."
+                  rows={4}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsCancelDialogOpen(false)}
+                disabled={isCancelLoading}
+              >
+                Voltar
+              </Button>
+              <Button
+                onClick={handleCancelSubscription}
+                disabled={isCancelLoading}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {isCancelLoading ? 'Abrindo portal...' : 'Continuar para cancelamento'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

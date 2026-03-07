@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { findLatestLeadKeyForUser, insertGrowthEvent } from "../_shared/growth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,6 +96,47 @@ const findUserIdByEmail = async (supabaseClient: any, email: string) => {
 
   const user = usersData.users.find((u: any) => u.email === email);
   return user?.id || null;
+};
+
+const trackGrowthForUser = async (
+  supabaseClient: any,
+  {
+    userId,
+    eventType,
+    dedupeKey,
+    planContext,
+    metadata,
+    sessionMeta,
+    customer,
+  }: {
+    userId: string;
+    eventType: string;
+    dedupeKey?: string | null;
+    planContext?: string | null;
+    metadata?: Record<string, unknown>;
+    sessionMeta?: Record<string, string>;
+    customer?: Stripe.Customer | null;
+  },
+) => {
+  const leadKey =
+    sessionMeta?.lead_key ||
+    customer?.metadata?.lead_key ||
+    (await findLatestLeadKeyForUser(supabaseClient, userId));
+
+  await insertGrowthEvent(supabaseClient, {
+    eventType,
+    dedupeKey: dedupeKey ?? null,
+    userId,
+    leadKey,
+    planContext: planContext ?? sessionMeta?.plan_type ?? null,
+    source: sessionMeta?.source ?? customer?.metadata?.source ?? null,
+    medium: sessionMeta?.medium ?? customer?.metadata?.medium ?? null,
+    campaign: sessionMeta?.campaign ?? customer?.metadata?.campaign ?? null,
+    content: sessionMeta?.content ?? customer?.metadata?.content ?? null,
+    term: sessionMeta?.term ?? customer?.metadata?.term ?? null,
+    referralCode: sessionMeta?.referral_code ?? customer?.metadata?.referral_code ?? null,
+    metadata,
+  });
 };
 
 // Gera senha temporária aleatória
@@ -410,7 +452,16 @@ serve(async (req) => {
           if (customerId) {
             // Atualizar metadata do customer no Stripe com o supabase_user_id
             await stripe.customers.update(customerId, {
-              metadata: { supabase_user_id: userId },
+              metadata: {
+                supabase_user_id: userId,
+                ...(sessionMeta.lead_key ? { lead_key: sessionMeta.lead_key } : {}),
+                ...(sessionMeta.source ? { source: sessionMeta.source } : {}),
+                ...(sessionMeta.medium ? { medium: sessionMeta.medium } : {}),
+                ...(sessionMeta.campaign ? { campaign: sessionMeta.campaign } : {}),
+                ...(sessionMeta.content ? { content: sessionMeta.content } : {}),
+                ...(sessionMeta.term ? { term: sessionMeta.term } : {}),
+                ...(sessionMeta.referral_code ? { referral_code: sessionMeta.referral_code } : {}),
+              },
             });
 
             const subscriptions = await stripe.subscriptions.list({
@@ -440,6 +491,44 @@ serve(async (req) => {
 
               logWebhookEvent("Assinatura ativada com sucesso", { email, priceId, status: subscription.status });
 
+              const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
+
+              if (subscription.status === "trialing") {
+                await trackGrowthForUser(supabaseClient, {
+                  userId,
+                  eventType: "trial_started",
+                  dedupeKey: `trial_started:${subscription.id}`,
+                  planContext: sessionMeta.plan_type ?? null,
+                  sessionMeta,
+                  customer,
+                  metadata: {
+                    stripe_customer_id: customerId,
+                    stripe_subscription_id: subscription.id,
+                    stripe_price_id: priceId,
+                    trial_ends_at: subscription.trial_end
+                      ? new Date(subscription.trial_end * 1000).toISOString()
+                      : null,
+                  },
+                });
+              }
+
+              if (subscription.status === "active") {
+                await trackGrowthForUser(supabaseClient, {
+                  userId,
+                  eventType: "converted_paid",
+                  dedupeKey: `converted_paid:${subscription.id}`,
+                  planContext: sessionMeta.plan_type ?? null,
+                  sessionMeta,
+                  customer,
+                  metadata: {
+                    stripe_customer_id: customerId,
+                    stripe_subscription_id: subscription.id,
+                    stripe_price_id: priceId,
+                    source_event: "checkout.session.completed",
+                  },
+                });
+              }
+
               try {
                 const referralRewardResult = await applyReferralRewardsIfEligible(supabaseClient, stripe, {
                   session,
@@ -468,6 +557,7 @@ serve(async (req) => {
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
+        const previousAttributes = (event.data as any)?.previous_attributes ?? {};
         logWebhookEvent("Processando atualização de assinatura", {
           subscriptionId: subscription.id,
           status: subscription.status
@@ -509,6 +599,56 @@ serve(async (req) => {
             email: customer.email,
             status: subscription.status
           });
+
+          if (subscription.status === "active") {
+            await trackGrowthForUser(supabaseClient, {
+              userId,
+              eventType: "converted_paid",
+              dedupeKey: `converted_paid:${subscription.id}`,
+              customer,
+              metadata: {
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscription.id,
+                stripe_price_id: priceId,
+                previous_status: previousAttributes?.status ?? null,
+                source_event: event.type,
+              },
+            });
+          }
+
+          if (subscription.status === "past_due") {
+            await trackGrowthForUser(supabaseClient, {
+              userId,
+              eventType: "past_due",
+              dedupeKey: `past_due:${subscription.id}:${subscription.current_period_end}`,
+              customer,
+              metadata: {
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscription.id,
+                stripe_price_id: priceId,
+                source_event: event.type,
+              },
+            });
+          }
+
+          if (
+            event.type === "customer.subscription.deleted" ||
+            ["canceled", "unpaid", "incomplete_expired"].includes(subscription.status)
+          ) {
+            await trackGrowthForUser(supabaseClient, {
+              userId,
+              eventType: "subscription_canceled",
+              dedupeKey: `subscription_canceled:${subscription.id}:${subscription.status}:${subscription.current_period_end}`,
+              customer,
+              metadata: {
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscription.id,
+                stripe_price_id: priceId,
+                source_event: event.type,
+                cancel_at_period_end: subscription.cancel_at_period_end,
+              },
+            });
+          }
         }
         break;
       }
@@ -548,6 +688,59 @@ serve(async (req) => {
             }, { onConflict: 'user_id' });
 
             logWebhookEvent("Data de renovação atualizada", { email: customer.email });
+
+            await trackGrowthForUser(supabaseClient, {
+              userId,
+              eventType: "converted_paid",
+              dedupeKey: `converted_paid:${subscription.id}`,
+              customer,
+              metadata: {
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscription.id,
+                stripe_price_id: subscription.items.data[0]?.price?.id ?? null,
+                invoice_id: invoice.id,
+                source_event: event.type,
+              },
+            });
+          }
+        }
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        logWebhookEvent("Pagamento de fatura falhou", { invoiceId: invoice.id });
+
+        if (invoice.customer && invoice.subscription) {
+          const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer.id;
+          const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
+
+          if (customer.email) {
+            let userId = await findUserIdByEmail(supabaseClient, customer.email);
+
+            if (!userId && customer.metadata?.supabase_user_id) {
+              userId = customer.metadata.supabase_user_id;
+            }
+
+            if (userId) {
+              const subscription = await stripe.subscriptions.retrieve(
+                typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription.id,
+              );
+
+              await trackGrowthForUser(supabaseClient, {
+                userId,
+                eventType: "past_due",
+                dedupeKey: `past_due:${subscription.id}:${invoice.id}`,
+                customer,
+                metadata: {
+                  stripe_customer_id: customerId,
+                  stripe_subscription_id: subscription.id,
+                  stripe_price_id: subscription.items.data[0]?.price?.id ?? null,
+                  invoice_id: invoice.id,
+                  source_event: event.type,
+                },
+              });
+            }
           }
         }
         break;

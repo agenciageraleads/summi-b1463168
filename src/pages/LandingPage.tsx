@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +9,21 @@ import { Link } from "react-router-dom";
 import { createCheckoutSession } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
 import { SEO } from "@/components/SEO";
+import { trackGrowthEvent } from "@/lib/growthTracking";
 
 const LandingPage = () => {
   const { toast } = useToast();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    void trackGrowthEvent('landing_view', {
+      oncePerSessionKey: `landing:${window.location.pathname}`,
+      metadata: {
+        path: window.location.pathname,
+        variant: 'main',
+      },
+    });
+  }, []);
 
   const handleCheckout = async (planType: 'monthly' | 'annual') => {
     try {

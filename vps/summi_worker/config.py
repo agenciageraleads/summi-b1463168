@@ -75,6 +75,7 @@ class Settings:
     daily_summary_timezone: str
     low_priority_cleanup_days: int
     redis_url: str | None
+    require_redis: bool
     webhook_dedupe_ttl_seconds: int
     enable_analysis_queue: bool
     enable_summary_queue: bool
@@ -82,6 +83,14 @@ class Settings:
     queue_summary_name: str
     run_now_wait_seconds: int
     run_now_result_ttl_seconds: int
+    enable_image_description: bool
+    enable_summi_audio: bool
+    default_seconds_to_summarize: int
+    paid_ai_soft_cap_brl: float
+    paid_ai_hard_cap_brl: float
+    trial_ai_soft_cap_brl: float
+    trial_ai_hard_cap_brl: float
+    usd_brl_exchange_rate: float
 
     # Blog auto-posting
     blog_auto_post_enabled: bool
@@ -91,7 +100,7 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    return Settings(
+    settings = Settings(
         supabase_url=_must("SUPABASE_URL").rstrip("/"),
         supabase_service_role_key=_must("SUPABASE_SERVICE_ROLE_KEY"),
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY"),
@@ -118,11 +127,12 @@ def load_settings() -> Settings:
         business_hours_end=_int("BUSINESS_HOURS_END", 18),
         ignore_remote_jid=os.getenv("IGNORE_REMOTE_JID", "556293984600"),
         enable_hourly_job=_bool("ENABLE_HOURLY_JOB", True),
-        enable_daily_job=_bool("ENABLE_DAILY_JOB", True),
+        enable_daily_job=_bool("ENABLE_DAILY_JOB", False),
         daily_summary_hour_utc=_int("DAILY_SUMMARY_HOUR_UTC", 19),
         daily_summary_timezone=os.getenv("DAILY_SUMMARY_TIMEZONE", "UTC"),
         low_priority_cleanup_days=_int("LOW_PRIORITY_CLEANUP_DAYS", 0),
         redis_url=os.getenv("REDIS_URL"),
+        require_redis=_bool("REQUIRE_REDIS", False),
         webhook_dedupe_ttl_seconds=_webhook_dedupe_ttl_seconds(),
         enable_analysis_queue=_bool("ENABLE_ANALYSIS_QUEUE", False),
         enable_summary_queue=_bool("ENABLE_SUMMARY_QUEUE", False),
@@ -130,8 +140,24 @@ def load_settings() -> Settings:
         queue_summary_name=os.getenv("QUEUE_SUMMARY_NAME", "summi:queue:summary"),
         run_now_wait_seconds=_int("RUN_NOW_WAIT_SECONDS", 12),
         run_now_result_ttl_seconds=_int("RUN_NOW_RESULT_TTL_SECONDS", 600),
+        enable_image_description=_bool("ENABLE_IMAGE_DESCRIPTION", False),
+        enable_summi_audio=_bool("ENABLE_SUMMI_AUDIO", False),
+        default_seconds_to_summarize=_int("DEFAULT_SECONDS_TO_SUMMARIZE", 90),
+        paid_ai_soft_cap_brl=_float("PAID_AI_SOFT_CAP_BRL", 4.0),
+        paid_ai_hard_cap_brl=_float("PAID_AI_HARD_CAP_BRL", 5.0),
+        trial_ai_soft_cap_brl=_float("TRIAL_AI_SOFT_CAP_BRL", 1.0),
+        trial_ai_hard_cap_brl=_float("TRIAL_AI_HARD_CAP_BRL", 1.5),
+        usd_brl_exchange_rate=_float("USD_BRL_EXCHANGE_RATE", 5.8),
         blog_auto_post_enabled=_bool("BLOG_AUTO_POST_ENABLED", False),
         blog_post_hour=_int("BLOG_POST_HOUR", 9),
         unsplash_access_key=os.getenv("UNSPLASH_ACCESS_KEY", ""),
         site_url=os.getenv("SITE_URL", "https://summi.gera-leads.com"),
     )
+
+    if settings.require_redis and not settings.redis_url:
+        raise RuntimeError("REDIS_URL is required when REQUIRE_REDIS=true")
+
+    if (settings.enable_analysis_queue or settings.enable_summary_queue) and not settings.redis_url:
+        raise RuntimeError("REDIS_URL is required when queue support is enabled")
+
+    return settings

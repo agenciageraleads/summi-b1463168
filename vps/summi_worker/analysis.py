@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from .openai_client import OpenAIClient
+from .openai_client import OpenAIClient, OpenAIUsage
 from .prompt_builders import (
     SUMMI_HOUR_FALLBACK_TEXT,
     build_summi_audio_prompt,
@@ -60,7 +60,7 @@ def analyze_single_chat(
     temas_urgentes: str | None,
     temas_importantes: str | None,
     blacklist: str | None,
-) -> AnalyzedChat:
+) -> tuple[AnalyzedChat, Optional[OpenAIUsage]]:
     # Conversa e um JSONB array no banco. Mantemos como string para o prompt.
     conversa_text = _trim_conversa_for_prompt(conversa)
 
@@ -103,7 +103,8 @@ def analyze_single_chat(
         f"Ultima Mensagem: {modificado_em}\n"
     )
 
-    out = openai.chat_json(model=model, system=system, user=user, temperature=0.2)
+    response = openai.chat_json_response(model=model, system=system, user=user, temperature=0.2)
+    out = response.data
 
     # Normalizacao defensiva
     prioridade = str(out.get("Prioridade", "0")).strip()
@@ -116,13 +117,16 @@ def analyze_single_chat(
     telefone = str(out.get("Telefone", remote_jid)).strip()
     nome_out = str(out.get("Nome", nome)).strip() or nome
 
-    return AnalyzedChat(
-        chat_id=str(out.get("id", chat_id)).strip() or chat_id,
-        prioridade=prioridade,
-        nome=nome_out,
-        telefone=telefone,
-        contexto=contexto,
-        horario=horario,
+    return (
+        AnalyzedChat(
+            chat_id=str(out.get("id", chat_id)).strip() or chat_id,
+            prioridade=prioridade,
+            nome=nome_out,
+            telefone=telefone,
+            contexto=contexto,
+            horario=horario,
+        ),
+        response.usage,
     )
 
 
@@ -179,9 +183,21 @@ def build_audio_script(
     *,
     summary_text: str,
 ) -> str:
+    return build_audio_script_with_usage(openai, model, summary_text=summary_text)[0]
+
+
+def build_audio_script_with_usage(
+    openai: OpenAIClient,
+    model: str,
+    *,
+    summary_text: str,
+) -> tuple[str, Optional[OpenAIUsage]]:
     fallback_script = render_summi_hour_audio_fallback(summary_text)
     if fallback_script:
-        return fallback_script
+        return fallback_script, None
 
     system, user = build_summi_audio_prompt(summary_text)
-    return openai.chat_text(model=model, system=system, user=user, temperature=0.2)
+    if hasattr(openai, "chat_text_response"):
+        response = openai.chat_text_response(model=model, system=system, user=user, temperature=0.2)
+        return response.text, response.usage
+    return openai.chat_text(model=model, system=system, user=user, temperature=0.2), None

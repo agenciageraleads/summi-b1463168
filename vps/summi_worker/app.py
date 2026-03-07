@@ -13,11 +13,13 @@ from typing import Any, Dict, Optional, Tuple
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 
+from .budget_guard import get_user_budget_state
 from .config import Settings, load_settings
-from .cost_tracking import log_transcription_cost
+from .cost_tracking import log_chat_cost, log_transcription_cost
 from .evolution_client import EvolutionClient, EvolutionError
 from .evolution_webhook import normalize_message_event
-from .openai_client import OpenAIClient, OpenAIError, TranscriptionResult
+from .growth_tracking import record_trial_budget_events
+from .openai_client import OpenAIClient, OpenAIError, OpenAIUsage, TranscriptionResult
 from .prompt_builders import (
     build_transcription_hint_terms,
     build_transcription_prompt,
@@ -41,6 +43,11 @@ if not logger.handlers:
 
 _RUN_NOW_RESULT_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _RUN_NOW_RESULT_CACHE_LOCK = threading.Lock()
+
+
+@app.on_event("startup")
+def validate_runtime_settings() -> None:
+    load_settings()
 
 
 def _settings() -> Settings:
@@ -398,6 +405,49 @@ def _safe_positive_int(value: Any) -> Optional[int]:
     return parsed if parsed > 0 else None
 
 
+def _should_skip_audio_summary_for_budget(
+    settings: Settings,
+    supabase: SupabaseRest,
+    *,
+    user_id: str,
+) -> tuple[bool, Optional[str]]:
+    try:
+        state = get_user_budget_state(settings, supabase, user_id=user_id)
+    except Exception as exc:
+        logger.warning("audio_summary_budget_check_failed user_id=%s error=%s", user_id, exc)
+        return False, None
+    try:
+        record_trial_budget_events(supabase, user_id=user_id, state=state)
+    except Exception as exc:
+        logger.warning("trial_budget_event_logging_failed user_id=%s error=%s", user_id, exc)
+    if not state.soft_cap_reached:
+        return False, None
+    return (
+        True,
+        f"budget_soft_cap_reached:{state.plan_kind}:{state.current_cost_brl:.2f}/{state.soft_cap_brl:.2f}",
+    )
+
+
+def _maybe_log_chat_usage(
+    supabase: SupabaseRest,
+    *,
+    user_id: str,
+    operation: str,
+    model: str,
+    usage: Optional[OpenAIUsage],
+) -> None:
+    if usage is None:
+        return
+    log_chat_cost(
+        supabase,
+        user_id,
+        operation=operation,
+        model=model,
+        input_tokens=usage.prompt_tokens,
+        output_tokens=usage.completion_tokens,
+    )
+
+
 def _increment_audio_metrics(supabase: SupabaseRest, *, user_id: str, audio_seconds: Optional[int]) -> None:
     if not audio_seconds or audio_seconds <= 0:
         return
@@ -426,7 +476,7 @@ def _summarize_transcription(
     profile: Dict[str, Any],
     *,
     audio_seconds: Optional[int] = None,
-) -> str:
+) -> tuple[str, Optional[OpenAIUsage]]:
     temas_urgentes = profile.get("temas_urgentes") or "Nenhum específico"
     temas_importantes = profile.get("temas_importantes") or "Nenhum específico"
 
@@ -437,12 +487,13 @@ def _summarize_transcription(
         audio_seconds=audio_seconds,
     )
 
-    return openai.chat_text(
+    response = openai.chat_text_response(
         model=model,
         system=system,
         user=user,
         temperature=0.2,
     )
+    return response.text, response.usage
 
 
 def _transcribe_audio_with_fallback(
@@ -1134,10 +1185,21 @@ async def _handle_evolution_webhook(
             if not media_b64 and message_id:
                 media_b64 = evolution.get_media_base64(instance_name, message_id)
             if media_b64:
-                image_bytes = _decode_b64_media(media_b64)
-                image_desc = openai.describe_image_base64("gpt-4o-mini", image_bytes)
-                text_for_chat = _derive_message_content(payload, normalized, image_description=image_desc)
-                extra["image_described"] = True
+                if settings.enable_image_description:
+                    image_bytes = _decode_b64_media(media_b64)
+                    vision_result = openai.describe_image_base64_response("gpt-4o-mini", image_bytes)
+                    _maybe_log_chat_usage(
+                        supabase,
+                        user_id=user_id,
+                        operation="vision",
+                        model="gpt-4o-mini",
+                        usage=vision_result.usage,
+                    )
+                    text_for_chat = _derive_message_content(payload, normalized, image_description=vision_result.text)
+                    extra["image_described"] = True
+                else:
+                    text_for_chat = _derive_message_content(payload, normalized)
+                    extra["image_ai_disabled"] = True
                 extra["image_media_source"] = media_source
 
         elif message_kind == "audio":
@@ -1272,7 +1334,11 @@ async def _handle_evolution_webhook(
                     audio_seconds = _safe_positive_int(duration_seconds)
 
                 resume_audio = _profile_bool(profile, "resume_audio", False)
-                segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
+                segundos_para_resumir = _profile_int(
+                    profile,
+                    "segundos_para_resumir",
+                    settings.default_seconds_to_summarize,
+                )
                 should_summarize = bool(
                     resume_audio and audio_seconds is not None and audio_seconds > segundos_para_resumir
                 )
@@ -1283,27 +1349,51 @@ async def _handle_evolution_webhook(
                 final_audio_text = transcript or ""
                 processed_audio_seconds = audio_seconds
                 if should_summarize and transcript and transcript.strip():
-                    summarize_started_at = time.perf_counter()
-                    final_audio_text = _summarize_transcription(
-                        openai,
-                        settings.openai_model_summary,
-                        transcript,
-                        profile,
-                        audio_seconds=audio_seconds,
+                    skip_summary, skip_reason = _should_skip_audio_summary_for_budget(
+                        settings,
+                        supabase,
+                        user_id=user_id,
                     )
-                    logger.info(
-                        "evolution_webhook.audio_summarized instance=%s message_id=%s elapsed_ms=%s summary_chars=%s",
-                        instance_name,
-                        message_id,
-                        _elapsed_ms(summarize_started_at),
-                        len(final_audio_text),
-                    )
+                    if skip_summary:
+                        extra["audio_summary_skipped"] = True
+                        extra["audio_summary_skip_reason"] = skip_reason
+                        logger.info(
+                            "evolution_webhook.audio_summary_skipped instance=%s message_id=%s reason=%s",
+                            instance_name,
+                            message_id,
+                            skip_reason,
+                        )
+                    else:
+                        summarize_started_at = time.perf_counter()
+                        final_audio_text, summary_usage = _summarize_transcription(
+                            openai,
+                            settings.openai_model_summary,
+                            transcript,
+                            profile,
+                            audio_seconds=audio_seconds,
+                        )
+                        _maybe_log_chat_usage(
+                            supabase,
+                            user_id=user_id,
+                            operation="summary",
+                            model=settings.openai_model_summary,
+                            usage=summary_usage,
+                        )
+                        logger.info(
+                            "evolution_webhook.audio_summarized instance=%s message_id=%s elapsed_ms=%s summary_chars=%s",
+                            instance_name,
+                            message_id,
+                            _elapsed_ms(summarize_started_at),
+                            len(final_audio_text),
+                        )
 
                 text_for_chat = final_audio_text.strip() if final_audio_text.strip() else None
                 extra.update(
                     {
                         "audio_transcribed": bool(transcript and transcript.strip()),
-                        "audio_summarized": should_summarize,
+                        "audio_summarized": bool(
+                            should_summarize and extra.get("audio_summary_skipped") is not True
+                        ),
                         "audio_seconds": audio_seconds,
                         "audio_media_source": media_source,
                     }
@@ -1394,27 +1484,53 @@ async def _handle_evolution_webhook(
                             final_text = transcript
                             audio_seconds = _safe_positive_int(duration_seconds)
                             resume_audio = _profile_bool(profile, "resume_audio", False)
-                            segundos_para_resumir = _profile_int(profile, "segundos_para_resumir", 45)
+                            segundos_para_resumir = _profile_int(
+                                profile,
+                                "segundos_para_resumir",
+                                settings.default_seconds_to_summarize,
+                            )
                             should_summarize_reaction = bool(
                                 resume_audio and audio_seconds is not None and audio_seconds > segundos_para_resumir
                             )
                             if should_summarize_reaction and transcript.strip():
-                                summarize_started_at = time.perf_counter()
-                                final_text = _summarize_transcription(
-                                    openai,
-                                    settings.openai_model_summary,
-                                    transcript,
-                                    profile,
-                                    audio_seconds=audio_seconds,
+                                skip_summary, skip_reason = _should_skip_audio_summary_for_budget(
+                                    settings,
+                                    supabase,
+                                    user_id=user_id,
                                 )
-                                extra["reaction_audio_summarized"] = True
-                                logger.info(
-                                    "evolution_webhook.reaction_audio_summarized instance=%s target_id=%s elapsed_ms=%s summary_chars=%s",
-                                    instance_name,
-                                    target_id,
-                                    _elapsed_ms(summarize_started_at),
-                                    len(final_text),
-                                )
+                                if skip_summary:
+                                    extra["reaction_audio_summary_skipped"] = True
+                                    extra["reaction_audio_summary_skip_reason"] = skip_reason
+                                    logger.info(
+                                        "evolution_webhook.reaction_audio_summary_skipped instance=%s target_id=%s reason=%s",
+                                        instance_name,
+                                        target_id,
+                                        skip_reason,
+                                    )
+                                else:
+                                    summarize_started_at = time.perf_counter()
+                                    final_text, summary_usage = _summarize_transcription(
+                                        openai,
+                                        settings.openai_model_summary,
+                                        transcript,
+                                        profile,
+                                        audio_seconds=audio_seconds,
+                                    )
+                                    _maybe_log_chat_usage(
+                                        supabase,
+                                        user_id=user_id,
+                                        operation="summary",
+                                        model=settings.openai_model_summary,
+                                        usage=summary_usage,
+                                    )
+                                    extra["reaction_audio_summarized"] = True
+                                    logger.info(
+                                        "evolution_webhook.reaction_audio_summarized instance=%s target_id=%s elapsed_ms=%s summary_chars=%s",
+                                        instance_name,
+                                        target_id,
+                                        _elapsed_ms(summarize_started_at),
+                                        len(final_text),
+                                    )
                             extra["reaction_audio_seconds"] = audio_seconds
                             for key, value in transcription_meta.items():
                                 extra[f"reaction_{key}"] = value

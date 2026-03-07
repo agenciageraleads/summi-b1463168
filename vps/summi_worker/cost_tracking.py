@@ -101,6 +101,7 @@ def _safe_upsert_daily_cost(
     col_map = {
         "transcribe": "transcription_cost_usd",
         "analyze": "analysis_cost_usd",
+        "vision": "analysis_cost_usd",
         "summary": "summary_cost_usd",
         "tts": "tts_cost_usd",
     }
@@ -277,3 +278,53 @@ def log_chat_cost(
         )
     except Exception as exc:
         logger.debug("cost_tracking.log_chat_failed user=%s error=%s", user_id, exc)
+
+
+def log_tts_cost(
+    supabase: Any,
+    user_id: str,
+    *,
+    model: str,
+    char_count: int,
+) -> None:
+    if char_count <= 0:
+        return
+    try:
+        cost = calculate_tts_cost(char_count)
+        if cost <= Decimal("0"):
+            return
+
+        date_str = dt.date.today().isoformat()
+        try:
+            supabase.insert(
+                "cost_logs",
+                [{
+                    "user_id": user_id,
+                    "operation": "tts",
+                    "model": model,
+                    "cost_usd": float(cost),
+                    "char_count": char_count,
+                }],
+            )
+        except Exception as exc:
+            logger.debug("cost_tracking.log_insert_failed user=%s error=%s", user_id, exc)
+
+        _safe_upsert_daily_cost(
+            supabase,
+            user_id=user_id,
+            date_str=date_str,
+            operation="tts",
+            cost_usd=cost,
+            call_count=1,
+            tokens_total=0,
+            audio_minutes=Decimal("0"),
+        )
+        logger.debug(
+            "cost_tracking.tts user=%s model=%s chars=%d cost_usd=%.8f",
+            user_id,
+            model,
+            char_count,
+            float(cost),
+        )
+    except Exception as exc:
+        logger.debug("cost_tracking.log_tts_failed user=%s error=%s", user_id, exc)

@@ -26,12 +26,12 @@ OPENAI_MODEL_ANALYSIS="gpt-4o-mini"
 OPENAI_MODEL_SUMMARY="gpt-4o-mini"
 OPENAI_TTS_MODEL="gpt-4o-mini-tts"
 OPENAI_TTS_VOICE="alloy"
-OPENAI_TRANSCRIPTION_MODEL="gpt-4o-mini-transcribe"
+OPENAI_TRANSCRIPTION_MODEL="whisper-1"
 OPENAI_TRANSCRIPTION_FALLBACK_MODEL="gpt-4o-transcribe"
 OPENAI_TRANSCRIPTION_LANGUAGE="pt"
 OPENAI_TRANSCRIPTION_PROMPT_EXTRA="CNPJ, CPF, orcamento, pedido, nota fiscal, codigo do produto, prazo de entrega, DeWalt, Makita, Bosch, Stanley, Milwaukee"
 OPENAI_TRANSCRIPTION_ENABLE_FALLBACK="true"
-OPENAI_TRANSCRIPTION_CONFIDENCE_THRESHOLD="0.55"
+OPENAI_TRANSCRIPTION_CONFIDENCE_THRESHOLD="0.65"
 OPENAI_TRANSCRIPTION_CRITICAL_CONFIDENCE_THRESHOLD="0.80"
 OPENAI_TRANSCRIPTION_CHUNKING_MIN_SECONDS="20"
 
@@ -50,7 +50,7 @@ IGNORE_REMOTE_JID="556293984600"
 
 # Job
 ENABLE_HOURLY_JOB="true"
-ENABLE_DAILY_JOB="true"
+ENABLE_DAILY_JOB="false"
 DAILY_SUMMARY_HOUR_UTC="22"     # 19:00 America/Sao_Paulo quando timezone=UTC
 DAILY_SUMMARY_TIMEZONE="UTC"
 RUN_NOW_WAIT_SECONDS="12"
@@ -59,17 +59,31 @@ RUN_NOW_RESULT_TTL_SECONDS="600"
 # Cleanup (opcional)
 LOW_PRIORITY_CLEANUP_DAYS="0"
 
+# Redis / dedupe
+REDIS_URL="redis://localhost:6379/0"
+REQUIRE_REDIS="false"
+
 # Idempotencia do webhook (recomendado >= 24h para cobrir replays da Evolution)
 WEBHOOK_DEDUPE_TTL_SECONDS="86400"
+
+# Wave 1 cost controls
+ENABLE_IMAGE_DESCRIPTION="false"
+ENABLE_SUMMI_AUDIO="false"
+DEFAULT_SECONDS_TO_SUMMARIZE="90"
+PAID_AI_SOFT_CAP_BRL="4.0"
+PAID_AI_HARD_CAP_BRL="5.0"
+TRIAL_AI_SOFT_CAP_BRL="1.0"
+TRIAL_AI_HARD_CAP_BRL="1.5"
+USD_BRL_EXCHANGE_RATE="5.8"
 ```
 
 ### Transcricao de audio
 
-- `OPENAI_TRANSCRIPTION_MODEL`: modelo padrao barato. Recomendado `gpt-4o-mini-transcribe`.
+- `OPENAI_TRANSCRIPTION_MODEL`: modelo padrao barato. Recomendado `whisper-1`.
 - `OPENAI_TRANSCRIPTION_FALLBACK_MODEL`: usado apenas quando a heuristica detectar transcricao vazia, baixa confianca, repeticao suspeita ou conteudo critico com confianca borderline.
 - `OPENAI_TRANSCRIPTION_LANGUAGE`: fixe em `pt` para reduzir erro e latencia.
 - `OPENAI_TRANSCRIPTION_PROMPT_EXTRA`: vocabulario global do negocio. Ajuste com marcas, siglas e termos recorrentes.
-- `OPENAI_TRANSCRIPTION_CONFIDENCE_THRESHOLD`: fallback geral. Comece em `0.55`.
+- `OPENAI_TRANSCRIPTION_CONFIDENCE_THRESHOLD`: fallback geral. Comece em `0.65`.
 - `OPENAI_TRANSCRIPTION_CRITICAL_CONFIDENCE_THRESHOLD`: fallback para audios com numeros, CNPJ, codigos e marcas. Comece em `0.80`.
 - `OPENAI_TRANSCRIPTION_CHUNKING_MIN_SECONDS`: ativa `chunking_strategy=auto` em audios maiores.
 
@@ -113,6 +127,12 @@ Ela sobe:
 - frontend (Traefik host `${SUMMI_FRONTEND_HOST}`)
 - worker API (Traefik host `${SUMMI_WORKER_HOST}`)
 - worker scheduler (sem exposicao publica)
+
+Defaults da onda 1:
+- `ENABLE_DAILY_JOB=false`
+- `ENABLE_IMAGE_DESCRIPTION=false`
+- `ENABLE_SUMMI_AUDIO=false`
+- `DEFAULT_SECONDS_TO_SUMMARIZE=90`
 
 ## Observabilidade rapida
 

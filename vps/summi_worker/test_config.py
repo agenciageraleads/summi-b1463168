@@ -25,6 +25,13 @@ def _base_env() -> dict[str, str]:
 
 
 class LoadSettingsTest(unittest.TestCase):
+    def test_load_settings_disables_daily_job_by_default(self) -> None:
+        with patch.dict(os.environ, _base_env(), clear=True):
+            settings = load_settings()
+
+        self.assertFalse(settings.enable_daily_job)
+        self.assertEqual(settings.default_seconds_to_summarize, 90)
+
     def test_webhook_dedupe_ttl_enforces_floor(self) -> None:
         with patch.dict(
             os.environ,
@@ -44,6 +51,15 @@ class LoadSettingsTest(unittest.TestCase):
             settings = load_settings()
 
         self.assertEqual(settings.webhook_dedupe_ttl_seconds, 172800)
+
+    def test_require_redis_raises_without_redis_url(self) -> None:
+        with patch.dict(
+            os.environ,
+            {**_base_env(), "REQUIRE_REDIS": "true"},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "REDIS_URL is required"):
+                load_settings()
 
 
 if __name__ == "__main__":

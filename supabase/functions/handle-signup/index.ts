@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { extractAttribution, insertGrowthEvent } from "../_shared/growth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,12 +100,15 @@ serve(async (req) => {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY não configurada");
 
-    const { name, email, password, referralCode } = await req.json();
+    const body = await req.json();
+    const { name, email, password, referralCode } = body;
     if (!name || !email || !password) {
       throw new Error("Nome, email e senha são obrigatórios");
     }
 
-    logStep("Dados recebidos", { name, email, referralCode });
+    const attribution = extractAttribution(body);
+
+    logStep("Dados recebidos", { name, email, referralCode, leadKey: attribution.leadKey });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
@@ -156,6 +160,12 @@ serve(async (req) => {
         id: userId,
         nome: name,
         email: email,
+        transcreve_audio_recebido: true,
+        transcreve_audio_enviado: true,
+        resume_audio: true,
+        segundos_para_resumir: 90,
+        send_on_reaction: false,
+        "Summi em Audio?": false,
         terms_accepted_at: new Date().toISOString(),
         terms_version: 'v2.0'
       };
@@ -182,7 +192,8 @@ serve(async (req) => {
         name,
         metadata: {
           supabase_user_id: userId,
-          referred_by: referrerUserId || 'none'
+          referred_by: referrerUserId || 'none',
+          ...(attribution.leadKey ? { lead_key: attribution.leadKey } : {}),
         }
       });
 
@@ -212,6 +223,23 @@ serve(async (req) => {
       if (referrerUserId) {
         logStep("Indicação registrada; recompensa será aplicada após checkout concluído", { referrerUserId, referrerRole });
       }
+
+      await insertGrowthEvent(supabaseAdmin, {
+        eventType: "signup_started",
+        dedupeKey: `signup_started:${userId}`,
+        userId,
+        leadKey: attribution.leadKey,
+        source: attribution.source,
+        medium: attribution.medium,
+        campaign: attribution.campaign,
+        content: attribution.content,
+        term: attribution.term,
+        referralCode: attribution.referralCode ?? referralCode ?? null,
+        metadata: {
+          via: "handle-signup",
+          referrer_user_id: referrerUserId,
+        },
+      });
 
       logStep("Conta criada com sucesso - usuário deve ir para checkout");
 

@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { PRICE_ID_BY_PLAN } from "../_shared/subscriptionPlans.ts";
+import { extractAttribution, findLatestLeadKeyForUser, insertGrowthEvent } from "../_shared/growth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,11 +18,14 @@ serve(async (req) => {
   }
 
   try {
-    const { planType, referralCode } = await req.json();
+    const body = await req.json();
+    const { planType, referralCode } = body;
 
     if (planType !== 'monthly' && planType !== 'annual') {
       throw new Error('Invalid plan type');
     }
+
+    const attribution = extractAttribution(body);
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
     const supabaseAdmin = createClient(
@@ -46,6 +50,10 @@ serve(async (req) => {
           .maybeSingle();
 
         referredByUserId = profile?.referred_by_user_id ?? null;
+
+        if (!attribution.leadKey) {
+          attribution.leadKey = await findLatestLeadKeyForUser(supabaseAdmin, authUserId);
+        }
       }
     }
 
@@ -82,16 +90,32 @@ serve(async (req) => {
         trial_period_days: trialDays,
         metadata: {
           plan_type: planType,
+          ...(attribution.leadKey ? { lead_key: attribution.leadKey } : {}),
+          ...(attribution.source ? { source: attribution.source } : {}),
+          ...(attribution.medium ? { medium: attribution.medium } : {}),
+          ...(attribution.campaign ? { campaign: attribution.campaign } : {}),
+          ...(attribution.content ? { content: attribution.content } : {}),
+          ...(attribution.term ? { term: attribution.term } : {}),
           ...(authUserId ? { supabase_user_id: authUserId } : {}),
           ...(referredByUserId ? { referred_by_user_id: referredByUserId } : {}),
-          ...(referralCode ? { referral_code: String(referralCode).toUpperCase() } : {}),
+          ...(attribution.referralCode ?? referralCode
+            ? { referral_code: String(attribution.referralCode ?? referralCode).toUpperCase() }
+            : {}),
         },
       },
       metadata: {
         plan_type: planType,
+        ...(attribution.leadKey ? { lead_key: attribution.leadKey } : {}),
+        ...(attribution.source ? { source: attribution.source } : {}),
+        ...(attribution.medium ? { medium: attribution.medium } : {}),
+        ...(attribution.campaign ? { campaign: attribution.campaign } : {}),
+        ...(attribution.content ? { content: attribution.content } : {}),
+        ...(attribution.term ? { term: attribution.term } : {}),
         ...(authUserId ? { supabase_user_id: authUserId } : {}),
         ...(referredByUserId ? { referred_by_user_id: referredByUserId } : {}),
-        ...(referralCode ? { referral_code: String(referralCode).toUpperCase() } : {}),
+        ...(attribution.referralCode ?? referralCode
+          ? { referral_code: String(attribution.referralCode ?? referralCode).toUpperCase() }
+          : {}),
       },
       phone_number_collection: {
         enabled: true,
@@ -105,6 +129,25 @@ serve(async (req) => {
       ],
       success_url: `${req.headers.get("origin") || "https://summi.gera-leads.com"}/complete-signup?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin") || "https://summi.gera-leads.com"}/?canceled=true`,
+    });
+
+    await insertGrowthEvent(supabaseAdmin, {
+      eventType: "checkout_started",
+      dedupeKey: `checkout_started:${session.id}`,
+      userId: authUserId,
+      leadKey: attribution.leadKey,
+      planContext: planType,
+      source: attribution.source,
+      medium: attribution.medium,
+      campaign: attribution.campaign,
+      content: attribution.content,
+      term: attribution.term,
+      referralCode: attribution.referralCode ?? referralCode ?? null,
+      metadata: {
+        session_id: session.id,
+        checkout_mode: "subscription",
+        referred_by_user_id: referredByUserId,
+      },
     });
 
     return new Response(JSON.stringify({ url: session.url }), {

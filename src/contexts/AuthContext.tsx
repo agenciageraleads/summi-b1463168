@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getLeadContext } from '@/lib/growthTracking';
 
 interface AuthContextType {
   user: User | null;
@@ -127,10 +128,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       console.log('[AUTH] Iniciando registro via Edge Function com trial de 7 dias');
+      const leadContext = getLeadContext();
 
       // Cria conta e trial no backend (também salva subscritor e bônus por indicação)
       const { data, error } = await supabase.functions.invoke('handle-signup', {
-        body: { name, email, password, referralCode },
+        body: {
+          name,
+          email,
+          password,
+          leadKey: leadContext.leadKey,
+          source: leadContext.source,
+          medium: leadContext.medium,
+          campaign: leadContext.campaign,
+          content: leadContext.content,
+          term: leadContext.term,
+          referralCode: referralCode ?? leadContext.referralCode ?? undefined,
+        },
       });
 
       if (error) {

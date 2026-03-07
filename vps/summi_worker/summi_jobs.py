@@ -4,7 +4,8 @@ import datetime as dt
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from .analysis import AnalyzedChat, analyze_single_chat, build_audio_script, build_summary_text
+from .analysis import AnalyzedChat, analyze_single_chat, build_audio_script_with_usage, build_summary_text
+from .cost_tracking import log_chat_cost, log_tts_cost
 from .config import Settings
 from .evolution_client import EvolutionClient
 from .openai_client import OpenAIClient
@@ -131,6 +132,10 @@ def _summary_frequency_hours(profile: Dict[str, Any]) -> int:
     return freq_map.get(summi_freq, 1)
 
 
+def _should_send_summi_audio(settings: Settings, profile: Dict[str, Any]) -> bool:
+    return bool(getattr(settings, "enable_summi_audio", False)) and profile.get("Summi em Audio?") is True
+
+
 def _summary_is_due(profile: Dict[str, Any], *, now_utc: dt.datetime) -> bool:
     ultimo_summi = profile.get("ultimo_summi_em")
     if not ultimo_summi:
@@ -240,7 +245,7 @@ def analyze_user_chats(
 
     analyzed: List[AnalyzedChat] = []
     for chat in unique_chats:
-        analyzed_chat = analyze_single_chat(
+        analyzed_chat, usage = analyze_single_chat(
             openai,
             settings.openai_model_analysis,
             chat_id=chat["id"],
@@ -253,6 +258,15 @@ def analyze_user_chats(
             temas_importantes=temas_importantes,
             blacklist=blacklist,
         )
+        if usage is not None:
+            log_chat_cost(
+                supabase,
+                user_id,
+                operation="analyze",
+                model=settings.openai_model_analysis,
+                input_tokens=usage.prompt_tokens,
+                output_tokens=usage.completion_tokens,
+            )
 
         supabase.patch(
             "chats",
@@ -390,11 +404,34 @@ def run_daily_summary_job(
                 print(f"daily_summary: delete_chats_failed user={user_id} error={exc}")
 
             # Enviar áudio se habilitado
-            if profile.get("Summi em Audio?") is True:
+            if _should_send_summi_audio(settings, profile):
                 try:
-                    audio_script = build_audio_script(openai, settings.openai_model_summary, summary_text=summary_text)
-                    mp3 = openai.tts_mp3(settings.openai_tts_model, settings.openai_tts_voice, audio_script)
-                    evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, mp3)
+                    audio_script, script_usage = build_audio_script_with_usage(
+                        openai,
+                        settings.openai_model_summary,
+                        summary_text=summary_text,
+                    )
+                    if script_usage is not None:
+                        log_chat_cost(
+                            supabase,
+                            user_id,
+                            operation="summary",
+                            model=settings.openai_model_summary,
+                            input_tokens=script_usage.prompt_tokens,
+                            output_tokens=script_usage.completion_tokens,
+                        )
+                    tts_result = openai.tts_mp3_response(
+                        settings.openai_tts_model,
+                        settings.openai_tts_voice,
+                        audio_script,
+                    )
+                    log_tts_cost(
+                        supabase,
+                        user_id,
+                        model=settings.openai_tts_model,
+                        char_count=tts_result.char_count,
+                    )
+                    evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, tts_result.audio_bytes)
                 except Exception as exc:
                     print(f"daily_summary: audio_failed user={user_id} error={exc}")
 
@@ -552,11 +589,34 @@ def run_user_summi_now(
         except Exception:
             pass
 
-        if profile.get("Summi em Audio?") is True:
+        if _should_send_summi_audio(settings, profile):
             try:
-                audio_script = build_audio_script(openai, settings.openai_model_summary, summary_text=summary_text)
-                mp3 = openai.tts_mp3(settings.openai_tts_model, settings.openai_tts_voice, audio_script)
-                evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, mp3)
+                audio_script, script_usage = build_audio_script_with_usage(
+                    openai,
+                    settings.openai_model_summary,
+                    summary_text=summary_text,
+                )
+                if script_usage is not None:
+                    log_chat_cost(
+                        supabase,
+                        user_id,
+                        operation="summary",
+                        model=settings.openai_model_summary,
+                        input_tokens=script_usage.prompt_tokens,
+                        output_tokens=script_usage.completion_tokens,
+                    )
+                tts_result = openai.tts_mp3_response(
+                    settings.openai_tts_model,
+                    settings.openai_tts_voice,
+                    audio_script,
+                )
+                log_tts_cost(
+                    supabase,
+                    user_id,
+                    model=settings.openai_tts_model,
+                    char_count=tts_result.char_count,
+                )
+                evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, tts_result.audio_bytes)
             except Exception as exc:
                 logger.warning("run_now.audio_failed user_id=%s error=%s", user_id, exc)
 
@@ -688,11 +748,34 @@ def run_hourly_job(
         except Exception:
             pass  # Não aborta o fluxo por falha em timestamp
 
-        if profile.get("Summi em Audio?") is True:
+        if _should_send_summi_audio(settings, profile):
             try:
-                audio_script = build_audio_script(openai, settings.openai_model_summary, summary_text=summary_text)
-                mp3 = openai.tts_mp3(settings.openai_tts_model, settings.openai_tts_voice, audio_script)
-                evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, mp3)
+                audio_script, script_usage = build_audio_script_with_usage(
+                    openai,
+                    settings.openai_model_summary,
+                    summary_text=summary_text,
+                )
+                if script_usage is not None:
+                    log_chat_cost(
+                        supabase,
+                        user_id,
+                        operation="summary",
+                        model=settings.openai_model_summary,
+                        input_tokens=script_usage.prompt_tokens,
+                        output_tokens=script_usage.completion_tokens,
+                    )
+                tts_result = openai.tts_mp3_response(
+                    settings.openai_tts_model,
+                    settings.openai_tts_voice,
+                    audio_script,
+                )
+                log_tts_cost(
+                    supabase,
+                    user_id,
+                    model=settings.openai_tts_model,
+                    char_count=tts_result.char_count,
+                )
+                evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, tts_result.audio_bytes)
             except Exception as exc:
                 print(f"Audio summary failed for user {user_id}: {exc}")
 

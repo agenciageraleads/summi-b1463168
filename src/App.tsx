@@ -1,5 +1,5 @@
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SubscriptionGuard } from "./components/SubscriptionGuard";
+import { ensureLeadContextFromWindow } from "./lib/growthTracking";
 
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const SalesLandingPage = lazy(() => import("./pages/SalesLandingPage"));
@@ -77,10 +78,21 @@ function OnboardingFlowGate() {
   );
 }
 
+function LeadContextBootstrap() {
+  const location = useLocation();
+
+  useEffect(() => {
+    ensureLeadContextFromWindow();
+  }, [location.search]);
+
+  return null;
+}
+
 function AppRoutes() {
   return (
     <>
       <OnboardingFlowGate />
+      <LeadContextBootstrap />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Check, Clock, CreditCard, Loader2, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { createCheckoutSession } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
+import { trackGrowthEvent } from '@/lib/growthTracking';
 import { cn } from '@/lib/utils';
 
 type PlanType = 'monthly' | 'annual';
@@ -46,6 +47,16 @@ const SalesLandingPage = () => {
   }, []);
 
   const selected = plans[selectedPlan];
+
+  useEffect(() => {
+    void trackGrowthEvent('landing_view', {
+      oncePerSessionKey: `sales-landing:${window.location.pathname}`,
+      metadata: {
+        path: window.location.pathname,
+        variant: 'sales',
+      },
+    });
+  }, []);
 
   const handleCheckout = async () => {
     try {
