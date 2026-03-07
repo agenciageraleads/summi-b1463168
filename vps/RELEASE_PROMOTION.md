@@ -42,6 +42,13 @@ python3 scripts/promote_release.py --sha <commit-sha> --deploy
 - promove frontend e worker na VPS via `docker service update --with-registry-auth`
 - imprime o estado final das imagens configuradas nos servicos principais
 
+## Limitacao atual
+
+- O script promove imagem, mas nao reaplica automaticamente mudancas de `env`, `args`, `command` ou `replicas` que estejam na stack.
+- Se a release alterar comportamento operacional via `vps/portainer/stack.summi-complete.yml`, sincronize a spec ativa depois da promocao:
+  - redeploy da stack no Portainer; ou
+  - `docker service update` explicito para os servicos afetados.
+
 ## Modo sem deploy
 
 Se voce quiser apenas preparar a stack local:

@@ -54,6 +54,10 @@ SUMMI_VPS_PASSWORD='...' python3 scripts/promote_release.py --sha <commit-sha> -
   - `summi_summi-frontend`
   - `summi_summi-worker-api`
   - `summi_summi-worker-scheduler`
+- Se a release mudou `env`, `args`, `command` ou `replicas` na stack, confirmar que a spec ativa tambem foi sincronizada:
+  - `docker service inspect <service> --format '{{json .Spec.TaskTemplate.ContainerSpec.Env}}'`
+  - `docker service inspect <service> --format '{{json .Spec.TaskTemplate.ContainerSpec.Args}}'`
+  - `docker service ls`
 
 - Confirmar que nao houve erro novo relevante nos logs.
 - Se a release mexer em transcricao, procurar:

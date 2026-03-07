@@ -1,5 +1,23 @@
 # Changelog Interno VPS
 
+## 2026-03-07
+
+- Release promovido para o commit `534d18757c58c734baecf51d3124c6e61667683e`.
+- Frontend pinado em `ghcr.io/agenciageraleads/summi-b1463168-frontend:534d18757c58c734baecf51d3124c6e61667683e`.
+- Worker/API, scheduler e filas pinados em `ghcr.io/agenciageraleads/summi-b1463168-worker:534d18757c58c734baecf51d3124c6e61667683e`.
+- Migrations `20260307120000_wave1_cost_controls.sql` e `20260307133000_add_growth_tracking.sql` aplicadas no projeto remoto via Management API do Supabase e registradas em `supabase_migrations.schema_migrations`.
+- Edge Functions `admin-billing-costs`, `track-growth-event`, `create-checkout`, `handle-signup`, `customer-portal` e `stripe-webhook` redeployadas em producao.
+- Runtime do worker alinhado manualmente apos a promocao para refletir a stack homologada:
+  - `ENABLE_DAILY_JOB=false`
+  - `ENABLE_ANALYSIS_QUEUE=false`
+  - `ENABLE_SUMMARY_QUEUE=false`
+  - `ENABLE_IMAGE_DESCRIPTION=false`
+  - `ENABLE_SUMMI_AUDIO=false`
+  - `REQUIRE_REDIS=true`
+  - `UVICORN_WORKERS=1`
+  - filas `analysis` e `summary` em `0/0`
+- Observacao operacional: `scripts/promote_release.py` atualmente promove apenas imagem por `docker service update`; quando a release altera `env`, `args` ou `replicas`, a spec precisa ser sincronizada explicitamente na VPS.
+
 ## 2026-03-01
 
 - Release promovido para o commit `7e42bfacd6b354d610d675b767c77644ffc574ed`.
