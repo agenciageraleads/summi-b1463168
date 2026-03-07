@@ -2,6 +2,18 @@
 
 ## 2026-03-07
 
+### Deploy de Unificação e Fixes
+
+- Release promovido para o commit `f04c5a25ba3156b47ccc8253ac77a64722a122ab`.
+- Frontend pinado em `ghcr.io/agenciageraleads/summi-b1463168-frontend:f04c5a25ba3156b47ccc8253ac77a64722a122ab`.
+- Worker/API, scheduler e filas pinados em `ghcr.io/agenciageraleads/summi-b1463168-worker:f04c5a25ba3156b47ccc8253ac77a64722a122ab`.
+- Funcionalidades consolidadas:
+  - Fix crítico: Resolvido o problema de carregamento infinito da landing page (adicionado `HelmetProvider`).
+  - Funcionalidade restaurada: Rotas e menu de Blog (CMS) agora presentes na build oficial.
+  - Correção na esteira CI/CD: Removida a compilação multi-arch (ARM64) temporariamente para contornar crash no simulador QEMU e estabilizar o tempo de build em ~1-3 minutos.
+
+### Início da Integração de Custos e Crescimento
+
 - Release promovido para o commit `534d18757c58c734baecf51d3124c6e61667683e`.
 - Frontend pinado em `ghcr.io/agenciageraleads/summi-b1463168-frontend:534d18757c58c734baecf51d3124c6e61667683e`.
 - Worker/API, scheduler e filas pinados em `ghcr.io/agenciageraleads/summi-b1463168-worker:534d18757c58c734baecf51d3124c6e61667683e`.
