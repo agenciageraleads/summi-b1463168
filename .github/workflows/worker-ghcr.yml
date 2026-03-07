@@ -41,7 +41,7 @@ jobs:
           context: vps/summi_worker
           file: vps/summi_worker/Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: |
             ghcr.io/${{ github.repository }}-worker:latest
             ghcr.io/${{ github.repository }}-worker:${{ github.sha }}
