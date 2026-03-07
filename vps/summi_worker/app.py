@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from pydantic import BaseModel
 
 from .budget_guard import get_user_budget_state
 from .config import Settings, load_settings
