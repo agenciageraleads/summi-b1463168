@@ -3,7 +3,7 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { BarChart3, Users, ArrowLeft, TestTube, MessageSquare, DollarSign } from 'lucide-react';
+import { BarChart3, Users, ArrowLeft, TestTube, MessageSquare, DollarSign, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navigation = [
@@ -12,6 +12,7 @@ const navigation = [
   { name: 'Usuários Beta', href: '/admin/beta-users', icon: TestTube },
   { name: 'Anúncios', href: '/admin/announcements', icon: MessageSquare },
   { name: 'Billing', href: '/admin/billing', icon: DollarSign },
+  { name: 'Blog', href: '/admin/blog', icon: FileText },
 ];
 
 export const AdminSidebar = () => {
@@ -61,7 +62,7 @@ export const AdminSidebar = () => {
           <ArrowLeft className="mr-3 h-5 w-5" />
           Voltar ao Dashboard
         </Link>
-        
+
         <button
           onClick={logout}
           className="flex items-center w-full px-4 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-red-400 rounded-lg transition-colors"
