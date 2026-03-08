@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from .budget_guard import get_user_budget_state
@@ -1705,3 +1706,63 @@ async def webhook_evolution_analyze(request: Request) -> Dict[str, Any]:
     """
     logger.info("webhook.analysis_disabled path=/webhooks/evolution-analyze")
     return await _handle_evolution_webhook(request, analysis_disabled=True)
+
+
+@app.get("/social/blog/{slug}", response_class=HTMLResponse)
+async def social_blog_preview(slug: str, request: Request):
+    """
+    Endpoint usado como proxy reverso pelo Nginx para injetar Meta Tags (OGP)
+    quando crawlers de redes sociais (WhatsApp, Facebook, Twitter) leem o link do blog.
+    """
+    settings = _settings()
+    supabase = _supabase(settings)
+    
+    try:
+        rows = supabase.select(
+            "blog_posts", 
+            select="title, excerpt, cover_image_url",
+            filters=[to_postgrest_filter_eq("slug", slug)],
+            limit=1
+        )
+    except Exception as e:
+        logger.error("Failed to fetch blog post %s: %s", slug, e)
+        rows = []
+
+    site_name = "Summi - Assistente de WhatsApp com IA"
+    if rows:
+        post = rows[0]
+        title = post.get("title") or site_name
+        description = post.get("excerpt") or ""
+        image = post.get("cover_image_url") or f"{settings.site_url}/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png"
+    else:
+        title = site_name
+        description = "Transcreva áudios, receba resumos das conversas mais importantes e nunca mais perca uma mensagem relevante no WhatsApp."
+        image = f"{settings.site_url}/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png"
+    
+    url = f"{settings.site_url}/blog/{slug}"
+    
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>{title}</title>
+    <meta property="og:title" content="{title}" />
+    <meta property="og:description" content="{description}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="{url}" />
+    <meta property="og:image" content="{image}" />
+    <meta property="og:site_name" content="Summi" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{title}" />
+    <meta name="twitter:description" content="{description}" />
+    <meta name="twitter:image" content="{image}" />
+    <meta http-equiv="refresh" content="0; url={url}" />
+</head>
+<body>
+    <script>window.location.href = "{url}";</script>
+</body>
+</html>
+"""
+    return html
+
+

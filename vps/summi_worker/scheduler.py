@@ -50,7 +50,11 @@ def main() -> None:
 
     if settings.blog_auto_post_enabled:
         def _run_blog_post() -> None:
-            run_daily_blog_post(settings, supabase)
+            run_daily_blog_post(
+                supabase=supabase,
+                openai_api_key=settings.openai_api_key,
+                unsplash_access_key=settings.unsplash_access_key,
+            )
 
         scheduler.add_job(
             _run_blog_post,
