@@ -52,7 +52,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
   const handleDeleteAllChats = async () => {
     setIsDeletingAll(true);
     const success = await onDeleteAllChats();
-    
+
     if (success) {
       toast({
         title: "Todas as conversas foram removidas",
@@ -75,7 +75,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
   // Função para classificar prioridade baseada no valor numérico
   const getPriorityInfo = (prioridade: string) => {
     const priority = parseInt(prioridade);
-    
+
     if (priority === 3) {
       return {
         label: 'Urgente',
@@ -107,7 +107,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
   const formatPhoneNumber = (remoteJid: string) => {
     // Extrair apenas os números do remote_jid
     const numbers = remoteJid.replace(/\D/g, '');
-    
+
     // Se tem 13 dígitos (55 + DDD + número), formatar como brasileiro
     if (numbers.length === 13 && numbers.startsWith('55')) {
       const ddd = numbers.slice(2, 4);
@@ -115,7 +115,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
       const secondPart = numbers.slice(9, 13);
       return `+55 (${ddd}) ${firstPart}-${secondPart}`;
     }
-    
+
     // Se tem 12 dígitos (55 + DDD + número sem 9), formatar como brasileiro
     if (numbers.length === 12 && numbers.startsWith('55')) {
       const ddd = numbers.slice(2, 4);
@@ -123,7 +123,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
       const secondPart = numbers.slice(8, 12);
       return `+55 (${ddd}) ${firstPart}-${secondPart}`;
     }
-    
+
     // Para outros formatos, retornar com + no início
     return `+${numbers}`;
   };
@@ -161,7 +161,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
               <span>Conversas</span>
             </CardTitle>
             <Button
-              onClick={handleAnalyzeMessages}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleAnalyzeMessages}
               disabled={isAnalyzing}
               size="sm"
               variant="outline"
@@ -196,7 +196,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button
-              onClick={handleDeleteAllChats}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleDeleteAllChats}
               disabled={isDeletingAll || chats.length === 0}
               size="sm"
               variant="outline"
@@ -206,7 +206,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
               <span className="hidden sm:inline">{isDeletingAll ? 'Removendo...' : 'Resolver tudo'}</span>
             </Button>
             <Button
-              onClick={handleAnalyzeMessages}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleAnalyzeMessages}
               disabled={isAnalyzing}
               size="sm"
               variant="outline"
@@ -225,7 +225,7 @@ export const ChatsList: React.FC<ChatsListProps> = ({
               const priorityInfo = getPriorityInfo(chat.prioridade);
               const formattedNumber = formatPhoneNumber(chat.remote_jid);
               const whatsappNumber = getWhatsAppNumber(chat.remote_jid);
-              
+
               return (
                 <div
                   key={chat.id}
@@ -265,10 +265,10 @@ export const ChatsList: React.FC<ChatsListProps> = ({
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteChat(chat.id, chat.nome)}
+                          className="h-11 w-11 shrink-0 text-destructive hover:text-destructive active:scale-[0.97] transition-transform"
+                          role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleDeleteChat(chat.id, chat.nome)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-5 w-5" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Remover</TooltipContent>
@@ -279,10 +279,10 @@ export const ChatsList: React.FC<ChatsListProps> = ({
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8"
-                          onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
+                          className="h-11 w-11 shrink-0 active:scale-[0.97] transition-transform"
+                          role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
                         >
-                          <MessageSquare className="h-4 w-4" />
+                          <MessageSquare className="h-5 w-5" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Responder</TooltipContent>

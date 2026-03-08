@@ -128,7 +128,7 @@ export const SecurityDashboard: React.FC = () => {
           <Shield className="h-6 w-6" />
           <h2 className="text-2xl font-bold">Dashboard de Segurança</h2>
         </div>
-        <Button onClick={loadSecurityData} variant="outline">
+        <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={loadSecurityData} variant="outline">
           Atualizar
         </Button>
       </div>

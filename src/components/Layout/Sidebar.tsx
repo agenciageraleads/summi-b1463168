@@ -20,13 +20,27 @@ import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
-// Sidebar corrigida com funcionalidade mobile e itens corretos
+// Mapeamento de rotas para títulos das páginas
+const PAGE_TITLES: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/settings': 'Configurações',
+  '/subscription': 'Assinatura',
+  '/referrals': 'Indique e Ganhe',
+  '/feedback': 'Feedback',
+  '/releases': 'Novidades',
+  '/beta': 'Beta',
+};
+
+// Sidebar com barra de topo mobile dedicada para evitar sobreposição
 export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { profile } = useProfile();
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
+
+  // Título da página atual baseado na rota
+  const currentPageTitle = PAGE_TITLES[location.pathname] || '';
 
   // Navegação principal do usuário
   const navigation = [
@@ -83,7 +97,7 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Navegação */}
       <nav className="flex-1 px-4 py-6 space-y-2">
         {allNavigation.map((item) => {
           const Icon = item.icon;
@@ -92,7 +106,7 @@ export const Sidebar = () => {
             <Link
               key={item.name}
               to={item.href}
-              onClick={handleNavClick}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleNavClick}
               className={cn(
                 "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                 isActive
@@ -107,7 +121,7 @@ export const Sidebar = () => {
         })}
       </nav>
 
-      {/* User section */}
+      {/* Seção do usuário */}
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center space-x-3 mb-4">
           <div className="w-8 h-8 rounded-full bg-summi-green flex items-center justify-center">
@@ -126,7 +140,7 @@ export const Sidebar = () => {
         </div>
 
         <Button
-          onClick={handleLogout}
+          role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleLogout}
           variant="outline"
           className="w-full flex items-center justify-center space-x-2 text-summi-gray-700 hover:text-red-600 hover:border-red-300"
         >
@@ -139,14 +153,14 @@ export const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile Menu Button - Visível apenas no mobile */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      {/* Barra de topo mobile dedicada — evita sobreposição com título da página */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-sm border-b border-gray-200 z-50 flex items-center px-4">
         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
           <SheetTrigger asChild>
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="bg-white shadow-lg border-gray-200"
+              className="shrink-0"
               aria-label="Abrir menu"
             >
               <Menu className="h-5 w-5" />
@@ -156,13 +170,15 @@ export const Sidebar = () => {
             <SidebarContent />
           </SheetContent>
         </Sheet>
+        <span className="ml-3 font-semibold text-base text-summi-gray-900 truncate">
+          {currentPageTitle}
+        </span>
       </div>
 
-      {/* Desktop Sidebar - Visível apenas no desktop */}
+      {/* Desktop Sidebar — visível apenas no desktop */}
       <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
         <SidebarContent />
       </div>
     </>
   );
 };
-

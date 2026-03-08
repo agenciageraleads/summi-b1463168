@@ -361,7 +361,7 @@ export const GroupsMonitoring: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchWhatsAppGroups} disabled={isLoading || isLoadingCache}>
+          <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={fetchWhatsAppGroups} disabled={isLoading || isLoadingCache}>
             <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isLoadingCache) ? 'animate-spin' : ''}`} />
             {isLoading ? 'Atualizando...' : isLoadingCache ? 'Carregando...' : 'Atualizar Grupos'}
           </Button>
@@ -373,7 +373,7 @@ export const GroupsMonitoring: React.FC = () => {
           )}
           {selectedGroups.length > 0 && (
             <Button
-              onClick={addToMonitoring}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={addToMonitoring}
               disabled={isAddingGroups}
               className="bg-green-600 hover:bg-green-700"
             >
@@ -418,7 +418,7 @@ export const GroupsMonitoring: React.FC = () => {
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
-                          onClick={() => removeFromMonitoring(group.id)}
+                          role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => removeFromMonitoring(group.id)}
                           className="bg-red-600 hover:bg-red-700"
                         >
                           Remover

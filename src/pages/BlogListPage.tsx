@@ -2,15 +2,16 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, ArrowRight, Calendar } from "lucide-react";
+import { Clock, ArrowRight, ArrowLeft, Calendar } from "lucide-react";
 import { useBlog } from "@/hooks/useBlogAdmin";
 import { blogPosts as staticPosts } from "@/data/blogPosts";
 import { SEO } from "@/components/SEO";
+import { useTranslation } from "react-i18next";
 
 const categoryColors: Record<string, string> = {
   Produtividade: "bg-green-100 text-green-700 border-green-200",
   Tutoriais: "bg-blue-100 text-blue-700 border-blue-200",
-  Negócios: "bg-purple-100 text-purple-700 border-purple-200",
+  Negócios: "bg-teal-100 text-teal-700 border-teal-200",
   Tecnologia: "bg-orange-100 text-orange-700 border-orange-200",
 };
 
@@ -24,6 +25,7 @@ function formatDate(dateStr: string): string {
 }
 
 const BlogListPage = () => {
+  const { t } = useTranslation();
   const { posts: dbPosts, isLoading } = useBlog();
 
   // Use DB posts if available, fallback to static data
@@ -35,6 +37,7 @@ const BlogListPage = () => {
     modified_at: p.modifiedAt,
     reading_time: p.readingTime,
     created_at: p.publishedAt,
+    cover_image_url: undefined as string | undefined, // Evitando erro do TS no mock
   }));
 
   const featuredPost = posts[0];
@@ -43,10 +46,11 @@ const BlogListPage = () => {
   return (
     <div className="min-h-screen bg-white">
       <SEO
-        title="Blog Summi - Dicas de Produtividade e WhatsApp Business com IA"
-        description="Aprenda a usar o WhatsApp de forma mais produtiva com IA. Dicas, tutoriais e estratégias para profissionais e empresas que usam WhatsApp Business."
+        title={t('blog_summi')}
+        description={t('blog_desc')}
         keywords="blog whatsapp business, dicas whatsapp, produtividade whatsapp, ia whatsapp, automacao whatsapp"
         canonicalPath="/blog"
+        author="Summi"
       />
 
       {/* Nav */}
@@ -63,16 +67,15 @@ const BlogListPage = () => {
               </div>
               <span className="text-xl font-bold text-green-600">Summi</span>
             </Link>
-            <div className="flex items-center gap-4">
-              <Link to="/" className="text-gray-600 hover:text-green-600 transition-colors text-sm">
-                Início
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Link to="/" className="text-gray-600 hover:text-green-600 transition-colors text-sm flex items-center pr-1 sm:pr-0">
+                <span className="sm:hidden"><ArrowLeft className="w-5 h-5" /></span>
+                <span className="hidden sm:inline">{t('home')}</span>
               </Link>
               <Link to="/login">
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  Começar Grátis
+                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 active:scale-95 transition-transform">
+                  <span className="sm:hidden">{t('test_free')}</span>
+                  <span className="hidden sm:inline">{t('start_free')}</span>
                 </Button>
               </Link>
             </div>
@@ -84,13 +87,13 @@ const BlogListPage = () => {
       <div className="bg-gradient-to-br from-green-50 to-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <Badge className="mb-4 bg-green-100 text-green-700 border-green-200">
-            Blog Summi
+            {t('blog_summi')}
           </Badge>
           <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            Produtividade e IA para WhatsApp
+            {t('blog_title')}
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Dicas, tutoriais e estratégias para profissionais e empresas que usam WhatsApp Business.
+            {t('blog_desc')}
           </p>
         </div>
       </div>
@@ -102,13 +105,13 @@ const BlogListPage = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
           </div>
         ) : !featuredPost ? (
-          <p className="text-center text-gray-500 py-20">Nenhum post publicado ainda.</p>
+          <p className="text-center text-gray-500 py-20">{t('no_posts_yet')}</p>
         ) : (
           <>
             {/* Featured Post */}
             <div className="mb-16">
               <h2 className="text-sm font-semibold text-green-600 uppercase tracking-wider mb-6">
-                Artigo em Destaque
+                {t('featured_article')}
               </h2>
               <Link to={`/blog/${featuredPost.slug}`} className="group block">
                 <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-200 group-hover:border-green-300">
@@ -128,7 +131,7 @@ const BlogListPage = () => {
                       </Badge>
                       <span className="flex items-center gap-1 text-sm text-gray-500">
                         <Clock className="w-3 h-3" />
-                        {featuredPost.reading_time} min de leitura
+                        {featuredPost.reading_time} {t('min_read')}
                       </span>
                     </div>
                     <h3 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4 group-hover:text-green-700 transition-colors">
@@ -145,7 +148,7 @@ const BlogListPage = () => {
                         <span>{featuredPost.author}</span>
                       </div>
                       <span className="flex items-center gap-1 text-green-600 font-medium group-hover:gap-2 transition-all">
-                        Ler artigo <ArrowRight className="w-4 h-4" />
+                        {t('read_article')} <ArrowRight className="w-4 h-4" />
                       </span>
                     </div>
                   </div>
@@ -157,7 +160,7 @@ const BlogListPage = () => {
             {otherPosts.length > 0 && (
               <div>
                 <h2 className="text-sm font-semibold text-green-600 uppercase tracking-wider mb-6">
-                  Todos os Artigos
+                  {t('all_articles')}
                 </h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {otherPosts.map((post) => (
@@ -197,7 +200,7 @@ const BlogListPage = () => {
                               {formatDate(post.published_at)}
                             </span>
                             <span className="flex items-center gap-1 text-green-600 text-sm font-medium group-hover:gap-2 transition-all">
-                              Ler <ArrowRight className="w-3 h-3" />
+                              {t('read')} <ArrowRight className="w-3 h-3" />
                             </span>
                           </div>
                         </CardContent>
@@ -213,17 +216,17 @@ const BlogListPage = () => {
         {/* CTA */}
         <div className="mt-20 text-center bg-gradient-to-br from-green-50 to-white rounded-2xl p-12 border border-green-100">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Pronto para ser mais produtivo no WhatsApp?
+            {t('ready_to_be_productive')}
           </h2>
           <p className="text-gray-600 mb-8 text-lg max-w-xl mx-auto">
-            Experimente a Summi gratuitamente por 7 dias e descubra como a IA pode transformar sua gestão do WhatsApp.
+            {t('try_summi_free')}
           </p>
           <Link to="/login">
             <Button
               size="lg"
               className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg px-8"
             >
-              Começar Grátis por 7 Dias
+              {t('start_free_7_days')}
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>
@@ -242,12 +245,12 @@ const BlogListPage = () => {
             <span className="font-bold">Summi</span>
           </div>
           <p className="text-gray-400 text-sm">
-            © 2026 Summi. Todos os direitos reservados.
+            © 2026 Summi. {t('all_rights_reserved')}
           </p>
           <div className="flex gap-4 text-sm text-gray-400">
-            <Link to="/" className="hover:text-white transition-colors">Início</Link>
-            <Link to="/terms" className="hover:text-white transition-colors">Termos</Link>
-            <Link to="/privacy" className="hover:text-white transition-colors">Privacidade</Link>
+            <Link to="/" className="hover:text-white transition-colors">{t('home')}</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">{t('terms')}</Link>
+            <Link to="/privacy" className="hover:text-white transition-colors">{t('privacy')}</Link>
           </div>
         </div>
       </footer>

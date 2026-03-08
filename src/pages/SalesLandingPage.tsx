@@ -8,6 +8,7 @@ import { createCheckoutSession } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { trackGrowthEvent } from '@/lib/growthTracking';
 import { cn } from '@/lib/utils';
+import { SEO } from '@/components/SEO';
 
 type PlanType = 'monthly' | 'annual';
 
@@ -75,6 +76,13 @@ const SalesLandingPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-summi-green/10 via-background to-background">
+      <SEO
+        title="Summi - Planos e Assinatura"
+        description="Escolha o plano ideal para sua produtividade no WhatsApp. Teste grátis por 7 dias."
+        canonicalPath="/sales"
+        author="Summi"
+      />
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 p-2 bg-background text-summi-green">Pular para o conteúdo principal</a>
       <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
@@ -91,7 +99,7 @@ const SalesLandingPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-md space-y-8 px-4 pb-28 pt-6">
+      <main id="main-content" className="mx-auto max-w-md space-y-8 px-4 pb-28 pt-6">
         <section className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="bg-summi-green/15 text-summi-green border-summi-green/20" variant="outline">
@@ -100,7 +108,7 @@ const SalesLandingPage = () => {
             <Badge variant="secondary">Ative em 2 minutos</Badge>
           </div>
 
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+          <h1 className="text-4xl sm:text-5xl font-semibold leading-tight tracking-tight text-balance">
             Pare de perder mensagens importantes.
           </h1>
           <p className="text-base text-muted-foreground">
@@ -275,20 +283,20 @@ const SalesLandingPage = () => {
         </footer>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-background/90 backdrop-blur">
-        <div className="mx-auto max-w-md px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur z-50 shadow-[0_-4px_15px_-3px_rgba(0,0,0,0.05)]">
+        <div className="mx-auto max-w-md px-4 py-3 sm:py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] text-muted-foreground">Plano selecionado</div>
-              <div className="truncate text-sm font-medium">
-                {selected.name} • {selected.trial}
+              <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider font-semibold">Plano selecionado</div>
+              <div className="truncate text-xs sm:text-sm font-medium">
+                {selected.name} • <span className="hidden sm:inline">{selected.trial}</span><span className="sm:hidden">7 dias grátis</span>
               </div>
             </div>
 
-            <Button onClick={handleCheckout} disabled={isLoading} className="shrink-0 bg-summi-gradient text-white">
+            <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleCheckout} disabled={isLoading} size="sm" className="sm:h-10 sm:px-4 shrink-0 bg-summi-gradient text-white active:scale-[0.97] transition-transform">
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {selected.cta}
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>

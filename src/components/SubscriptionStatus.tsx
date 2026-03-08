@@ -151,7 +151,7 @@ export const SubscriptionStatus = () => {
           <div className="text-center">
             <p className="text-summi-gray-600">Nenhuma assinatura encontrada</p>
             <Button
-              onClick={handleRefresh}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleRefresh}
               variant="outline"
               size="sm"
               className="mt-2"
@@ -185,7 +185,7 @@ export const SubscriptionStatus = () => {
             </span>
           </div>
           <Button
-            onClick={handleRefresh}
+            role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleRefresh}
             variant="ghost"
             size="sm"
             disabled={isRefreshing}
@@ -259,7 +259,7 @@ export const SubscriptionStatus = () => {
               Para utilizar todas as funcionalidades da Summi, é necessário ter uma assinatura ativa. Inicie agora e aproveite um <strong>período de teste gratuito</strong>.
             </p>
             <Button
-              onClick={() => navigate('/subscription')}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => navigate('/subscription')}
               className="mt-4 w-full bg-summi-gradient text-white hover:opacity-90"
             >
               Ver Planos e Iniciar Teste

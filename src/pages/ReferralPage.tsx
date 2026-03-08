@@ -8,8 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Gift, Calendar, CheckCircle, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
+import { SEO } from '@/components/SEO';
 
 const ReferralPage: React.FC = () => {
+  const { t } = useTranslation();
   const { referralCode } = useParams<{ referralCode: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -75,8 +78,8 @@ const ReferralPage: React.FC = () => {
 
     if (formData.password !== formData.confirmPassword) {
       toast({
-        title: "Erro",
-        description: "As senhas não conferem",
+        title: t("error"),
+        description: t("passwords_do_not_match"),
         variant: "destructive",
       });
       return;
@@ -84,8 +87,8 @@ const ReferralPage: React.FC = () => {
 
     if (formData.password.length < 6) {
       toast({
-        title: "Erro",
-        description: "A senha deve ter pelo menos 6 caracteres",
+        title: t("error"),
+        description: t("password_min_length"),
         variant: "destructive",
       });
       return;
@@ -112,21 +115,21 @@ const ReferralPage: React.FC = () => {
       }
 
       if (!data?.success) {
-        throw new Error(data?.error || 'Erro no registro');
+        throw new Error(data?.error || t('registration_error'));
       }
 
       console.log('[REFERRAL-PAGE] Registro bem-sucedido');
 
       toast({
-        title: "Conta criada com sucesso!",
-        description: data.message || "Sua conta foi criada e você ganhou 10 dias de teste gratuito!",
+        title: t("account_created_success_title"),
+        description: data.message || t("account_created_success_desc"),
       });
 
       // Redirecionar para login com mensagem
       setTimeout(() => {
         navigate('/login', {
           state: {
-            message: 'Conta criada! Faça login para começar seu teste gratuito de 10 dias.',
+            message: t('account_created_login_message'),
             email: formData.email
           }
         });
@@ -135,8 +138,8 @@ const ReferralPage: React.FC = () => {
     } catch (error) {
       console.error('[REFERRAL-PAGE] Erro inesperado:', error);
       toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Erro inesperado ao criar conta",
+        title: t("error"),
+        description: error instanceof Error ? error.message : t("unexpected_error_creating_account"),
         variant: "destructive",
       });
     } finally {
@@ -146,12 +149,12 @@ const ReferralPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-summi-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F5F7F6] flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-blue mx-auto"></div>
-              <p className="mt-4 text-summi-gray-600">Validando convite...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00A36C] mx-auto"></div>
+              <p className="mt-4 text-[#4A4D4C]">{t('validating_invite')}</p>
             </div>
           </CardContent>
         </Card>
@@ -161,23 +164,23 @@ const ReferralPage: React.FC = () => {
 
   if (!isValidCode) {
     return (
-      <div className="min-h-screen bg-summi-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md card-hover">
+      <div className="min-h-screen bg-[#F5F7F6] flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
               <span className="text-red-600 text-2xl">❌</span>
             </div>
-            <CardTitle className="text-red-600">Convite Inválido</CardTitle>
+            <h2 className="text-2xl font-bold text-red-600">{t('invitation_invalid_title')}</h2>
           </CardHeader>
           <CardContent className="text-center space-y-4">
-            <p className="text-summi-gray-600">
-              Este link de convite não é válido ou pode ter expirado.
+            <p className="text-[#4A4D4C]">
+              {t('invitation_invalid_desc')}
             </p>
             <Button
               onClick={() => navigate('/register')}
-              className="btn-primary w-full"
+              className="w-full bg-[#00A36C] hover:bg-[#008F5D]"
             >
-              Criar Conta Normalmente
+              {t('create_account_normal')}
             </Button>
           </CardContent>
         </Card>
@@ -186,120 +189,125 @@ const ReferralPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-summi-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md card-hover">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-            <Gift className="h-8 w-8 text-green-600" />
-          </div>
-          <CardTitle className="text-2xl text-summi-gray-900">Você foi convidado!</CardTitle>
-          <p className="text-summi-gray-600">
-            <strong>{referrerName}</strong> te convidou para conhecer a Summi
-          </p>
-        </CardHeader>
+    <div className="min-h-screen bg-[#F5F7F6]">
+      <SEO
+        title={t('you_were_invited')}
+        description={t('referral_page_desc')}
+        author="Summi"
+      />
+      <div className="flex items-center justify-center p-4 min-h-screen">
+        <Card className="w-full max-w-md shadow-lg border-[#E9EDEB]">
+          <CardHeader className="text-center pt-8">
+            <div className="mx-auto mb-4 w-16 h-16 bg-[#00A36C]/10 rounded-full flex items-center justify-center">
+              <Gift className="h-8 w-8 text-[#00A36C]" />
+            </div>
+            <h1 className="text-2xl font-bold text-[#1A1C1B]">{t('you_were_invited')}</h1>
+            <p className="text-[#4A4D4C]">
+              <strong>{referrerName}</strong> {t('invited_you_to_summi')}
+            </p>
+          </CardHeader>
 
-        <CardContent className="space-y-6">
-          {/* Benefícios */}
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <h3 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
-              <CheckCircle className="h-5 w-5" />
-              Seus benefícios especiais:
-            </h3>
-            <ul className="space-y-2 text-sm text-green-700">
-              <li className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span><strong>10 dias</strong> de teste gratuito (3 a mais que o normal)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Gift className="h-4 w-4" />
-                <span>Acesso completo a todas as funcionalidades</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Formulário de Registro */}
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div>
-              <Label htmlFor="name">Nome completo</Label>
-              <Input
-                id="name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                placeholder="Seu nome completo"
-                className="mt-1"
-              />
+          <CardContent className="space-y-6 pb-8">
+            <div className="bg-[#00A36C]/5 p-4 rounded-xl border border-[#00A36C]/10">
+              <h2 className="font-semibold text-[#1A1C1B] mb-3 flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-[#00A36C]" />
+                {t('special_benefits_title')}
+              </h2>
+              <ul className="space-y-2 text-sm text-[#4A4D4C]">
+                <li className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-[#00A36C]" />
+                  <span>{t('special_benefit_days')}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-[#00A36C]" />
+                  <span>{t('special_benefit_access')}</span>
+                </li>
+              </ul>
             </div>
 
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                placeholder="seu@email.com"
-                className="mt-1"
-              />
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="name" className="text-summi-gray-700 font-medium">{t('full_name')}</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                  placeholder={t('full_name_placeholder')}
+                  className="bg-white border-[#E9EDEB] focus:border-[#000000]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="email" className="text-summi-gray-700 font-medium">{t('email')}</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  placeholder="seu@email.com"
+                  className="bg-white border-[#E9EDEB] focus:border-[#000000]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="password" className="text-summi-gray-700 font-medium">{t('password')}</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                  placeholder="••••••••"
+                  minLength={6}
+                  className="bg-white border-[#E9EDEB] focus:border-[#000000]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="confirmPassword" className="text-summi-gray-700 font-medium">{t('confirm_password')}</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  required
+                  placeholder="••••••••"
+                  className="bg-white border-[#E9EDEB] focus:border-[#000000]"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-[#00A36C] hover:bg-[#008F5D] text-white font-bold h-11"
+                disabled={isRegistering}
+              >
+                {isRegistering ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {t('creating_account')}
+                  </>
+                ) : (
+                  t('activate_trial_button')
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center text-sm text-[#4A4D4C]">
+              {t('already_have_account')}{' '}
+              <Button
+                variant="link"
+                className="p-0 h-auto font-semibold text-[#00A36C] hover:text-[#008F5D]"
+                onClick={() => navigate('/login')}
+              >
+                {t('login')}
+              </Button>
             </div>
-
-            <div>
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                placeholder="Mínimo 6 caracteres"
-                minLength={6}
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="confirmPassword">Confirmar senha</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                required
-                placeholder="Confirme sua senha"
-                className="mt-1"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              className="btn-primary w-full"
-              disabled={isRegistering}
-            >
-              {isRegistering ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Criando conta...
-                </>
-              ) : (
-                'Ativar Teste de 10 Dias'
-              )}
-            </Button>
-          </form>
-
-          <div className="text-center text-xs text-summi-gray-500">
-            Já tem uma conta?{' '}
-            <Button
-              variant="link"
-              className="p-0 h-auto text-xs text-summi-blue hover:underline"
-              onClick={() => navigate('/login')}
-            >
-              Fazer login
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

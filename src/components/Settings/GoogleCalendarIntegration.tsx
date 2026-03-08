@@ -143,7 +143,7 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
               </p>
             </div>
             <Button 
-              onClick={handleConnect}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleConnect}
               disabled={isConnecting}
               variant="outline"
               className="min-w-[200px]"
@@ -165,7 +165,7 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
               </p>
             </div>
             <Button 
-              onClick={handleConnect}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleConnect}
               disabled={isConnecting}
               className="min-w-[200px]"
             >
@@ -202,7 +202,7 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleSync}
+                  role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleSync}
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -215,7 +215,7 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleDisconnect}
+                  role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleDisconnect}
                   disabled={isLoading}
                 >
                   <Unlink className="mr-2 h-4 w-4" />
@@ -265,7 +265,7 @@ export const GoogleCalendarIntegration = ({ profile, onUpdate }: GoogleCalendarI
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleSetDefault(calendar)}
+                            role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleSetDefault(calendar)}
                             disabled={isUpdating}
                           >
                             Definir como Padrão

@@ -15,6 +15,8 @@ import { RefreshCw, Send, Plus, Mail, MessageSquare, Eye, Clock, CheckCircle, XC
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 interface Announcement {
   id: string;
@@ -42,6 +44,7 @@ interface Delivery {
 }
 
 const AdminAnnouncementsPage = () => {
+  const { t } = useTranslation();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,8 +70,8 @@ const AdminAnnouncementsPage = () => {
     } catch (error) {
       console.error('Erro ao buscar anúncios:', error);
       toast({
-        title: "Erro",
-        description: "Falha ao carregar anúncios",
+        title: t('error'),
+        description: t('fetch_announcements_error', { defaultValue: 'Falha ao carregar anúncios' }),
         variant: "destructive"
       });
     }
@@ -92,8 +95,8 @@ const AdminAnnouncementsPage = () => {
   const createAnnouncement = async () => {
     if (!title.trim() || !message.trim()) {
       toast({
-        title: "Erro",
-        description: "Título e mensagem são obrigatórios",
+        title: t('error'),
+        description: t('title_message_required', { defaultValue: 'Título e mensagem são obrigatórios' }),
         variant: "destructive"
       });
       return;
@@ -101,8 +104,8 @@ const AdminAnnouncementsPage = () => {
 
     if (!sendViaEmail && !sendViaWhatsapp) {
       toast({
-        title: "Erro",
-        description: "Selecione pelo menos um método de envio",
+        title: t('error'),
+        description: t('select_delivery_method_error', { defaultValue: 'Selecione pelo menos um método de envio' }),
         variant: "destructive"
       });
       return;
@@ -110,7 +113,7 @@ const AdminAnnouncementsPage = () => {
 
     setIsCreating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-announcement', {
+      const { error } = await supabase.functions.invoke('create-announcement', {
         body: {
           title: title.trim(),
           message: message.trim(),
@@ -122,8 +125,8 @@ const AdminAnnouncementsPage = () => {
       if (error) throw error;
 
       toast({
-        title: "Sucesso",
-        description: "Anúncio criado com sucesso!"
+        title: t('success'),
+        description: t('announcement_created')
       });
 
       // Reset form
@@ -136,8 +139,8 @@ const AdminAnnouncementsPage = () => {
     } catch (error) {
       console.error('Erro ao criar anúncio:', error);
       toast({
-        title: "Erro",
-        description: "Falha ao criar anúncio",
+        title: t('error'),
+        description: t('create_announcement_error'),
         variant: "destructive"
       });
     } finally {
@@ -147,23 +150,23 @@ const AdminAnnouncementsPage = () => {
 
   const sendAnnouncement = async (announcementId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('send-announcement', {
+      const { error } = await supabase.functions.invoke('send-announcement', {
         body: { announcement_id: announcementId }
       });
 
       if (error) throw error;
 
       toast({
-        title: "Enviando",
-        description: "Anúncio sendo enviado em segundo plano"
+        title: t('sending'),
+        description: t('announcement_sending_background')
       });
 
       fetchAnnouncements();
     } catch (error) {
       console.error('Erro ao enviar anúncio:', error);
       toast({
-        title: "Erro",
-        description: "Falha ao enviar anúncio",
+        title: t('error'),
+        description: t('send_announcement_error'),
         variant: "destructive"
       });
     }
@@ -171,13 +174,13 @@ const AdminAnnouncementsPage = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      draft: { variant: 'secondary' as const, label: 'Rascunho', icon: Clock },
-      sending: { variant: 'default' as const, label: 'Enviando', icon: Send },
-      sent: { variant: 'default' as const, label: 'Enviado', icon: CheckCircle },
-      failed: { variant: 'destructive' as const, label: 'Falhou', icon: XCircle }
+      draft: { variant: 'secondary' as const, label: t('draft'), icon: Clock },
+      sending: { variant: 'default' as const, label: t('sending'), icon: Send },
+      sent: { variant: 'default' as const, label: t('sent'), icon: CheckCircle },
+      failed: { variant: 'destructive' as const, label: t('failed'), icon: XCircle }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig];
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.failed;
     const Icon = config.icon;
 
     return (
@@ -199,6 +202,11 @@ const AdminAnnouncementsPage = () => {
       <AdminRoute>
         <AdminLayout>
           <div className="flex items-center justify-center min-h-[400px]">
+            <SEO
+              title={t('loading')}
+              description={t('please_wait')}
+              noIndex
+            />
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         </AdminLayout>
@@ -209,21 +217,27 @@ const AdminAnnouncementsPage = () => {
   return (
     <AdminRoute>
       <AdminLayout>
+        <SEO
+          title={t('admin_announcements_title')}
+          description={t('admin_announcements_desc')}
+          noIndex
+          author="Summi"
+        />
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
                 <MessageSquare className="h-8 w-8 text-primary" />
-                Anúncios Administrativos 📢
+                {t('admin_announcements_title')}
               </h1>
               <p className="text-gray-600">
-                Crie e gerencie mensagens para todos os usuários
+                {t('admin_announcements_subtitle')}
               </p>
             </div>
             <div className="flex gap-2">
-              <Button onClick={fetchAnnouncements} variant="outline">
+              <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={fetchAnnouncements} variant="outline">
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Atualizar
+                {t('refresh')}
               </Button>
             </div>
           </div>
@@ -233,36 +247,36 @@ const AdminAnnouncementsPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Plus className="h-5 w-5" />
-                Criar Novo Anúncio
+                {t('create_new_announcement')}
               </CardTitle>
               <CardDescription>
-                Envie mensagens importantes para todos os usuários da plataforma
+                {t('create_announcement_desc')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="title">Título</Label>
+                <Label htmlFor="title">{t('title')}</Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Título do anúncio..."
+                  placeholder={t('announcement_title_placeholder')}
                   maxLength={200}
                 />
               </div>
 
               <div>
-                <Label htmlFor="message">Mensagem</Label>
+                <Label htmlFor="message">{t('message')}</Label>
                 <Textarea
                   id="message"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Conteúdo da mensagem..."
+                  placeholder={t('announcement_message_placeholder')}
                   rows={4}
                   maxLength={1000}
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  {message.length}/1000 caracteres
+                  {message.length}/1000 {t('characters')}
                 </p>
               </div>
 
@@ -275,7 +289,7 @@ const AdminAnnouncementsPage = () => {
                   />
                   <Label htmlFor="email" className="flex items-center gap-2">
                     <Mail className="h-4 w-4" />
-                    Enviar por Email
+                    {t('send_via_email')}
                   </Label>
                 </div>
 
@@ -287,25 +301,25 @@ const AdminAnnouncementsPage = () => {
                   />
                   <Label htmlFor="whatsapp" className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4" />
-                    Enviar por WhatsApp
+                    {t('send_via_whatsapp')}
                   </Label>
                 </div>
               </div>
 
               <Button
-                onClick={createAnnouncement}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={createAnnouncement}
                 disabled={isCreating}
                 className="w-full"
               >
                 {isCreating ? (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Criando...
+                    {t('creating')}
                   </>
                 ) : (
                   <>
                     <Plus className="h-4 w-4 mr-2" />
-                    Criar Anúncio
+                    {t('create_announcement')}
                   </>
                 )}
               </Button>
@@ -325,13 +339,13 @@ const AdminAnnouncementsPage = () => {
                         {announcement.send_via_email && (
                           <Badge variant="outline" className="flex items-center gap-1">
                             <Mail className="h-3 w-3" />
-                            Email
+                            {t('email')}
                           </Badge>
                         )}
                         {announcement.send_via_whatsapp && (
                           <Badge variant="outline" className="flex items-center gap-1">
                             <MessageSquare className="h-3 w-3" />
-                            WhatsApp
+                            {t('whatsapp')}
                           </Badge>
                         )}
                       </div>
@@ -340,10 +354,10 @@ const AdminAnnouncementsPage = () => {
                       {announcement.status === 'draft' && (
                         <Button
                           size="sm"
-                          onClick={() => sendAnnouncement(announcement.id)}
+                          role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => sendAnnouncement(announcement.id)}
                         >
                           <Send className="h-4 w-4 mr-2" />
-                          Enviar
+                          {t('send')}
                         </Button>
                       )}
                       <Dialog>
@@ -351,47 +365,51 @@ const AdminAnnouncementsPage = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
+                            role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => {
                               setSelectedAnnouncement(announcement);
                               fetchDeliveries(announcement.id);
                             }}
                           >
                             <Eye className="h-4 w-4 mr-2" />
-                            Detalhes
+                            {t('details')}
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl">
                           <DialogHeader>
                             <DialogTitle>{selectedAnnouncement?.title}</DialogTitle>
                             <DialogDescription>
-                              Detalhes do anúncio e status de entrega
+                              {t('announcement_details_desc')}
                             </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
                             <div>
-                              <Label>Mensagem:</Label>
-                              <p className="text-sm bg-gray-50 p-3 rounded">
+                              <h3 className="font-semibold text-foreground">
+                                {t('message')}:
+                              </h3>
+                              <div className="text-sm bg-gray-50 p-3 rounded">
                                 {selectedAnnouncement?.message}
-                              </p>
+                                <br />
+                                <h4 className="sr-only">{t('announcement_content_heading')}</h4>
+                              </div>
                             </div>
                             <div className="grid grid-cols-3 gap-4 text-center">
                               <div>
                                 <p className="text-2xl font-bold text-blue-600">
                                   {selectedAnnouncement?.recipients_count || 0}
                                 </p>
-                                <p className="text-sm text-gray-600">Total Recipients</p>
+                                <p className="text-sm text-gray-600">{t('total_recipients', { defaultValue: 'Total Recipients' })}</p>
                               </div>
                               <div>
                                 <p className="text-2xl font-bold text-green-600">
                                   {selectedAnnouncement?.sent_count || 0}
                                 </p>
-                                <p className="text-sm text-gray-600">Enviados</p>
+                                <p className="text-sm text-gray-600">{t('sent_count_label', { defaultValue: 'Enviados' })}</p>
                               </div>
                               <div>
                                 <p className="text-2xl font-bold text-red-600">
                                   {selectedAnnouncement?.failed_count || 0}
                                 </p>
-                                <p className="text-sm text-gray-600">Falharam</p>
+                                <p className="text-sm text-gray-600">{t('failed_count_label', { defaultValue: 'Falharam' })}</p>
                               </div>
                             </div>
                           </div>
@@ -404,11 +422,11 @@ const AdminAnnouncementsPage = () => {
                   <p className="text-gray-600 mb-3">{announcement.message.substring(0, 150)}...</p>
                   <div className="flex justify-between text-sm text-gray-500">
                     <span>
-                      Criado em: {new Date(announcement.created_at).toLocaleDateString('pt-BR')}
+                      {t('created_at_prefix', { defaultValue: 'Criado em:' })} {new Date(announcement.created_at).toLocaleDateString()}
                     </span>
                     {announcement.sent_at && (
                       <span>
-                        Enviado em: {new Date(announcement.sent_at).toLocaleDateString('pt-BR')}
+                        {t('sent_at_prefix', { defaultValue: 'Enviado em:' })} {new Date(announcement.sent_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -420,7 +438,7 @@ const AdminAnnouncementsPage = () => {
               <Card>
                 <CardContent className="text-center py-8">
                   <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">Nenhum anúncio criado ainda</p>
+                  <p className="text-gray-500">{t('no_announcements_yet', { defaultValue: 'Nenhum anúncio criado ainda' })}</p>
                 </CardContent>
               </Card>
             )}

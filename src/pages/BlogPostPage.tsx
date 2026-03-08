@@ -39,7 +39,7 @@ function renderMarkdown(content: string): string {
 const categoryColors: Record<string, string> = {
   Produtividade: "bg-green-100 text-green-700 border-green-200",
   Tutoriais: "bg-blue-100 text-blue-700 border-blue-200",
-  Negócios: "bg-purple-100 text-purple-700 border-purple-200",
+  Negócios: "bg-teal-100 text-teal-700 border-teal-200",
   Tecnologia: "bg-orange-100 text-orange-700 border-orange-200",
 };
 
@@ -169,13 +169,15 @@ const BlogPostPage = () => {
               </div>
               <span className="text-xl font-bold text-green-600">Summi</span>
             </Link>
-            <div className="flex items-center gap-4">
-              <Link to="/blog" className="text-gray-600 hover:text-green-600 transition-colors text-sm">
-                ← Blog
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Link to="/blog" className="text-gray-600 hover:text-green-600 transition-colors text-sm flex items-center pr-1 sm:pr-0">
+                <span className="sm:hidden"><ArrowLeft className="w-5 h-5" /></span>
+                <span className="hidden sm:inline">← Blog</span>
               </Link>
               <Link to="/login">
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
-                  Começar Grátis
+                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 active:scale-95 transition-transform">
+                  <span className="sm:hidden">Testar Grátis</span>
+                  <span className="hidden sm:inline">Começar Grátis</span>
                 </Button>
               </Link>
             </div>

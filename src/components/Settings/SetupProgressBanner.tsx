@@ -60,7 +60,7 @@ export const SetupProgressBanner: React.FC<SetupProgressBannerProps> = ({
                                 </span>
                             </div>
                             {!whatsappConnected && (
-                                <Button variant="ghost" size="sm" onClick={onGoToWhatsApp} className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 gap-1 h-8 px-2">
+                                <Button variant="ghost" size="sm" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={onGoToWhatsApp} className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 gap-1 h-8 px-2">
                                     Conectar <ArrowRight className="w-3 h-3" />
                                 </Button>
                             )}
@@ -87,7 +87,7 @@ export const SetupProgressBanner: React.FC<SetupProgressBannerProps> = ({
                                 </span>
                             </div>
                             {!hasPreferencesSet && (
-                                <Button variant="ghost" size="sm" onClick={onGoToPreferences} className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 gap-1 h-8 px-2">
+                                <Button variant="ghost" size="sm" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={onGoToPreferences} className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 gap-1 h-8 px-2">
                                     Configurar <ArrowRight className="w-3 h-3" />
                                 </Button>
                             )}

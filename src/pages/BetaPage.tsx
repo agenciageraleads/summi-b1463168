@@ -1,25 +1,33 @@
-
 import React from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { BetaFeatureWrapper } from '@/components/BetaFeatureWrapper';
 import { GroupsMonitoring } from '@/components/Admin/GroupsMonitoring';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TestTube, Zap, Users } from 'lucide-react';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 // Página dedicada para funcionalidades Beta
 const BetaPage: React.FC = () => {
+  const { t } = useTranslation();
+
   return (
     <DashboardLayout>
+      <SEO
+        title={t('beta_features')}
+        description={t('beta_desc')}
+        noIndex
+      />
       <div className="space-y-6">
         {/* Cabeçalho da página Beta */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
               <TestTube className="h-8 w-8 text-emerald-600" />
-              Funcionalidades Beta
+              {t('beta_features')}
             </h1>
             <p className="text-gray-600">
-              Acesso exclusivo às funcionalidades mais recentes da plataforma Summi
+              {t('beta_desc')}
             </p>
           </div>
         </div>
@@ -28,42 +36,42 @@ const BetaPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Zap className="h-5 w-5 text-yellow-500" />
-                Novidades
-              </CardTitle>
+                {t('whats_new', { defaultValue: 'Novidades' })}
+              </h2>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600">
-                Teste as funcionalidades mais recentes antes do lançamento oficial
+                {t('test_latest_features', { defaultValue: 'Teste as funcionalidades mais recentes antes do lançamento oficial' })}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Users className="h-5 w-5 text-blue-500" />
-                Comunidade
-              </CardTitle>
+                {t('community', { defaultValue: 'Comunidade' })}
+              </h2>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600">
-                Faça parte de um grupo seleto de usuários testadores
+                {t('be_part_of_beta', { defaultValue: 'Faça parte de um grupo seleto de usuários testadores' })}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
                 <TestTube className="h-5 w-5 text-emerald-500" />
-                Feedback
-              </CardTitle>
+                {t('feedback')}
+              </h2>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600">
-                Seu feedback ajuda a moldar o futuro da plataforma
+                {t('beta_feedback_desc', { defaultValue: 'Seu feedback ajuda a moldar o futuro da plataforma' })}
               </p>
             </CardContent>
           </Card>
@@ -72,19 +80,19 @@ const BetaPage: React.FC = () => {
         {/* Monitoramento de Grupos - Funcionalidade Beta */}
         <BetaFeatureWrapper
           featureName="groups-monitoring"
-          title="Monitoramento de Grupos WhatsApp"
-          description="Monitore e gerencie grupos do WhatsApp diretamente pela plataforma Summi."
+          title={t('groups_monitoring', { defaultValue: 'Monitoramento de Grupos WhatsApp' })}
+          description={t('groups_monitoring_desc', { defaultValue: 'Monitore e gerencie grupos do WhatsApp diretamente pela plataforma Summi.' })}
           showBadge={false}
         >
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Monitoramento de Grupos WhatsApp
+                {t('groups_monitoring', { defaultValue: 'Monitoramento de Grupos WhatsApp' })}
                 <span className="ml-auto text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
                   BETA
                 </span>
-              </CardTitle>
+              </h2>
             </CardHeader>
             <CardContent>
               <GroupsMonitoring />

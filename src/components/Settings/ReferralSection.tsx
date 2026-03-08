@@ -74,7 +74,7 @@ const ReferralSection: React.FC = () => {
               {referralData.referralLink}
             </div>
             <Button 
-              onClick={copyReferralLink}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={copyReferralLink}
               variant="outline" 
               size="sm"
               className="flex-shrink-0"

@@ -130,7 +130,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
                 </p>
               )}
             </div>
-            <Button onClick={handleDisconnect} variant="outline" size="sm" className="border-emerald-300 text-emerald-700 hover:bg-emerald-100">
+            <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleDisconnect} variant="outline" size="sm" className="border-emerald-300 text-emerald-700 hover:bg-emerald-100">
               Desconectar
             </Button>
           </div>
@@ -192,7 +192,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
             {/* NOVO: Botão de restart manual */}
             {!state.isRestarting && state.restartAttempts < 3 && (
               <Button
-                onClick={forceRestartInstance}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={forceRestartInstance}
                 variant="outline"
                 size="sm"
                 className={`${showRestartIndicator
@@ -228,11 +228,11 @@ export const WhatsAppConnectionManager: React.FC = () => {
               )}
             </div>
             <div className="flex space-x-2">
-              <Button onClick={() => handleConnect()} variant="outline" size="sm" className="border-red-300 text-red-700 hover:bg-red-100">
+              <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleConnect()} variant="outline" size="sm" className="border-red-300 text-red-700 hover:bg-red-100">
                 Tentar Novamente
               </Button>
               {profile?.instance_name && (state.errorCount >= 3 || state.restartAttempts >= 3) && (
-                <Button onClick={handleRecreateInstance} variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-100" disabled={isRecreating}>
+                <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleRecreateInstance} variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-100" disabled={isRecreating}>
                   {isRecreating ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-1" />
                   ) : (
@@ -255,12 +255,12 @@ export const WhatsAppConnectionManager: React.FC = () => {
               <p className="text-sm text-gray-700">Conecte seu dispositivo para começar</p>
             </div>
             {state.connectionState === 'needs_phone_number' ? (
-              <Button variant="outline" size="sm" onClick={() => navigate('/settings?tab=connection')} className="border-blue-300 text-blue-700 hover:bg-blue-50">
+              <Button variant="outline" size="sm" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => navigate('/settings?tab=connection')} className="border-blue-300 text-blue-700 hover:bg-blue-50">
                 <Settings className="w-4 h-4 mr-1" />
                 Configurar
               </Button>
             ) : (
-              <Button onClick={() => handleConnect()} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={state.isLoading}>
+              <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleConnect()} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={state.isLoading}>
                 {state.isLoading ? (
                   <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                 ) : (
@@ -307,7 +307,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
         <Button
           variant="outline"
           size="sm"
-          onClick={forceRenewCodes}
+          role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={forceRenewCodes}
           className={`text-xs px-3 py-1 h-7 ${isExpiring ? 'border-red-300 text-red-700 hover:bg-red-100' :
               isWarning ? 'border-amber-300 text-amber-700 hover:bg-amber-100' :
                 'border-blue-300 text-blue-700 hover:bg-blue-100'
@@ -356,7 +356,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleRecreateInstance}
+            role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleRecreateInstance}
             disabled={isRecreating}
             className="text-xs border-orange-300 text-orange-700 hover:bg-orange-100 flex-shrink-0"
           >
@@ -422,7 +422,7 @@ export const WhatsAppConnectionManager: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={copyPairingCode}
+                    role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={copyPairingCode}
                     className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                   >
                     <Copy className="w-4 h-4 mr-1" />

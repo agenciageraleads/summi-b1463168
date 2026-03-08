@@ -16,15 +16,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus, Pencil, Trash2, Eye, EyeOff, ExternalLink, Clock } from 'lucide-react';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 const categoryColors: Record<string, string> = {
   Produtividade: 'bg-green-100 text-green-700',
   Tutoriais: 'bg-blue-100 text-blue-700',
-  Negócios: 'bg-purple-100 text-purple-700',
+  Negócios: 'bg-teal-100 text-teal-700',
   Tecnologia: 'bg-orange-100 text-orange-700',
 };
 
 const AdminBlogPage = () => {
+  const { t } = useTranslation();
   const { posts, isLoading, togglePublish, deletePost } = useBlogAdmin();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -44,17 +47,22 @@ const AdminBlogPage = () => {
   return (
     <AdminRoute>
       <AdminLayout>
+        <SEO
+          title={t('blog')}
+          description={t('blog_admin_subtitle')}
+          noIndex
+        />
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Blog</h1>
-              <p className="text-gray-500 mt-1">Gerencie os posts do blog público.</p>
+              <h1 className="text-3xl font-bold text-gray-900">{t('blog')}</h1>
+              <p className="text-gray-500 mt-1">{t('blog_admin_subtitle')}</p>
             </div>
             <Link to="/admin/blog/new">
               <Button className="bg-green-600 hover:bg-green-700 text-white gap-2">
                 <Plus className="w-4 h-4" />
-                Novo Post
+                {t('new_post')}
               </Button>
             </Link>
           </div>
@@ -63,11 +71,11 @@ const AdminBlogPage = () => {
           <div className="grid grid-cols-3 gap-4">
             {[
               { label: 'Total', value: posts.length },
-              { label: 'Publicados', value: posts.filter(p => p.published).length },
-              { label: 'Rascunhos', value: posts.filter(p => !p.published).length },
+              { label: t('published'), value: posts.filter(p => p.published).length },
+              { label: t('draft'), value: posts.filter(p => !p.published).length },
             ].map(stat => (
               <div key={stat.label} className="bg-white rounded-lg border border-gray-200 p-4 text-center">
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <h2 className="text-2xl font-bold text-gray-900">{stat.value}</h2>
                 <p className="text-sm text-gray-500">{stat.label}</p>
               </div>
             ))}
@@ -81,8 +89,8 @@ const AdminBlogPage = () => {
               </div>
             ) : posts.length === 0 ? (
               <div className="text-center py-20 text-gray-400">
-                <p className="text-lg font-medium mb-2">Nenhum post encontrado</p>
-                <p className="text-sm">Crie o primeiro post clicando em "Novo Post".</p>
+                <h2 className="text-lg font-medium mb-2">Nenhum post encontrado</h2>
+                <h3 className="text-sm">Crie o primeiro post clicando em "Novo Post".</h3>
               </div>
             ) : (
               <table className="w-full">
@@ -115,7 +123,7 @@ const AdminBlogPage = () => {
                       </td>
                       <td className="px-6 py-4">
                         <Badge className={post.published ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>
-                          {post.published ? 'Publicado' : 'Rascunho'}
+                          {post.published ? t('published') : t('draft')}
                         </Badge>
                       </td>
                       <td className="px-6 py-4">
@@ -178,7 +186,7 @@ const AdminBlogPage = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
+              <AlertDialogAction role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
                 Excluir
               </AlertDialogAction>
             </AlertDialogFooter>

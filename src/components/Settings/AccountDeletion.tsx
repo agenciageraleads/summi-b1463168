@@ -125,11 +125,11 @@ export const AccountDeletion = () => {
             </div>
 
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setConfirmText('')}>
+              <AlertDialogCancel role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => setConfirmText('')}>
                 Cancelar
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDeleteAccount}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleDeleteAccount}
                 disabled={isDeleting || confirmText !== 'DELETAR'}
                 className="bg-destructive hover:bg-destructive/90"
               >

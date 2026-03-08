@@ -28,7 +28,7 @@ export const SubscriptionWarningBanner = () => {
       </div>
       <Button
         size="sm"
-        onClick={() => navigate('/subscription')}
+        role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => navigate('/subscription')}
         className="bg-summi-green hover:bg-summi-green/90 text-white flex-shrink-0"
       >
         Reativar Assinatura

@@ -334,6 +334,7 @@ const AdminBlogFormPage = () => {
                 <h3 className="font-semibold text-gray-900 text-sm">Tags</h3>
                 <div className="flex gap-2">
                   <Input
+                    aria-label="Adicionar tag"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}

@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Loader2 } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { Check, MessageSquare, Mic, FileText, BarChart3, Bell, Shield, ArrowRight, QrCode, Settings, Zap, Loader2, Menu, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createCheckoutSession } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
@@ -46,7 +47,7 @@ const LandingPage = () => {
       keywords="assistente whatsapp ia, automação whatsapp, transcrição áudio whatsapp, resumo mensagens whatsapp, whatsapp business ia"
       canonicalPath="/"
     />
-    {/* Navigation */}
+    {/* Navegação com menu hamburger mobile */}
     <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
@@ -74,21 +75,90 @@ const LandingPage = () => {
             </Link>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="flex items-center space-x-4">
+          {/* Desktop CTA Buttons */}
+          <div className="hidden md:flex items-center space-x-4">
             <Link to="/login">
-              <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg">
+              <Button variant="outline" className="border-green-500 text-green-600 hover:bg-green-50">
                 Entrar
               </Button>
             </Link>
             <Button
-              onClick={() => handleCheckout('monthly')}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleCheckout('monthly')}
               disabled={loadingPlan !== null}
               className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg"
             >
               {loadingPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Conectar Agora
             </Button>
+          </div>
+
+          {/* Mobile: CTA + Hamburger */}
+          <div className="flex md:hidden items-center space-x-3">
+            <Link to="/login">
+              <Button size="sm" variant="outline" className="border-green-500 text-green-600 hover:bg-green-50">
+                Entrar
+              </Button>
+            </Link>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Abrir menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72 p-0">
+                <div className="flex flex-col h-full">
+                  {/* Header do menu */}
+                  <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8">
+                        <img src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" alt="Summi" className="w-full h-full object-contain" />
+                      </div>
+                      <span className="text-lg font-bold text-green-600">Summi</span>
+                    </div>
+                  </div>
+                  {/* Links de navegação */}
+                  <nav className="flex-1 p-4 space-y-1">
+                    <SheetClose asChild>
+                      <a href="#recursos" className="flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:bg-green-50 hover:text-green-600 rounded-lg transition-colors">
+                        Recursos
+                      </a>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <a href="#como-funciona" className="flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:bg-green-50 hover:text-green-600 rounded-lg transition-colors">
+                        Como Funciona
+                      </a>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <a href="#precos" className="flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:bg-green-50 hover:text-green-600 rounded-lg transition-colors">
+                        Planos
+                      </a>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <a href="#faq" className="flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:bg-green-50 hover:text-green-600 rounded-lg transition-colors">
+                        FAQ
+                      </a>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Link to="/blog" className="flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:bg-green-50 hover:text-green-600 rounded-lg transition-colors">
+                        Blog
+                      </Link>
+                    </SheetClose>
+                  </nav>
+                  {/* CTA no fundo */}
+                  <div className="p-4 border-t border-gray-200">
+                    <Button
+                      role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleCheckout('monthly')}
+                      disabled={loadingPlan !== null}
+                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg"
+                    >
+                      {loadingPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Conectar Agora
+                      <ArrowRight className="ml-2 w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>
@@ -102,7 +172,7 @@ const LandingPage = () => {
             IA Avançada para WhatsApp
           </Badge>
 
-          <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6">
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-bold text-gray-900 mb-6">
             Automatize seu{" "}
             <br />
             <span className="bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent">WhatsApp com a Summi</span>
@@ -113,7 +183,7 @@ const LandingPage = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 my-0">
             <Button
               size="lg"
-              onClick={() => handleCheckout('monthly')}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleCheckout('monthly')}
               disabled={loadingPlan !== null}
               className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl px-8 py-4 text-lg"
             >
@@ -136,7 +206,7 @@ const LandingPage = () => {
     </section>
 
     {/* Como Funciona Section */}
-    <section id="como-funciona" className="bg-gray-50 py-[21px]">
+    <section id="como-funciona" className="bg-gray-50 py-[21px] scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Como Funciona</h2>
@@ -202,7 +272,7 @@ const LandingPage = () => {
     </section>
 
     {/* Recursos Section */}
-    <section id="recursos" className="bg-white py-[32px]">
+    <section id="recursos" className="bg-white py-[32px] scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Recursos</h2>
@@ -286,7 +356,7 @@ const LandingPage = () => {
     </section>
 
     {/* Pricing Section */}
-    <section id="precos" className="py-20 bg-green-50">
+    <section id="precos" className="py-20 bg-green-50 scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
@@ -341,7 +411,7 @@ const LandingPage = () => {
               </div>
 
               <Button
-                onClick={() => handleCheckout('monthly')}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleCheckout('monthly')}
                 disabled={loadingPlan !== null}
                 className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 text-lg"
               >
@@ -352,7 +422,7 @@ const LandingPage = () => {
           </Card>
 
           {/* Plano Anual */}
-          <Card className="border-green-500 shadow-2xl relative bg-gradient-to-br from-white to-green-50 transform scale-105">
+          <Card className="border-green-500 shadow-2xl relative bg-gradient-to-br from-white to-green-50 md:transform md:scale-105">
             {/* Badge de melhor oferta */}
             <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
               <Badge className="bg-green-600 text-white px-6 py-2 text-sm font-semibold shadow-lg">
@@ -424,7 +494,7 @@ const LandingPage = () => {
               </div>
 
               <Button
-                onClick={() => handleCheckout('annual')}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleCheckout('annual')}
                 disabled={loadingPlan !== null}
                 className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg shadow-lg transform hover:scale-[1.02] transition-all"
               >
@@ -442,7 +512,7 @@ const LandingPage = () => {
     </section>
 
     {/* FAQ Section */}
-    <section id="faq" className="py-20 bg-white">
+    <section id="faq" className="py-20 bg-white scroll-mt-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
@@ -543,7 +613,7 @@ const LandingPage = () => {
           </p>
           <Button
             size="lg"
-            onClick={() => handleCheckout('monthly')}
+            role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleCheckout('monthly')}
             disabled={loadingPlan !== null}
             className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
           >
@@ -573,7 +643,7 @@ const LandingPage = () => {
 
           <div>
             <h4 className="font-semibold mb-4">Links Rápidos</h4>
-            <ul className="space-y-2 text-gray-400">
+            <ul className="space-y-4 text-gray-400">
               <li><a href="#recursos" className="hover:text-white transition-colors">Funcionalidades</a></li>
               <li><a href="#precos" className="hover:text-white transition-colors">Planos</a></li>
               <li><a href="#faq" className="hover:text-white transition-colors">FAQ</a></li>

@@ -156,7 +156,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={() => callPromoteBeta(user.id, 'remove', user.nome)}
+                        role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => callPromoteBeta(user.id, 'remove', user.nome)}
                         className="bg-red-600 hover:bg-red-700"
                         disabled={loadingStates[user.id]}
                       >
@@ -189,7 +189,7 @@ export const BetaUsersSection: React.FC<BetaUsersSectionProps> = ({ users, onRef
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={() => callPromoteBeta(user.id, 'promote', user.nome)}
+                        role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => callPromoteBeta(user.id, 'promote', user.nome)}
                         className="bg-emerald-600 hover:bg-emerald-700"
                         disabled={loadingStates[user.id]}
                       >

@@ -39,7 +39,7 @@ export const GoogleLoginButton = () => {
 
   return (
     <Button
-      onClick={handleGoogleSignIn}
+      role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleGoogleSignIn}
       variant="outline"
       className="w-full flex items-center justify-center space-x-2 border-summi-gray-300 hover:bg-summi-gray-50"
     >

@@ -1,21 +1,30 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 // Nova página dedicada à LGPD
 const LGPDPage = () => {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-summi-green/5 to-summi-secondary/5">
+      <SEO
+        title={t('lgpd_title')}
+        description={t('lgpd_subtitle')}
+        canonicalPath="/lgpd"
+        author="Summi Team"
+      />
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 py-4">
           <Link to="/">
             <Button variant="ghost" className="text-summi-green hover:text-summi-secondary">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
+              {t('back')}
             </Button>
           </Link>
         </div>
@@ -25,22 +34,22 @@ const LGPDPage = () => {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-summi-gray-900 mb-2">
-            Lei Geral de Proteção de Dados (LGPD)
+            {t('lgpd_title')}
           </h1>
           <p className="text-summi-gray-600">
-            Como a Summi trata seus dados pessoais
+            {t('lgpd_subtitle')}
           </p>
         </div>
 
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="text-summi-green">
+            <h2 className="text-xl font-bold text-summi-green">
               Tratamento de Dados Pessoais - LGPD
-            </CardTitle>
+            </h2>
           </CardHeader>
           <CardContent className="space-y-6 text-sm">
             <section>
-              <h3 className="font-semibold text-summi-gray-900 mb-2">1. Quais dados coletamos</h3>
+              <h2 className="text-base font-semibold text-summi-gray-900 mb-2">1. Quais dados coletamos</h2>
               <p className="text-summi-gray-700 mb-3">A Summi coleta e processa os seguintes tipos de dados:</p>
               <ul className="list-disc ml-6 space-y-1 text-summi-gray-700">
                 <li><strong>Dados de cadastro:</strong> nome, e-mail, telefone</li>
@@ -51,7 +60,7 @@ const LGPDPage = () => {
             </section>
 
             <section>
-              <h3 className="font-semibold text-summi-gray-900 mb-2">2. Finalidade do tratamento</h3>
+              <h2 className="text-base font-semibold text-summi-gray-900 mb-2">2. Finalidade do tratamento</h2>
               <p className="text-summi-gray-700 mb-3">Seus dados são utilizados para:</p>
               <ul className="list-disc ml-6 space-y-1 text-summi-gray-700">
                 <li>Fornecer os serviços de análise e automação de mensagens</li>
@@ -63,15 +72,15 @@ const LGPDPage = () => {
             </section>
 
             <section>
-              <h3 className="font-semibold text-summi-gray-900 mb-2">3. Base legal</h3>
+              <h2 className="text-base font-semibold text-summi-gray-900 mb-2">3. Base legal</h2>
               <p className="text-summi-gray-700">
-                O tratamento dos seus dados baseia-se no <strong>consentimento</strong> fornecido ao aceitar 
+                O tratamento dos seus dados baseia-se no <strong>consentimento</strong> fornecido ao aceitar
                 nossos termos de uso e na <strong>execução de contrato</strong> para prestação dos serviços contratados.
               </p>
             </section>
 
             <section>
-              <h3 className="font-semibold text-summi-gray-900 mb-2">4. Compartilhamento de dados</h3>
+              <h2 className="text-base font-semibold text-summi-gray-900 mb-2">4. Compartilhamento de dados</h2>
               <p className="text-summi-gray-700 mb-3">Seus dados podem ser compartilhados apenas com:</p>
               <ul className="list-disc ml-6 space-y-1 text-summi-gray-700">
                 <li><strong>Prestadores de serviço:</strong> Stripe (pagamentos), serviços de IA (OpenAI/similar)</li>
@@ -81,7 +90,7 @@ const LGPDPage = () => {
             </section>
 
             <section>
-              <h3 className="font-semibold text-summi-gray-900 mb-2">5. Seus direitos</h3>
+              <h2 className="text-base font-semibold text-summi-gray-900 mb-2">5. Seus direitos</h2>
               <p className="text-summi-gray-700 mb-3">Você tem direito a:</p>
               <ul className="list-disc ml-6 space-y-1 text-summi-gray-700">
                 <li><strong>Acesso:</strong> saber quais dados temos sobre você</li>
@@ -93,32 +102,32 @@ const LGPDPage = () => {
             </section>
 
             <section>
-              <h3 className="font-semibold text-summi-gray-900 mb-2">6. Segurança</h3>
+              <h2 className="text-base font-semibold text-summi-gray-900 mb-2">6. Segurança</h2>
               <p className="text-summi-gray-700">
-                Implementamos medidas técnicas e organizacionais adequadas para proteger seus dados, 
+                Implementamos medidas técnicas e organizacionais adequadas para proteger seus dados,
                 incluindo criptografia, controle de acesso e monitoramento de segurança.
               </p>
             </section>
 
             <section>
-              <h3 className="font-semibold text-summi-gray-900 mb-2">7. Retenção</h3>
+              <h2 className="text-base font-semibold text-summi-gray-900 mb-2">7. Retenção</h2>
               <p className="text-summi-gray-700">
-                Mantemos seus dados apenas pelo tempo necessário para cumprir as finalidades descritas 
-                ou conforme exigido por lei. Dados de conversas são mantidos temporariamente para 
+                Mantemos seus dados apenas pelo tempo necessário para cumprir as finalidades descritas
+                ou conforme exigido por lei. Dados de conversas são mantidos temporariamente para
                 funcionamento do sistema.
               </p>
             </section>
 
             <section>
-              <h3 className="font-semibold text-summi-gray-900 mb-2">8. Contato do Encarregado</h3>
+              <h2 className="text-base font-semibold text-summi-gray-900 mb-2">8. Contato do Encarregado</h2>
               <p className="text-summi-gray-700">
-                Para exercer seus direitos ou esclarecer dúvidas sobre o tratamento de dados, 
+                Para exercer seus direitos ou esclarecer dúvidas sobre o tratamento de dados,
                 entre em contato através dos canais de suporte da plataforma.
               </p>
             </section>
 
             <div className="bg-summi-green/10 p-4 rounded-lg border border-summi-green/20 mt-6">
-              <h4 className="font-semibold text-summi-green mb-2">Importante:</h4>
+              <h3 className="font-semibold text-summi-green mb-2">Importante:</h3>
               <p className="text-summi-gray-700">
                 Esta política pode ser atualizada periodicamente. Manteremos você informado sobre mudanças significativas.
               </p>

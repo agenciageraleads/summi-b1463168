@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,8 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 const ResetPasswordPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [password, setPassword] = useState('');
@@ -30,11 +32,11 @@ const ResetPasswordPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       toast({
-        title: "Erro",
-        description: "As senhas não coincidem",
+        title: t('error'),
+        description: t('passwords_dont_match', { defaultValue: 'As senhas não coincidem' }),
         variant: "destructive",
       });
       return;
@@ -42,8 +44,8 @@ const ResetPasswordPage = () => {
 
     if (password.length < 6) {
       toast({
-        title: "Erro",
-        description: "A senha deve ter pelo menos 6 caracteres",
+        title: t('error'),
+        description: t('password_too_short', { defaultValue: 'A senha deve ter pelo menos 6 caracteres' }),
         variant: "destructive",
       });
       return;
@@ -58,7 +60,7 @@ const ResetPasswordPage = () => {
 
       if (error) {
         toast({
-          title: "Erro",
+          title: t('error'),
           description: error.message,
           variant: "destructive",
         });
@@ -66,15 +68,15 @@ const ResetPasswordPage = () => {
       }
 
       toast({
-        title: "Sucesso!",
-        description: "Senha atualizada com sucesso",
+        title: t('success'),
+        description: t('password_updated', { defaultValue: 'Senha atualizada com sucesso' }),
       });
 
       navigate('/dashboard');
     } catch (error) {
       toast({
-        title: "Erro",
-        description: "Erro inesperado ao atualizar senha",
+        title: t('error'),
+        description: t('unexpected_error', { defaultValue: 'Erro inesperado ao atualizar senha' }),
         variant: "destructive",
       });
     } finally {
@@ -84,14 +86,19 @@ const ResetPasswordPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-green/5 to-summi-secondary/5 py-12 px-4 sm:px-6 lg:px-8">
+      <SEO
+        title={t('reset_password')}
+        description={t('reset_password_desc')}
+        author="Summi"
+      />
       <div className="max-w-md w-full space-y-8">
         {/* Logo Oficial Summi */}
         <div className="text-center">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg">
-              <img 
-                src="/lovable-uploads/3cf7feb3-ab92-46ee-85a8-7706495a4bcf.png" 
-                alt="Summi Logo" 
+              <img
+                src="/lovable-uploads/3cf7feb3-ab92-46ee-85a8-7706495a4bcf.png"
+                alt="Summi Logo"
                 className="w-full h-full object-cover"
               />
             </div>
@@ -103,17 +110,18 @@ const ResetPasswordPage = () => {
             </div>
           </div>
           <h2 className="text-3xl font-bold text-summi-gray-900">
-            Nova Senha
+            {t('reset_password')}
           </h2>
           <p className="mt-2 text-sm text-summi-gray-600">
-            Digite sua nova senha
+            {t('reset_password_desc')}
           </p>
+          <h2 className="sr-only">{t('reset_password_page_subtitle')}</h2>
         </div>
 
         {/* Form */}
         <Card className="card-hover shadow-xl border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="bg-gradient-to-r from-summi-green/5 to-summi-secondary/5 rounded-t-lg">
-            <CardTitle className="text-center text-summi-gray-900">Redefinir Senha</CardTitle>
+            <CardTitle className="text-center text-summi-gray-900">{t('reset_password')}</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -148,7 +156,7 @@ const ResetPasswordPage = () => {
                 className="w-full bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
                 disabled={isLoading}
               >
-                {isLoading ? 'Atualizando...' : 'Atualizar Senha'}
+                {isLoading ? t('updating', { defaultValue: 'Atualizando...' }) : t('update_password', { defaultValue: 'Atualizar Senha' })}
               </Button>
             </form>
           </CardContent>

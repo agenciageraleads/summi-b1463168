@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -18,6 +19,7 @@ export const TermsCheckbox: React.FC<TermsCheckboxProps> = ({
   error
 }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { t } = useTranslation(); // Added useTranslation hook
 
   return (
     <div className="space-y-2">
@@ -37,7 +39,7 @@ export const TermsCheckbox: React.FC<TermsCheckboxProps> = ({
                   variant="link"
                   className="p-0 h-auto text-summi-green hover:text-summi-secondary underline"
                 >
-                  Termos de Uso
+                  {t('terms_of_use')} {/* Replaced hardcoded text with t('terms_of_use') */}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">

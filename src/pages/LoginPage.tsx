@@ -7,8 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
 import { GoogleLoginButton } from '@/components/auth/GoogleLoginButton';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 const LoginPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { login, resetPassword, user, isLoading } = useAuth();
@@ -20,15 +23,6 @@ const LoginPage = () => {
   const [resetEmail, setResetEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mostrar mensagem de sucesso se veio do registro
-  useEffect(() => {
-    if (location.state?.message) {
-      // Toast já é exibido pelo AuthContext, não precisa duplicar
-    }
-  }, [location.state]);
-
-  // Efeito para redirecionar o usuário após o login bem-sucedido.
-  // Isso garante que a navegação só ocorra quando o estado de 'user' for atualizado.
   useEffect(() => {
     if (user && !isLoading) {
       navigate('/dashboard');
@@ -38,33 +32,25 @@ const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
-    // A função de login é chamada, e os toasts de sucesso/erro são exibidos.
     await login(formData.email, formData.password);
-
-    // A navegação foi removida daqui para evitar a condição de corrida.
-    // O useEffect acima agora é o único responsável pelo redirecionamento.
-
     setIsSubmitting(false);
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     const result = await resetPassword(resetEmail);
-
     if (!result.error) {
       setShowResetPassword(false);
       setResetEmail('');
     }
-
     setIsSubmitting(false);
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-green/5 to-summi-green/10">
+        <SEO title={t('loading', { defaultValue: 'Carregando...' })} description={t('please_wait', { defaultValue: 'Aguarde...' })} noIndex />
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-green"></div>
       </div>
     );
@@ -72,8 +58,13 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-summi-green/5 to-summi-green/10 py-12 px-4 sm:px-6 lg:px-8">
+      <SEO
+        title={showResetPassword ? t('reset_password') : t('login_title')}
+        description={t('login_description', { defaultValue: 'Entre na sua conta Summi para gerenciar suas automações.' })}
+        canonicalPath="/login"
+        author="Summi Team"
+      />
       <div className="max-w-md w-full space-y-8">
-        {/* Logo Oficial Summi */}
         <div className="text-center">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg">
@@ -84,21 +75,22 @@ const LoginPage = () => {
               />
             </div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-summi-green to-summi-secondary bg-clip-text text-transparent">
+              <p className="text-3xl font-bold bg-gradient-to-r from-summi-green to-summi-secondary bg-clip-text text-transparent">
                 Summi
-              </h1>
+              </p>
               <p className="text-sm text-summi-gray-600">Inteligência Artificial para WhatsApp</p>
             </div>
           </div>
-          <h2 className="text-3xl font-bold text-summi-gray-900">
-            {showResetPassword ? 'Redefinir Senha' : 'Entre na sua conta'}
-          </h2>
+          <h1 className="text-3xl font-bold text-summi-gray-900 mt-2">
+            {showResetPassword ? t('reset_password') : t('login_title')}
+          </h1>
           <p className="mt-2 text-sm text-summi-gray-600">
-            {showResetPassword && 'Digite seu e-mail para receber instruções'}
+            {showResetPassword
+              ? t('reset_password_instructions', { defaultValue: 'Digite seu e-mail para receber instruções.' })
+              : t('login_subtitle')}
           </p>
         </div>
 
-        {/* Mensagem de sucesso do registro */}
         {location.state?.message && (
           <div className="bg-summi-green/10 border border-summi-green/20 rounded-lg p-4">
             <p className="text-sm text-summi-green font-medium text-center">
@@ -107,18 +99,13 @@ const LoginPage = () => {
           </div>
         )}
 
-        {/* Form */}
         <Card className="card-hover shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="bg-gradient-to-r from-summi-green/5 to-summi-secondary/5 rounded-t-lg">
-            <CardTitle className="text-center text-summi-gray-900">
-              {showResetPassword ? 'Recuperar Acesso' : 'Fazer Login'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
+          <CardContent className="p-6 pt-8">
             {showResetPassword ? (
               <form onSubmit={handleResetPassword} className="space-y-4">
+                <h2 className="text-lg font-semibold text-summi-gray-900 text-center mb-4">{t('reset_password')}</h2>
                 <div>
-                  <Label htmlFor="resetEmail" className="text-summi-gray-700 font-medium">E-mail</Label>
+                  <Label htmlFor="resetEmail" className="text-summi-gray-700 font-medium">{t('email')}</Label>
                   <Input
                     id="resetEmail"
                     type="email"
@@ -137,36 +124,36 @@ const LoginPage = () => {
                     className="flex-1 border-summi-gray-300 text-summi-gray-700 hover:bg-summi-gray-50"
                     onClick={() => setShowResetPassword(false)}
                   >
-                    Voltar
+                    {t('back')}
                   </Button>
                   <Button
                     type="submit"
                     className="flex-1 bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? 'Enviando...' : 'Enviar'}
+                    {isSubmitting ? t('sending') : t('send')}
                   </Button>
                 </div>
               </form>
             ) : (
               <>
-                {/* **ADIÇÃO: Botão Google antes do formulário** */}
                 <div className="space-y-4">
+                  <h2 className="text-sm font-medium text-summi-gray-500 text-center mb-2">{t('login_social', { defaultValue: 'Acesse com sua rede social' })}</h2>
                   <GoogleLoginButton />
-
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
                       <span className="w-full border-t border-summi-gray-300" />
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-white px-2 text-summi-gray-500">Ou continue com</span>
+                      <span className="bg-white px-2 text-summi-gray-500">{t('or_continue_with', { defaultValue: 'Ou continue com' })}</span>
                     </div>
                   </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+                  <h2 className="text-sm font-medium text-summi-gray-500 text-center mb-4">{t('login_email', { defaultValue: 'Acesse com seu e-mail' })}</h2>
                   <div>
-                    <Label htmlFor="email" className="text-summi-gray-700 font-medium">E-mail</Label>
+                    <Label htmlFor="email" className="text-summi-gray-700 font-medium">{t('email')}</Label>
                     <Input
                       id="email"
                       type="email"
@@ -179,7 +166,7 @@ const LoginPage = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="password" className="text-summi-gray-700 font-medium">Senha</Label>
+                    <Label htmlFor="password" className="text-summi-gray-700 font-medium">{t('password')}</Label>
                     <Input
                       id="password"
                       type="password"
@@ -197,7 +184,7 @@ const LoginPage = () => {
                       onClick={() => setShowResetPassword(true)}
                       className="text-sm text-summi-green hover:text-summi-secondary transition-colors"
                     >
-                      Esqueci minha senha
+                      {t('forgot_password')}
                     </button>
                   </div>
 
@@ -206,7 +193,7 @@ const LoginPage = () => {
                     className="w-full bg-gradient-to-r from-summi-green to-summi-secondary hover:from-summi-green/90 hover:to-summi-secondary/90 text-white font-medium shadow-lg"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? 'Entrando...' : 'Entrar'}
+                    {isSubmitting ? t('logging_in') : t('login_button')}
                   </Button>
                 </form>
               </>

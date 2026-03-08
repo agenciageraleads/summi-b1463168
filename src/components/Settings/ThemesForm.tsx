@@ -190,7 +190,7 @@ export const ThemesForm: React.FC<ThemesFormProps> = ({ profile, onSave, isUpdat
               <CardTitle>Temas de Interesse</CardTitle>
               <CardDescription>Ajude a Summi a identificar o que é urgente e importante nas suas conversas.</CardDescription>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={openWizard} className="shrink-0">
+            <Button type="button" variant="outline" size="sm" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={openWizard} className="shrink-0">
               <Wand2 className="h-4 w-4 mr-2" />
               Sugestões com IA
             </Button>
@@ -338,7 +338,7 @@ export const ThemesForm: React.FC<ThemesFormProps> = ({ profile, onSave, isUpdat
               <Separator />
 
               <div className="space-y-3">
-                <Button type="button" onClick={handleGenerate} disabled={!canGenerate || isGenerating} className="w-full">
+                <Button type="button" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleGenerate} disabled={!canGenerate || isGenerating} className="w-full">
                   {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
                   Gerar sugestões
                 </Button>
@@ -362,7 +362,7 @@ export const ThemesForm: React.FC<ThemesFormProps> = ({ profile, onSave, isUpdat
                         <div className="text-sm">{suggestions.importantes.join(', ')}</div>
                       </div>
                     </div>
-                    <Button type="button" variant="secondary" onClick={applySuggestions} className="w-full">
+                    <Button type="button" variant="secondary" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={applySuggestions} className="w-full">
                       Aplicar nos campos
                     </Button>
                   </div>
@@ -373,16 +373,16 @@ export const ThemesForm: React.FC<ThemesFormProps> = ({ profile, onSave, isUpdat
 
           <DialogFooter>
             {wizardStep === 2 ? (
-              <Button type="button" variant="outline" onClick={() => setWizardStep(1)} disabled={isGenerating}>
+              <Button type="button" variant="outline" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => setWizardStep(1)} disabled={isGenerating}>
                 Voltar
               </Button>
             ) : null}
             {wizardStep === 1 ? (
-              <Button type="button" onClick={() => setWizardStep(2)}>
+              <Button type="button" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => setWizardStep(2)}>
                 Continuar
               </Button>
             ) : (
-              <Button type="button" variant="ghost" onClick={() => setIsWizardOpen(false)} disabled={isGenerating}>
+              <Button type="button" variant="ghost" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => setIsWizardOpen(false)} disabled={isGenerating}>
                 Fechar
               </Button>
             )}

@@ -1,10 +1,11 @@
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useBetaFeatures } from '@/hooks/useBetaFeatures';
 import { BetaBadge } from '@/components/BetaBadge';
-import { Lock, Mail, TestTube } from 'lucide-react'; // Adicionado TestTube na importação
+import { Lock, Mail, TestTube } from 'lucide-react';
 
 interface BetaFeatureWrapperProps {
   children: React.ReactNode;
@@ -22,6 +23,7 @@ export const BetaFeatureWrapper: React.FC<BetaFeatureWrapperProps> = ({
   description,
   showBadge = true
 }) => {
+  const { t } = useTranslation();
   const { isBetaUser, hasFeatureAccess, isLoading } = useBetaFeatures();
 
   if (isLoading) {
@@ -68,29 +70,29 @@ export const BetaFeatureWrapper: React.FC<BetaFeatureWrapperProps> = ({
               <TestTube className="h-8 w-8 text-emerald-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Funcionalidade Beta
+              {t('beta_feature')}
             </h3>
             <p className="text-gray-600 mb-6">
               {description}
             </p>
           </div>
-          
+
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <p className="text-sm text-gray-600 mb-2">
-              Esta funcionalidade está disponível apenas para usuários beta.
+              {t('beta_available_only_for_users')}
             </p>
             <p className="text-sm text-gray-500">
-              Entre em contato conosco para solicitar acesso ao programa beta.
+              {t('contact_us_to_request_beta')}
             </p>
           </div>
 
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="w-full"
-            onClick={() => window.location.href = 'mailto:contato@summi.com.br?subject=Solicitar Acesso Beta'}
+            role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => window.location.href = 'mailto:contato@summi.com.br?subject=Solicitar Acesso Beta'}
           >
             <Mail className="h-4 w-4 mr-2" />
-            Solicitar Acesso Beta
+            {t('request_beta_access')}
           </Button>
         </div>
       </CardContent>

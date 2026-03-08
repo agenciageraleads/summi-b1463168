@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { useProfile } from '@/hooks/useProfile';
 import { useWhatsAppManager } from '@/hooks/useWhatsAppManager';
 import { CheckCircle, AlertCircle, RotateCcw, Smartphone } from 'lucide-react';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 const WhatsAppConnectionV2Page = () => {
+  const { t } = useTranslation();
   const { profile } = useProfile();
   const { state, handleConnect, handleDisconnect } = useWhatsAppManager();
 
@@ -24,7 +27,7 @@ const WhatsAppConnectionV2Page = () => {
           color: 'text-green-600',
           bg: 'bg-green-100',
           icon: CheckCircle,
-          text: 'Conectado'
+          text: t('connected')
         };
       case 'is_connecting':
       case 'needs_connection':
@@ -32,14 +35,14 @@ const WhatsAppConnectionV2Page = () => {
           color: 'text-yellow-600',
           bg: 'bg-yellow-100',
           icon: RotateCcw,
-          text: state.isPolling ? 'Aguardando conexão...' : 'Conectando...'
+          text: state.isPolling ? t('waiting_connection') : t('connecting')
         };
       default:
         return {
           color: 'text-red-500',
           bg: 'bg-red-100',
           icon: AlertCircle,
-          text: 'Desconectado'
+          text: t('disconnected')
         };
     }
   };
@@ -49,14 +52,19 @@ const WhatsAppConnectionV2Page = () => {
 
   return (
     <DashboardLayout>
+      <SEO
+        title={t('whatsapp_connection_v2_title')}
+        description={t('whatsapp_connection_v2_desc')}
+        author="Summi"
+      />
       <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Conexão WhatsApp v2 📱
+            {t('whatsapp_connection_v2_header')}
           </h1>
           <p className="text-muted-foreground">
-            Sistema aprimorado de conexão com webhook automático
+            {t('whatsapp_connection_v2_subtitle')}
           </p>
         </div>
 
@@ -69,46 +77,46 @@ const WhatsAppConnectionV2Page = () => {
                   <StatusIcon className={`w-6 h-6 ${status.color} ${state.connectionState === 'is_connecting' ? 'animate-spin' : ''}`} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">Status da Conexão</h3>
+                  <h2 className="font-semibold text-foreground text-base">{t('connection_status_label')}</h2>
                   <p className={`font-medium ${status.color}`}>{status.text}</p>
                   {state.isPolling && (
                     <p className="text-sm text-muted-foreground">
-                      Monitorando conexão...
+                      {t('monitoring_connection')}
                     </p>
                   )}
                 </div>
               </div>
-              
+
               <div className="flex space-x-2">
                 {state.connectionState === 'needs_phone_number' ||
-                 state.connectionState === 'needs_connection' ||
-                 state.connectionState === 'error' ? (
-                  <Button 
-                    onClick={handleConnectClick}
+                  state.connectionState === 'needs_connection' ||
+                  state.connectionState === 'error' ? (
+                  <Button
+                    role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleConnectClick}
                     disabled={state.isLoading || !profile?.nome || !profile?.numero}
                     className="flex items-center"
                   >
                     {state.isLoading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Processando...
+                        {t('processing')}
                       </>
                     ) : (
                       <>
                         <Smartphone className="w-4 h-4 mr-2" />
-                        Conectar WhatsApp
+                        {t('connect_whatsapp_btn')}
                       </>
                     )}
                   </Button>
                 ) : null}
-                
+
                 {state.connectionState === 'already_connected' && (
-                  <Button 
-                    onClick={handleDisconnect}
+                  <Button
+                    role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleDisconnect}
                     disabled={state.isLoading}
                     variant="destructive"
                   >
-                    Desconectar
+                    {t('disconnect_btn')}
                   </Button>
                 )}
               </div>
@@ -123,7 +131,7 @@ const WhatsAppConnectionV2Page = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <span>📋</span>
-                <span>Como conectar</span>
+                <h2 className="text-lg font-semibold">{t('how_to_connect_title')}</h2>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -132,33 +140,33 @@ const WhatsAppConnectionV2Page = () => {
                   1
                 </div>
                 <div>
-                  <h4 className="font-medium text-foreground">Criar Instância</h4>
+                  <h3 className="font-medium text-foreground">{t('step1_v2_title')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Cria automaticamente a instância com webhook configurado
+                    {t('step1_v2_desc')}
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-start space-x-3">
                 <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
                   2
                 </div>
                 <div>
-                  <h4 className="font-medium text-foreground">Gerar QR Code</h4>
+                  <h3 className="font-medium text-foreground">{t('step2_v2_title')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    QR Code é gerado automaticamente após criar a instância
+                    {t('step2_v2_desc')}
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-start space-x-3">
                 <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
                   3
                 </div>
                 <div>
-                  <h4 className="font-medium text-foreground">Monitoramento</h4>
+                  <h3 className="font-medium text-foreground">{t('step3_v2_title')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Sistema monitora a conexão automaticamente a cada 4 segundos
+                    {t('step3_v2_desc')}
                   </p>
                 </div>
               </div>
@@ -170,7 +178,7 @@ const WhatsAppConnectionV2Page = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <span>📱</span>
-                <span>QR Code</span>
+                <h2 className="text-lg font-semibold">{t('qrcode_display_title')}</h2>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -179,14 +187,14 @@ const WhatsAppConnectionV2Page = () => {
                   <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
                     <div className="text-center text-muted-foreground">
                       <span className="text-4xl block mb-2">📱</span>
-                      <p>Clique em "Conectar WhatsApp" para começar</p>
+                      <p>{t('click_to_start_msg')}</p>
                     </div>
                   </div>
                 ) : (state.connectionState === 'is_connecting' || state.connectionState === 'needs_connection') && state.qrCode ? (
                   <div className="w-64 h-64 bg-white border-2 border-border rounded-lg flex items-center justify-center relative overflow-hidden">
-                    <img 
-                      src={state.qrCode} 
-                      alt="QR Code" 
+                    <img
+                      src={state.qrCode}
+                      alt={t('whatsapp_qrcode_alt')}
                       className="w-56 h-56 object-contain"
                     />
                   </div>
@@ -194,9 +202,9 @@ const WhatsAppConnectionV2Page = () => {
                   <div className="w-64 h-64 bg-green-50 rounded-lg flex items-center justify-center">
                     <div className="text-center text-green-600">
                       <span className="text-6xl block mb-4">✅</span>
-                      <p className="font-semibold">Conectado com sucesso!</p>
+                      <h3 className="font-semibold">{t('success_connection_msg')}</h3>
                       <p className="text-sm text-muted-foreground mt-2">
-                        Webhook configurado automaticamente
+                        {t('webhook_configured_msg')}
                       </p>
                     </div>
                   </div>
@@ -204,7 +212,7 @@ const WhatsAppConnectionV2Page = () => {
                   <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
                     <div className="text-center text-muted-foreground">
                       <span className="text-4xl block mb-2">⏳</span>
-                      <p>Processando...</p>
+                      <p>{t('processing')}</p>
                     </div>
                   </div>
                 )}
@@ -219,7 +227,7 @@ const WhatsAppConnectionV2Page = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <span>⚡</span>
-                <span>Recursos Ativos v2</span>
+                <h2 className="text-lg font-semibold">{t('active_features_v2_title')}</h2>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -227,24 +235,24 @@ const WhatsAppConnectionV2Page = () => {
                 <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
                   <span className="text-2xl">🔗</span>
                   <div>
-                    <h4 className="font-medium text-foreground">Webhook Automático</h4>
-                    <p className="text-sm text-muted-foreground">Configurado na criação</p>
+                    <h3 className="font-medium text-foreground">{t('auto_webhook_title')}</h3>
+                    <p className="text-sm text-muted-foreground">{t('configured_on_creation')}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
                   <span className="text-2xl">📨</span>
                   <div>
-                    <h4 className="font-medium text-foreground">Eventos MESSAGES_UPSERT</h4>
-                    <p className="text-sm text-muted-foreground">Captura todas as mensagens</p>
+                    <h3 className="font-medium text-foreground">{t('upsert_events_title')}</h3>
+                    <p className="text-sm text-muted-foreground">{t('capture_all_messages')}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
                   <span className="text-2xl">🔄</span>
                   <div>
-                    <h4 className="font-medium text-foreground">Dados em Base64</h4>
-                    <p className="text-sm text-muted-foreground">Formato otimizado</p>
+                    <h3 className="font-medium text-foreground">{t('base64_data_title')}</h3>
+                    <p className="text-sm text-muted-foreground">{t('optimized_format')}</p>
                   </div>
                 </div>
               </div>
@@ -258,15 +266,15 @@ const WhatsAppConnectionV2Page = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-orange-800">
                 <AlertCircle className="w-5 h-5" />
-                <span>Complete seu perfil</span>
+                <h2 className="text-lg font-semibold">{t('complete_your_profile_title')}</h2>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-orange-700 mb-4">
-                Para conectar o WhatsApp, você precisa completar as informações do seu perfil.
+                {t('complete_profile_warning_msg')}
               </p>
               <Button variant="outline" className="border-orange-300 text-orange-800 hover:bg-orange-100">
-                Ir para Configurações
+                {t('go_to_settings_btn')}
               </Button>
             </CardContent>
           </Card>

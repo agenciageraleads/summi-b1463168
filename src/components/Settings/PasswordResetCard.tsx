@@ -52,7 +52,7 @@ export const PasswordResetCard = () => {
             <div className="truncate text-sm text-muted-foreground">{email || '—'}</div>
           </div>
 
-          <Button type="button" onClick={handleSendResetEmail} disabled={isSending || !email} className="sm:shrink-0">
+          <Button type="button" role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleSendResetEmail} disabled={isSending || !email} className="sm:shrink-0">
             {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
             {isSending ? 'Enviando...' : 'Enviar link'}
           </Button>

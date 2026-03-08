@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,8 +8,11 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { useFeedback } from '@/hooks/useFeedback';
 import { Star, MessageSquare, Lightbulb, Bug } from 'lucide-react';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 const FeedbackPage = () => {
+  const { t } = useTranslation();
   const [feedbackType, setFeedbackType] = useState<'avaliacao' | 'sugestao' | 'bug'>('avaliacao');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -38,22 +40,22 @@ const FeedbackPage = () => {
   const feedbackTypes = [
     {
       value: 'avaliacao',
-      label: 'Avaliação',
-      description: 'Compartilhe sua experiência com a Summi',
+      label: t('evaluation', { defaultValue: 'Avaliação' }),
+      description: t('evaluation_desc', { defaultValue: 'Compartilhe sua experiência com a Summi' }),
       icon: Star,
       color: 'text-yellow-500'
     },
     {
       value: 'sugestao',
-      label: 'Sugestão',
-      description: 'Sugira melhorias ou novas funcionalidades',
+      label: t('suggestion', { defaultValue: 'Sugestão' }),
+      description: t('suggestion_desc', { defaultValue: 'Sugira melhorias ou novas funcionalidades' }),
       icon: Lightbulb,
       color: 'text-blue-500'
     },
     {
       value: 'bug',
-      label: 'Reportar Bug',
-      description: 'Relate problemas ou erros encontrados',
+      label: t('report_bug', { defaultValue: 'Reportar Bug' }),
+      description: t('report_bug_desc', { defaultValue: 'Relate problemas ou erros encontrados' }),
       icon: Bug,
       color: 'text-red-500'
     }
@@ -61,29 +63,35 @@ const FeedbackPage = () => {
 
   return (
     <DashboardLayout>
+      <SEO
+        title={t('feedback')}
+        description={t('feedback_desc')}
+        noIndex
+        author="Summi"
+      />
       <div className="max-w-2xl mx-auto space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-summi-gray-900">Feedback</h1>
+          <h1 className="text-3xl font-bold text-summi-gray-900">{t('feedback')}</h1>
           <p className="text-summi-gray-600 mt-2">
-            Sua opinião é muito importante para nós. Ajude-nos a melhorar a Summi!
+            {t('feedback_desc')}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <h2 className="text-xl font-semibold flex items-center space-x-2">
               <MessageSquare className="w-5 h-5 text-summi-green" />
-              <span>Enviar Feedback</span>
-            </CardTitle>
+              <span>{t('send_feedback', { defaultValue: 'Enviar Feedback' })}</span>
+            </h2>
             <CardDescription>
-              Escolha o tipo de feedback e compartilhe seus comentários
+              {t('choose_feedback_type', { defaultValue: 'Escolha o tipo de feedback e compartilhe seus comentários' })}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Tipo de Feedback */}
               <div className="space-y-4">
-                <Label className="text-base font-medium">Tipo de Feedback</Label>
+                <Label className="text-base font-medium">{t('feedback_type', { defaultValue: 'Tipo de Feedback' })}</Label>
                 <RadioGroup
                   value={feedbackType}
                   onValueChange={(value) => setFeedbackType(value as 'avaliacao' | 'sugestao' | 'bug')}
@@ -118,7 +126,7 @@ const FeedbackPage = () => {
               {feedbackType === 'avaliacao' && (
                 <div className="space-y-3">
                   <Label htmlFor="rating" className="text-base font-medium">
-                    Avaliação Geral
+                    {t('overall_rating', { defaultValue: 'Avaliação Geral' })}
                   </Label>
                   <div className="flex space-x-1">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -134,11 +142,11 @@ const FeedbackPage = () => {
                     ))}
                   </div>
                   <p className="text-sm text-summi-gray-500">
-                    {rating === 1 && 'Muito insatisfeito'}
-                    {rating === 2 && 'Insatisfeito'}
-                    {rating === 3 && 'Neutro'}
-                    {rating === 4 && 'Satisfeito'}
-                    {rating === 5 && 'Muito satisfeito'}
+                    {rating === 1 && t('very_dissatisfied', { defaultValue: 'Muito insatisfeito' })}
+                    {rating === 2 && t('dissatisfied', { defaultValue: 'Insatisfeito' })}
+                    {rating === 3 && t('neutral', { defaultValue: 'Neutro' })}
+                    {rating === 4 && t('satisfied', { defaultValue: 'Satisfeito' })}
+                    {rating === 5 && t('very_satisfied', { defaultValue: 'Muito satisfeito' })}
                   </p>
                 </div>
               )}
@@ -146,16 +154,16 @@ const FeedbackPage = () => {
               {/* Título */}
               <div className="space-y-2">
                 <Label htmlFor="title" className="text-base font-medium">
-                  Título
+                  {t('title', { defaultValue: 'Título' })}
                 </Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={
-                    feedbackType === 'avaliacao' ? 'Ex: Experiência geral com a plataforma' :
-                      feedbackType === 'sugestao' ? 'Ex: Melhorar interface de configurações' :
-                        'Ex: Erro ao conectar WhatsApp'
+                    feedbackType === 'avaliacao' ? t('feedback_placeholder_eval', { defaultValue: 'Ex: Experiência geral com a plataforma' }) :
+                      feedbackType === 'sugestao' ? t('feedback_placeholder_sugg', { defaultValue: 'Ex: Melhorar interface de configurações' }) :
+                        t('feedback_placeholder_bug', { defaultValue: 'Ex: Erro ao conectar WhatsApp' })
                   }
                   required
                 />
@@ -164,16 +172,16 @@ const FeedbackPage = () => {
               {/* Descrição */}
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-base font-medium">
-                  Descrição
+                  {t('description', { defaultValue: 'Descrição' })}
                 </Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={
-                    feedbackType === 'avaliacao' ? 'Conte-nos sobre sua experiência usando a Summi...' :
-                      feedbackType === 'sugestao' ? 'Descreva sua sugestão de melhoria...' :
-                        'Descreva o problema encontrado, quando aconteceu e os passos para reproduzi-lo...'
+                    feedbackType === 'avaliacao' ? t('desc_placeholder_eval', { defaultValue: 'Conte-nos sobre sua experiência usando a Summi...' }) :
+                      feedbackType === 'sugestao' ? t('desc_placeholder_sugg', { defaultValue: 'Descreva sua sugestão de melhoria...' }) :
+                        t('desc_placeholder_bug', { defaultValue: 'Descreva o problema encontrado, quando aconteceu e os passos para reproduzi-lo...' })
                   }
                   rows={6}
                   required
@@ -186,7 +194,7 @@ const FeedbackPage = () => {
                 disabled={isSubmitting}
                 className="w-full bg-summi-gradient hover:opacity-90 text-white"
               >
-                {isSubmitting ? 'Enviando...' : 'Enviar Feedback'}
+                {isSubmitting ? t('sending', { defaultValue: 'Enviando...' }) : t('send_feedback', { defaultValue: 'Enviar Feedback' })}
               </Button>
             </form>
           </CardContent>
@@ -197,11 +205,10 @@ const FeedbackPage = () => {
           <CardContent className="pt-6">
             <div className="text-center space-y-2">
               <h3 className="font-semibold text-summi-gray-900">
-                Obrigado pelo seu tempo!
+                {t('thanks_for_time', { defaultValue: 'Obrigado pelo seu tempo!' })}
               </h3>
               <p className="text-sm text-summi-gray-600">
-                Sua opinião nos ajuda a criar uma experiência melhor para todos os usuários.
-                Nossa equipe analisa cada feedback recebido.
+                {t('thanks_desc', { defaultValue: 'Sua opinião nos ajuda a criar uma experiência melhor para todos os usuários. Nossa equipe analisa cada feedback recebido.' })}
               </p>
             </div>
           </CardContent>

@@ -4,6 +4,8 @@ import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Rocket, Zap, Bug, Sparkles, Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { SEO } from '@/components/SEO';
 
 const releases = [
     {
@@ -170,14 +172,20 @@ const releases = [
 ];
 
 const ReleasesPage = () => {
+    const { t } = useTranslation();
     return (
         <DashboardLayout>
+            <SEO
+                title={t('releases_title')}
+                description={t('releases_page_desc')}
+                author="Summi"
+            />
             <div className="max-w-4xl mx-auto space-y-8 py-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Novidades & Releases 🚀</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Acompanhe a evolução da Summi. Estamos sempre trabalhando para tornar sua rotina mais produtiva.
-                    </p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">{t('releases_title')} 🚀</h1>
+                    <h2 className="text-muted-foreground font-normal text-lg mt-2">
+                        {t('releases_page_subtitle')}
+                    </h2>
                 </div>
 
                 <div className="space-y-6">
@@ -189,7 +197,7 @@ const ReleasesPage = () => {
                                         <Badge variant={index === 0 ? "default" : "secondary"} className={index === 0 ? "bg-summi-green" : ""}>
                                             {release.version}
                                         </Badge>
-                                        <CardTitle className="text-xl">{release.title}</CardTitle>
+                                        <h2 className="text-xl font-bold">{release.title}</h2>
                                     </div>
                                     <div className="flex items-center text-sm text-muted-foreground">
                                         <Clock className="w-4 h-4 mr-1" />
@@ -222,10 +230,11 @@ const ReleasesPage = () => {
                 </div>
 
                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+                    <h2 className="sr-only">{t('mission_statement_heading')}</h2>
                     <p className="text-slate-600 text-sm italic">
-                        "Nossa missão é devolver a você o controle do seu tempo."
+                        {t('mission_statement')}
                     </p>
-                    <p className="text-slate-400 text-xs mt-2">— Time Summi</p>
+                    <p className="text-slate-400 text-xs mt-2">— {t('summi_team')}</p>
                 </div>
             </div>
         </DashboardLayout>

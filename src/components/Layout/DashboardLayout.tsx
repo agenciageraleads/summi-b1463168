@@ -14,7 +14,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     <div className="flex h-screen bg-summi-gray-50">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        {/* pt-14 compensa a barra de topo mobile fixa (h-14) */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pt-[72px] lg:pt-6">
           {children}
         </main>
       </div>

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,8 +10,11 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { Check, Crown, Calendar, CreditCard, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getPlanActivePriceLabel, getPlanLabel, normalizePlanType } from '@/lib/subscriptionPlans';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 const SubscriptionPage = () => {
+  const { t } = useTranslation();
   const { subscription, isLoading, createCheckout, manageSubscription } = useSubscription();
   const { toast } = useToast();
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -28,8 +30,8 @@ const SubscriptionPage = () => {
       await createCheckout(planType);
     } catch (error) {
       toast({
-        title: 'Erro',
-        description: 'Não foi possível iniciar o processo de assinatura',
+        title: t('error'),
+        description: t('checkout_error', { defaultValue: 'Não foi possível iniciar o processo de assinatura' }),
         variant: 'destructive'
       });
     }
@@ -40,8 +42,8 @@ const SubscriptionPage = () => {
       await manageSubscription();
     } catch (error) {
       toast({
-        title: 'Erro',
-        description: 'Não foi possível abrir o portal de gerenciamento',
+        title: t('error'),
+        description: t('portal_error', { defaultValue: 'Não foi possível abrir o portal de gerenciamento' }),
         variant: 'destructive'
       });
     }
@@ -58,13 +60,13 @@ const SubscriptionPage = () => {
       setIsCancelDialogOpen(false);
       setCancelReasonDetails('');
       toast({
-        title: 'Portal aberto',
-        description: 'Seu motivo foi registrado. Se quiser, conclua o cancelamento no Stripe.',
+        title: t('portal_opened', { defaultValue: 'Portal aberto' }),
+        description: t('cancel_portal_desc', { defaultValue: 'Seu motivo foi registrado. Se quiser, conclua o cancelamento no Stripe.' }),
       });
     } catch (error) {
       toast({
-        title: 'Erro',
-        description: 'Não foi possível abrir o portal de cancelamento',
+        title: t('error'),
+        description: t('cancel_error', { defaultValue: 'Não foi possível abrir o portal de cancelamento' }),
         variant: 'destructive'
       });
     } finally {
@@ -75,6 +77,7 @@ const SubscriptionPage = () => {
   if (isLoading) {
     return (
       <DashboardLayout>
+        <SEO title="Carregando..." description="Aguarde..." noIndex />
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-summi-green"></div>
         </div>
@@ -84,21 +87,26 @@ const SubscriptionPage = () => {
 
   return (
     <DashboardLayout>
+      <SEO
+        title={t('subscription')}
+        description={t('manage_subscription_subtitle')}
+        noIndex
+      />
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-summi-gray-900">Assinatura</h1>
+          <h1 className="text-3xl font-bold text-summi-gray-900">{t('subscription')}</h1>
           <p className="text-summi-gray-600 mt-2">
-            Gerencie sua assinatura e acesse todas as funcionalidades da Summi
+            {t('manage_subscription_subtitle')}
           </p>
         </div>
 
         {/* Funcionalidades da Summi */}
         <Card className="bg-gradient-to-r from-summi-green/10 to-blue-50 border-summi-green/20">
           <CardHeader>
-            <CardTitle className="text-xl text-summi-gray-900 flex items-center space-x-2">
+            <h2 className="text-xl font-semibold text-summi-gray-900 flex items-center space-x-2">
               <Crown className="w-5 h-5 text-summi-green" />
-              <span>O que você pode fazer com a Summi</span>
-            </CardTitle>
+              <span>{t('what_you_can_do')}</span>
+            </h2>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-2 gap-4">
@@ -106,22 +114,22 @@ const SubscriptionPage = () => {
                 <div className="flex items-start space-x-3">
                   <Check className="w-4 h-4 text-summi-green mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-summi-gray-900 text-sm">Transcrição de áudios</p>
-                    <p className="text-xs text-summi-gray-600">Transforme áudios em texto automaticamente</p>
+                    <h3 className="font-medium text-summi-gray-900 text-sm">{t('audio_transcription')}</h3>
+                    <p className="text-xs text-summi-gray-600">{t('audio_transcription_desc')}</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Check className="w-4 h-4 text-summi-green mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-summi-gray-900 text-sm">Resumo de conversas</p>
-                    <p className="text-xs text-summi-gray-600">Análise inteligente das mensagens importantes</p>
+                    <h3 className="font-medium text-summi-gray-900 text-sm">{t('chat_summary')}</h3>
+                    <p className="text-xs text-summi-gray-600">{t('chat_summary_desc')}</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Check className="w-4 h-4 text-summi-green mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-summi-gray-900 text-sm">Alertas prioritários</p>
-                    <p className="text-xs text-summi-gray-600">Notificações para palavras-chave importantes</p>
+                    <h3 className="font-medium text-summi-gray-900 text-sm">{t('priority_alerts')}</h3>
+                    <p className="text-xs text-summi-gray-600">{t('priority_alerts_desc')}</p>
                   </div>
                 </div>
               </div>
@@ -129,22 +137,22 @@ const SubscriptionPage = () => {
                 <div className="flex items-start space-x-3">
                   <Check className="w-4 h-4 text-summi-green mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-summi-gray-900 text-sm">Resumo de áudios longos</p>
-                    <p className="text-xs text-summi-gray-600">Condense áudios extensos sem perder o contexto</p>
+                    <h3 className="font-medium text-summi-gray-900 text-sm">{t('long_audio_summary')}</h3>
+                    <p className="text-xs text-summi-gray-600">{t('long_audio_summary_desc')}</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Check className="w-4 h-4 text-summi-green mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-summi-gray-900 text-sm">Privacidade garantida</p>
-                    <p className="text-xs text-summi-gray-600">Dados criptografados e seguros</p>
+                    <h3 className="font-medium text-summi-gray-900 text-sm">{t('guaranteed_privacy')}</h3>
+                    <p className="text-xs text-summi-gray-600">{t('guaranteed_privacy_desc')}</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Check className="w-4 h-4 text-summi-green mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-summi-gray-900 text-sm">Cancele quando quiser</p>
-                    <p className="text-xs text-summi-gray-600">Sem compromisso ou taxas de cancelamento</p>
+                    <h3 className="font-medium text-summi-gray-900 text-sm">{t('cancel_anytime')}</h3>
+                    <p className="text-xs text-summi-gray-600">{t('cancel_anytime_desc')}</p>
                   </div>
                 </div>
               </div>
@@ -156,10 +164,10 @@ const SubscriptionPage = () => {
         {subscription.subscribed && subscription.cancel_at_period_end && (
           <Card className="border-yellow-400 bg-yellow-50">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-yellow-700">
+              <h2 className="text-lg font-semibold flex items-center space-x-2 text-yellow-700">
                 <AlertTriangle className="w-5 h-5" />
                 <span>Assinatura será cancelada</span>
-              </CardTitle>
+              </h2>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-yellow-800">
@@ -172,7 +180,7 @@ const SubscriptionPage = () => {
                 . Até lá, você continua com acesso completo.
               </p>
               <Button
-                onClick={handleManageSubscription}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleManageSubscription}
                 className="w-full bg-summi-green hover:bg-summi-green/90 text-white"
               >
                 <CreditCard className="w-4 h-4 mr-2" />
@@ -186,10 +194,10 @@ const SubscriptionPage = () => {
         {subscription.subscribed && !subscription.cancel_at_period_end && (
           <Card className="border-summi-green bg-summi-green/5">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-summi-green">
+              <h2 className="text-lg font-semibold flex items-center space-x-2 text-summi-green">
                 <Crown className="w-5 h-5" />
                 <span>Assinatura Ativa</span>
-              </CardTitle>
+              </h2>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
@@ -212,7 +220,7 @@ const SubscriptionPage = () => {
               )}
 
               <Button
-                onClick={handleManageSubscription}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleManageSubscription}
                 variant="outline"
                 className="w-full border-summi-green text-summi-green hover:bg-summi-green hover:text-white"
               >
@@ -220,7 +228,7 @@ const SubscriptionPage = () => {
                 Gerenciar Assinatura
               </Button>
               <Button
-                onClick={() => setIsCancelDialogOpen(true)}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => setIsCancelDialogOpen(true)}
                 variant="ghost"
                 className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
               >
@@ -265,17 +273,17 @@ const SubscriptionPage = () => {
                   </li>
                 </ul>
 
-                {currentPlanType !== 'monthly' && (
+                {String(currentPlanType) !== 'monthly' && (
                   <Button
-                    onClick={() => handleSubscribe('monthly')}
+                    role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleSubscribe('monthly')}
                     className="w-full bg-summi-gradient hover:opacity-90 text-white"
-                    disabled={subscription.subscribed && currentPlanType === 'monthly'}
+                    disabled={subscription.subscribed && String(currentPlanType) === 'monthly'}
                   >
                     {subscription.subscribed ? 'Alterar para Mensal' : 'Assinar Mensal'}
                   </Button>
                 )}
 
-                {currentPlanType === 'monthly' && (
+                {String(currentPlanType) === 'monthly' && (
                   <div className="text-center py-2">
                     <Badge className="bg-summi-green text-white">Plano Atual</Badge>
                   </div>
@@ -283,7 +291,7 @@ const SubscriptionPage = () => {
               </CardContent>
             </Card>
 
-            <Card className={`border-2 transition-all duration-300 hover:shadow-lg relative ${currentPlanType === 'annual' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
+            <Card className={`border-2 transition-all duration-300 hover:shadow-lg relative ${String(currentPlanType) === 'annual' ? 'border-summi-green bg-summi-green/5' : 'border-summi-gray-200'
               }`}>
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-summi-green text-white">Melhor Oferta</Badge>
@@ -317,17 +325,17 @@ const SubscriptionPage = () => {
                   </li>
                 </ul>
 
-                {currentPlanType !== 'annual' && (
+                {String(currentPlanType) !== 'annual' && (
                   <Button
-                    onClick={() => handleSubscribe('annual')}
+                    role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => handleSubscribe('annual')}
                     className="w-full bg-summi-green hover:bg-summi-green/90 text-white"
-                    disabled={subscription.subscribed && currentPlanType === 'annual'}
+                    disabled={subscription.subscribed && String(currentPlanType) === 'annual'}
                   >
                     {subscription.subscribed ? 'Alterar para Anual' : 'Assinar Anual'}
                   </Button>
                 )}
 
-                {currentPlanType === 'annual' && (
+                {String(currentPlanType) === 'annual' && (
                   <div className="text-center py-2">
                     <Badge className="bg-summi-green text-white">Plano Atual</Badge>
                   </div>
@@ -341,9 +349,9 @@ const SubscriptionPage = () => {
           <Card className="bg-summi-gray-50 border-summi-gray-200">
             <CardContent className="pt-6">
               <div className="text-center">
-                <h3 className="font-semibold text-summi-gray-900 mb-2">
+                <h2 className="text-base font-semibold text-summi-gray-900 mb-2">
                   🎉 Complete seu cadastro
-                </h3>
+                </h2>
                 <p className="text-sm text-summi-gray-600">
                   Adicione seu cartão e ganhe <strong>7 dias grátis</strong> no plano mensal ou <strong>7 dias grátis</strong> no plano anual.
                   <br />
@@ -365,7 +373,7 @@ const SubscriptionPage = () => {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-summi-gray-900">Motivo principal</p>
+                <h3 className="text-sm font-medium text-summi-gray-900">Motivo principal</h3>
                 <Select value={cancelReason} onValueChange={setCancelReason}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um motivo" />
@@ -381,7 +389,7 @@ const SubscriptionPage = () => {
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-summi-gray-900">Detalhes opcionais</p>
+                <h3 className="text-sm font-medium text-summi-gray-900">Detalhes opcionais</h3>
                 <Textarea
                   value={cancelReasonDetails}
                   onChange={(e) => setCancelReasonDetails(e.target.value)}
@@ -394,13 +402,13 @@ const SubscriptionPage = () => {
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setIsCancelDialogOpen(false)}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => setIsCancelDialogOpen(false)}
                 disabled={isCancelLoading}
               >
-                Voltar
+                {t('back')}
               </Button>
               <Button
-                onClick={handleCancelSubscription}
+                role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={handleCancelSubscription}
                 disabled={isCancelLoading}
                 className="bg-red-600 text-white hover:bg-red-700"
               >

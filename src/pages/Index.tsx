@@ -2,8 +2,11 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { SEO } from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 
 const Index = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
@@ -20,11 +23,12 @@ const Index = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-green-50">
+        <SEO title="Carregando..." description="Aguarde enquanto carregamos seus dados." noIndex />
         <div className="text-center">
           <div className="w-12 h-12 mb-4 mx-auto">
-            <img 
-              src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png" 
-              alt="Summi Logo" 
+            <img
+              src="/lovable-uploads/8d37281c-dfb2-4e98-93c9-888cccd6a706.png"
+              alt={t('welcome')}
               className="w-full h-full object-contain"
             />
           </div>

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { TestTube } from 'lucide-react';
 
@@ -10,6 +11,8 @@ interface BetaBadgeProps {
 
 // Componente para exibir badge beta
 export const BetaBadge: React.FC<BetaBadgeProps> = ({ className = '', size = 'md' }) => {
+  const { t } = useTranslation();
+
   const sizeClasses = {
     sm: 'text-xs px-2 py-1',
     md: 'text-sm px-3 py-1',
@@ -23,11 +26,11 @@ export const BetaBadge: React.FC<BetaBadgeProps> = ({ className = '', size = 'md
   };
 
   return (
-    <Badge 
+    <Badge
       className={`bg-gradient-to-r from-emerald-500 to-teal-400 text-white ${sizeClasses[size]} ${className}`}
     >
       <TestTube className={`${iconSizes[size]} mr-1`} />
-      BETA
+      {t('beta')}
     </Badge>
   );
 };

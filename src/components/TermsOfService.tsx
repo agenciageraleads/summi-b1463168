@@ -8,17 +8,17 @@ interface TermsOfServiceProps {
 
 // Componente atualizado com os novos termos de uso para MVP
 export const TermsOfService: React.FC<TermsOfServiceProps> = ({ isModal = false }) => {
-  const containerClass = isModal 
-    ? "max-h-96 overflow-y-auto p-4" 
+  const containerClass = isModal
+    ? "max-h-96 overflow-y-auto p-4"
     : "container mx-auto px-4 py-8 max-w-4xl";
 
   return (
     <div className={containerClass}>
       {!isModal && (
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-summi-gray-900 mb-2">
+          <h2 className="text-3xl font-bold text-summi-gray-900 mb-2">
             Termos de Uso da Plataforma Summi (Versão MVP)
-          </h1>
+          </h2>
           <p className="text-summi-gray-600">
             Última atualização: 18 de junho de 2025
           </p>
@@ -27,20 +27,20 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ isModal = false 
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="text-summi-green">
+          <h2 className="text-xl font-bold text-summi-green">
             Termos de Uso da Plataforma Summi (Versão MVP)
-          </CardTitle>
+          </h2>
           <p className="text-sm text-summi-gray-600 mt-2">
-            <strong>Importante:</strong> Ao utilizar a plataforma Summi em sua fase inicial (MVP - Produto Mínimo Viável), 
+            <strong>Importante:</strong> Ao utilizar a plataforma Summi em sua fase inicial (MVP - Produto Mínimo Viável),
             você declara ter lido, compreendido e aceito integralmente as condições abaixo.
           </p>
         </CardHeader>
         <CardContent className="space-y-6 text-sm">
           <section>
-            <h3 className="font-semibold text-summi-gray-900 mb-2">1. Natureza Experimental do Serviço</h3>
+            <h2 className="text-base font-semibold text-summi-gray-900 mb-2">1. Natureza Experimental do Serviço</h2>
             <p className="text-summi-gray-700 mb-3">
-              A plataforma Summi encontra-se em fase inicial de desenvolvimento (MVP), disponibilizada de forma 
-              limitada e experimental a usuários interessados em testar as funcionalidades propostas. 
+              A plataforma Summi encontra-se em fase inicial de desenvolvimento (MVP), disponibilizada de forma
+              limitada e experimental a usuários interessados em testar as funcionalidades propostas.
               Ao utilizar a plataforma neste estágio, o usuário reconhece e aceita que:
             </p>
             <ul className="list-disc ml-6 space-y-1 text-summi-gray-700">
@@ -50,7 +50,7 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ isModal = false 
           </section>
 
           <section>
-            <h3 className="font-semibold text-summi-gray-900 mb-2">2. Funcionalidades e Autorização do Usuário</h3>
+            <h2 className="text-base font-semibold text-summi-gray-900 mb-2">2. Funcionalidades e Autorização do Usuário</h2>
             <p className="text-summi-gray-700 mb-3">
               Ao aceitar estes termos, o usuário autoriza a plataforma a:
             </p>
@@ -62,19 +62,19 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ isModal = false 
               <li>(Quando habilitado) Responder automaticamente mensagens com base em regras configuradas</li>
             </ul>
             <p className="text-summi-gray-700 mt-3">
-              O usuário declara estar ciente de que todas as análises, classificações e respostas são feitas por 
+              O usuário declara estar ciente de que todas as análises, classificações e respostas são feitas por
               sistemas automatizados e, portanto, estão sujeitas a falhas de interpretação.
             </p>
           </section>
 
           <section>
-            <h3 className="font-semibold text-summi-gray-900 mb-2">3. Uso de API Não Oficial e Riscos Associados</h3>
+            <h2 className="text-base font-semibold text-summi-gray-900 mb-2">3. Uso de API Não Oficial e Riscos Associados</h2>
             <p className="text-summi-gray-700 mb-3">
-              A integração com o WhatsApp ocorre por meio de tecnologia de API não oficial, sem qualquer vínculo, 
+              A integração com o WhatsApp ocorre por meio de tecnologia de API não oficial, sem qualquer vínculo,
               certificação, homologação ou aprovação da empresa Meta Platforms Inc.
             </p>
             <p className="text-summi-gray-700 mb-3">
-              O usuário está plenamente ciente e aceita que o uso de integrações não oficiais pode, 
+              O usuário está plenamente ciente e aceita que o uso de integrações não oficiais pode,
               a critério exclusivo do WhatsApp, resultar em:
             </p>
             <ul className="list-disc ml-6 space-y-1 text-summi-gray-700 mb-3">
@@ -83,17 +83,17 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ isModal = false 
               <li>Banimento parcial ou total do número de WhatsApp vinculado</li>
             </ul>
             <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-              <h4 className="font-medium text-red-800 mb-2">Isenção de Responsabilidade:</h4>
+              <h3 className="font-medium text-red-800 mb-2">Isenção de Responsabilidade:</h3>
               <p className="text-red-700 text-sm">
-                A Summi não possui controle sobre as decisões da Meta/WhatsApp e não se responsabiliza, 
-                em nenhuma hipótese, por eventuais bloqueios, sanções, prejuízos, perdas comerciais ou 
+                A Summi não possui controle sobre as decisões da Meta/WhatsApp e não se responsabiliza,
+                em nenhuma hipótese, por eventuais bloqueios, sanções, prejuízos, perdas comerciais ou
                 financeiras decorrentes de ações tomadas pelo WhatsApp sobre o número utilizado na integração.
               </p>
             </div>
           </section>
 
           <section>
-            <h3 className="font-semibold text-summi-gray-900 mb-2">4. Responsabilidades do Usuário</h3>
+            <h2 className="text-base font-semibold text-summi-gray-900 mb-2">4. Responsabilidades do Usuário</h2>
             <p className="text-summi-gray-700 mb-3">O usuário compromete-se a:</p>
             <ul className="list-disc ml-6 space-y-1 text-summi-gray-700">
               <li>Manter sigilo e segurança de suas credenciais de acesso</li>
@@ -104,17 +104,17 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ isModal = false 
           </section>
 
           <section>
-            <h3 className="font-semibold text-summi-gray-900 mb-2">5. Limitação de Garantias e Responsabilidades</h3>
+            <h2 className="text-base font-semibold text-summi-gray-900 mb-2">5. Limitação de Garantias e Responsabilidades</h2>
             <p className="text-summi-gray-700">
-              A Summi é disponibilizada "como está" (as is), sem garantias de funcionamento contínuo, 
-              estabilidade ou precisão absoluta. A responsabilidade pelo uso dos dados processados, 
-              decisões baseadas nos resumos e eventuais consequências comerciais ou jurídicas decorrentes 
+              A Summi é disponibilizada "como está" (as is), sem garantias de funcionamento contínuo,
+              estabilidade ou precisão absoluta. A responsabilidade pelo uso dos dados processados,
+              decisões baseadas nos resumos e eventuais consequências comerciais ou jurídicas decorrentes
               das interações automatizadas recai exclusivamente sobre o usuário.
             </p>
           </section>
 
           <section>
-            <h3 className="font-semibold text-summi-gray-900 mb-2">6. Privacidade e Tratamento de Dados</h3>
+            <h2 className="text-base font-semibold text-summi-gray-900 mb-2">6. Privacidade e Tratamento de Dados</h2>
             <ul className="list-disc ml-6 space-y-1 text-summi-gray-700">
               <li>As mensagens processadas são armazenadas temporariamente com a única finalidade de viabilizar o funcionamento do sistema</li>
               <li>Não há compartilhamento, comercialização ou cessão dos dados processados a terceiros, salvo exigência legal ou operacional indispensável ao funcionamento</li>
@@ -122,23 +122,23 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ isModal = false 
           </section>
 
           <section>
-            <h3 className="font-semibold text-summi-gray-900 mb-2">7. Atualizações</h3>
+            <h2 className="text-base font-semibold text-summi-gray-900 mb-2">7. Atualizações</h2>
             <p className="text-summi-gray-700">
-              Estes termos poderão ser revisados e atualizados a qualquer tempo, sendo a versão vigente 
+              Estes termos poderão ser revisados e atualizados a qualquer tempo, sendo a versão vigente
               aquela disponibilizada no momento do acesso.
             </p>
           </section>
 
           <section>
-            <h3 className="font-semibold text-summi-gray-900 mb-2">8. Contato</h3>
+            <h2 className="text-base font-semibold text-summi-gray-900 mb-2">8. Contato</h2>
             <p className="text-summi-gray-700">
-              Em caso de dúvidas ou sugestões, o usuário poderá entrar em contato com a equipe responsável 
+              Em caso de dúvidas ou sugestões, o usuário poderá entrar em contato com a equipe responsável
               diretamente pelos canais de suporte da plataforma.
             </p>
           </section>
 
           <div className="bg-summi-green/10 p-4 rounded-lg border border-summi-green/20 mt-6">
-            <h4 className="font-semibold text-summi-green mb-2">Nota Final:</h4>
+            <h3 className="font-semibold text-summi-green mb-2">Nota Final:</h3>
             <p className="text-summi-gray-700">
               Ao seguir com o cadastro, o usuário declara total ciência e aceitação de todas as condições aqui estabelecidas.
             </p>

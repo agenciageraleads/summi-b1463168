@@ -166,7 +166,7 @@ const CompleteSignupPage = () => {
           </CardHeader>
           <CardContent>
             <Button
-              onClick={() => navigate('/login')}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => navigate('/login')}
               className="w-full bg-green-600 hover:bg-green-700 text-white"
             >
               Ir para o Login
@@ -188,10 +188,10 @@ const CompleteSignupPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button onClick={verifySession} className="w-full" variant="outline">
+            <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={verifySession} className="w-full" variant="outline">
               Tentar novamente
             </Button>
-            <Button onClick={() => navigate('/')} className="w-full" variant="ghost">
+            <Button role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }} onClick={() => navigate('/')} className="w-full" variant="ghost">
               Voltar para o início
             </Button>
           </CardContent>
