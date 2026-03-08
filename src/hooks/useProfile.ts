@@ -33,7 +33,7 @@ export interface Profile {
   google_calendar_token?: string;
   google_calendar_refresh_token?: string;
   default_calendar_id?: string;
-  calendar_preferences?: any;
+  calendar_preferences?: import('@/integrations/supabase/types').Database['public']['Tables']['profiles']['Row']['calendar_preferences'];
   role?: string;
   total_segundos_audio?: number;
   total_mensagens_analisadas?: number;
@@ -98,8 +98,8 @@ export const useProfile = () => {
   // Usar a função segura para atualizações
   const updateProfile = async (updates: Partial<Profile>) => {
     const result = await secureUpdateProfile(updates);
-    if (result && (result as any).success && (result as any).data) {
-      setProfile((result as any).data);
+    if (result && (result).success && (result).data) {
+      setProfile((result).data);
     }
     return result;
   };

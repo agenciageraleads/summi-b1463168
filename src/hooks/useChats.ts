@@ -13,7 +13,7 @@ export interface Chat {
   modificado_em: string;
   contexto?: string;
   analisado_em?: string;
-  conversa: any[];
+  conversa: import('@/integrations/supabase/types').Database['public']['Tables']['chats']['Row']['conversa'];
 }
 
 export const useChats = () => {
@@ -23,7 +23,7 @@ export const useChats = () => {
 
   const fetchChats = async () => {
     if (!user) return;
-    
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -33,13 +33,13 @@ export const useChats = () => {
         .order('modificado_em', { ascending: false });
 
       if (error) throw error;
-      
+
       // Transform the data to ensure conversa is always an array
       const transformedData = (data || []).map(chat => ({
         ...chat,
         conversa: Array.isArray(chat.conversa) ? chat.conversa : []
       }));
-      
+
       setChats(transformedData);
     } catch (error) {
       console.error('Error fetching chats:', error);

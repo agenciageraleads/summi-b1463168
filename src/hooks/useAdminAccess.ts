@@ -69,8 +69,8 @@ export const useAdminAccess = (): AdminAccessResult => {
       try {
         const { data: verifyData, error: verifyError } = await supabase.functions.invoke('admin-verify');
         if (!verifyError && verifyData && typeof verifyData === 'object') {
-          allowlistConfigured = Boolean((verifyData as any).allowlist_configured);
-          const maybe = (verifyData as any).is_admin;
+          allowlistConfigured = Boolean((verifyData ).allowlist_configured);
+          const maybe = (verifyData ).is_admin;
           allowlistIsAdmin = typeof maybe === 'boolean' ? maybe : null;
         }
       } catch {
@@ -108,7 +108,7 @@ export const useAdminAccess = (): AdminAccessResult => {
         userRole: profile.role
       }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[ADMIN-ACCESS] ❌ Erro na validação:', error);
       
       setState(prev => ({

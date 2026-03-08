@@ -23,7 +23,7 @@ export interface BlogPostRow {
 export type BlogPostInput = Omit<BlogPostRow, 'id' | 'created_at'>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const BLOG_TABLE = 'blog_posts' as any;
+const BLOG_TABLE = 'blog_posts';
 
 export function useBlogAdmin() {
   const { toast } = useToast();
@@ -32,8 +32,8 @@ export function useBlogAdmin() {
 
   const fetchPosts = async () => {
     setIsLoading(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    // @ts-expect-error - blog_posts not in generated types yet
+    const { data, error } = await supabase
       .from(BLOG_TABLE)
       .select('*')
       .order('created_at', { ascending: false });
@@ -48,8 +48,8 @@ export function useBlogAdmin() {
   useEffect(() => { fetchPosts(); }, []);
 
   const createPost = async (input: BlogPostInput): Promise<BlogPostRow | null> => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    // @ts-expect-error - blog_posts not in generated types yet
+    const { data, error } = await supabase
       .from(BLOG_TABLE)
       .insert([{ ...input, modified_at: new Date().toISOString().split('T')[0] }])
       .select()
@@ -64,8 +64,8 @@ export function useBlogAdmin() {
   };
 
   const updatePost = async (id: string, input: Partial<BlogPostInput>): Promise<boolean> => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    // @ts-expect-error - blog_posts not in generated types yet
+    const { error } = await supabase
       .from(BLOG_TABLE)
       .update({ ...input, modified_at: new Date().toISOString().split('T')[0] })
       .eq('id', id);
@@ -79,8 +79,8 @@ export function useBlogAdmin() {
   };
 
   const deletePost = async (id: string): Promise<boolean> => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    // @ts-expect-error - blog_posts not in generated types yet
+    const { error } = await supabase
       .from(BLOG_TABLE)
       .delete()
       .eq('id', id);
@@ -98,8 +98,8 @@ export function useBlogAdmin() {
   };
 
   const getPostById = async (id: string): Promise<BlogPostRow | null> => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    // @ts-expect-error - blog_posts not in generated types yet
+    const { data, error } = await supabase
       .from(BLOG_TABLE)
       .select('*')
       .eq('id', id)
@@ -120,8 +120,8 @@ export function useBlog() {
   useEffect(() => {
     const fetchPublished = async () => {
       setIsLoading(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error: err } = await (supabase as any)
+      // @ts-expect-error - blog_posts not in generated types yet
+      const { data, error: err } = await supabase
         .from(BLOG_TABLE)
         .select('*')
         .eq('published', true)
@@ -137,8 +137,7 @@ export function useBlog() {
   }, []);
 
   const getPostBySlug = async (slug: string): Promise<BlogPostRow | null> => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error: err } = await (supabase as any)
+    const { data, error: err } = await supabase
       .from(BLOG_TABLE)
       .select('*')
       .eq('slug', slug)

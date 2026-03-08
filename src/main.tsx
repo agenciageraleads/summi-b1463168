@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client'
+import './i18n'
 import App from './App.tsx'
 import 'driver.js/dist/driver.css'
 import './index.css'

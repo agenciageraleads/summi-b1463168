@@ -11,7 +11,7 @@ interface SecurityEvent {
   id: string;
   user_id: string;
   event_type: 'login' | 'logout' | 'profile_update' | 'password_change' | 'admin_action' | 'unauthorized_access' | 'data_access';
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   timestamp: string;
   ip_address?: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -25,7 +25,7 @@ export const useSecurityAudit = () => {
   // Função para registrar eventos de segurança com severidade
   const logSecurityEvent = async (
     eventType: SecurityEvent['event_type'],
-    details: Record<string, any> = {},
+    details: Record<string, unknown> = {},
     severity: SecurityEvent['severity'] = 'medium'
   ) => {
     if (!user) return;
@@ -47,12 +47,12 @@ export const useSecurityAudit = () => {
       // Salvar no localStorage para auditoria local
       const existingLogs = JSON.parse(localStorage.getItem('security_audit_logs') || '[]');
       existingLogs.push(securityLog);
-      
+
       // Manter apenas os últimos 100 logs
       if (existingLogs.length > 100) {
         existingLogs.splice(0, existingLogs.length - 100);
       }
-      
+
       localStorage.setItem('security_audit_logs', JSON.stringify(existingLogs));
 
       // Para eventos críticos, mostrar alerta
@@ -75,10 +75,10 @@ export const useSecurityAudit = () => {
   // Função para validar tokens de acesso com logs de auditoria
   const validateAccess = async (requiredRole?: string, operation?: string) => {
     if (!user) {
-      await logSecurityEvent('unauthorized_access', { 
-        action: 'access_denied', 
+      await logSecurityEvent('unauthorized_access', {
+        action: 'access_denied',
         reason: 'no_user',
-        operation 
+        operation
       }, 'high');
       return false;
     }
@@ -91,17 +91,17 @@ export const useSecurityAudit = () => {
         .single();
 
       if (error) {
-        await logSecurityEvent('admin_action', { 
-          action: 'access_validation_error', 
+        await logSecurityEvent('admin_action', {
+          action: 'access_validation_error',
           error: error.message,
-          operation 
+          operation
         }, 'high');
         return false;
       }
 
       if (requiredRole && profile?.role !== requiredRole) {
-        await logSecurityEvent('unauthorized_access', { 
-          action: 'access_denied', 
+        await logSecurityEvent('unauthorized_access', {
+          action: 'access_denied',
           reason: 'insufficient_role',
           user_role: profile?.role,
           required_role: requiredRole,
@@ -121,10 +121,10 @@ export const useSecurityAudit = () => {
       return true;
     } catch (error) {
       console.error('[SECURITY] Erro na validação de acesso:', error);
-      await logSecurityEvent('admin_action', { 
-        action: 'access_validation_error', 
+      await logSecurityEvent('admin_action', {
+        action: 'access_validation_error',
         error: 'unexpected_error',
-        operation 
+        operation
       }, 'critical');
       return false;
     }
@@ -134,14 +134,14 @@ export const useSecurityAudit = () => {
   const detectSuspiciousActivity = async () => {
     try {
       const logs = JSON.parse(localStorage.getItem('security_audit_logs') || '[]');
-      const recentLogs = logs.filter((log: any) => {
+      const recentLogs = logs.filter((log: { timestamp: string, event_type: string }) => {
         const logTime = new Date(log.timestamp);
         const now = new Date();
         return (now.getTime() - logTime.getTime()) < (60 * 60 * 1000); // Última hora
       });
 
       // Detectar múltiplas tentativas de acesso negado
-      const deniedAttempts = recentLogs.filter((log: any) => 
+      const deniedAttempts = recentLogs.filter((log: Record<string, unknown>) =>
         log.event_type === 'unauthorized_access'
       );
 
@@ -170,15 +170,15 @@ export const useSecurityAudit = () => {
       const logs = JSON.parse(localStorage.getItem('security_audit_logs') || '[]');
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - 30); // Manter logs dos últimos 30 dias
-      
-      const recentLogs = logs.filter((log: any) => {
+
+      const recentLogs = logs.filter((log: { timestamp: string, event_type: string }) => {
         const logDate = new Date(log.timestamp);
         return logDate > cutoffDate;
       });
-      
+
       localStorage.setItem('security_audit_logs', JSON.stringify(recentLogs));
       console.log('[SECURITY] Logs antigos limpos, mantidos:', recentLogs.length);
-      
+
     } catch (error) {
       console.error('[SECURITY] Erro ao limpar logs antigos:', error);
     }

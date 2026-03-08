@@ -84,7 +84,7 @@ export const useSecurityValidation = () => {
   // Registrar evento de segurança para auditoria
   const logSecurityEvent = async (
     eventType: 'unauthorized_access' | 'admin_action' | 'data_access' | 'profile_update',
-    details: Record<string, any> = {}
+    details: Record<string, unknown> = {}
   ) => {
     if (!user) return;
 

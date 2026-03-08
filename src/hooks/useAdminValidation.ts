@@ -112,7 +112,7 @@ export const useAdminValidation = () => {
         permissions
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[ADMIN-VALIDATION] ❌ Erro crítico na validação:', error);
       
       setResult({

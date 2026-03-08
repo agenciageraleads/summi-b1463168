@@ -202,7 +202,7 @@ export const useWhatsAppManager = () => {
         throw new Error(restartResult.error || 'Falha no restart');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[WA Manager] ❌ Erro ao reiniciar instância:', error);
 
       setState(prev => ({
@@ -377,7 +377,7 @@ export const useWhatsAppManager = () => {
           }));
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[WA Manager] Erro ao renovar códigos:', error);
       setState(prev => ({
         ...prev,
@@ -519,7 +519,7 @@ export const useWhatsAppManager = () => {
       }
 
       // Verificar se precisa de restart devido a connecting
-      if (result.error?.includes('connecting') || (result as any).needsRestart) {
+      if (result.error?.includes('connecting') || (result ).needsRestart) {
         console.log('[WA Manager] API sinalizou necessidade de restart');
         handleRestartInstance(instanceName);
         return;
@@ -553,7 +553,7 @@ export const useWhatsAppManager = () => {
       } else {
         throw new Error(result.error || 'Falha ao gerar códigos.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[WA Manager] Erro ao gerar códigos:', error);
 
       const shouldRetry = state.generationAttempts < maxAttempts;
@@ -670,7 +670,7 @@ export const useWhatsAppManager = () => {
         throw new Error(initResult.error || 'Falha na inicialização da conexão.');
       }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[WA Manager] ❌ Erro durante handleConnect:', err);
       setState(prev => ({
         ...prev,
@@ -721,7 +721,7 @@ export const useWhatsAppManager = () => {
       }));
 
       toast({ title: "✅ Desconectado", description: "Seu WhatsApp foi desconectado." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setState(prev => ({
         ...prev,
         isLoading: false,

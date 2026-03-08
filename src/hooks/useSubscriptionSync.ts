@@ -76,7 +76,7 @@ export const useSubscriptionSync = () => {
           
           // Mostra notificação quando há mudanças
           if (payload.eventType === 'UPDATE') {
-            const newData = payload.new as any;
+            const newData = payload.new ;
             if (newData.subscription_status === 'active') {
               toast({
                 title: 'Assinatura Ativada!',

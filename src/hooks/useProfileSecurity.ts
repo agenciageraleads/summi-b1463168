@@ -13,13 +13,13 @@ export const useProfileSecurity = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
-  const { 
-    logSecurityEvent, 
-    checkRateLimit, 
-    validateAdminAccess, 
-    sanitizeInput, 
-    validateInput, 
-    detectSuspiciousActivity 
+  const {
+    logSecurityEvent,
+    checkRateLimit,
+    validateAdminAccess,
+    sanitizeInput,
+    validateInput,
+    detectSuspiciousActivity
   } = useEnhancedSecurity();
 
   // Atualizar perfil com validações de segurança aprimoradas
@@ -34,7 +34,7 @@ export const useProfileSecurity = () => {
     }
 
     setIsUpdating(true);
-    
+
     try {
       // SECURITY: Check rate limiting first
       const rateLimitOk = await checkRateLimit('profile_update', 20, 60);
@@ -51,11 +51,11 @@ export const useProfileSecurity = () => {
       await detectSuspiciousActivity();
 
       // Validar e sanitizar dados de entrada
-      const sanitizedUpdates: any = {};
+      const sanitizedUpdates: Record<string, unknown> = {};
       const validationErrors: string[] = [];
 
       // CRITICAL SECURITY: Role change validation using enhanced security
-      const validateRoleChange = async (value: any): Promise<boolean> => {
+      const validateRoleChange = async (value: unknown): Promise<boolean> => {
         const isAdmin = await validateAdminAccess('role_change');
         if (!isAdmin) {
           await logSecurityEvent('unauthorized_access', {
@@ -204,7 +204,7 @@ export const useProfileSecurity = () => {
 
       if (error) {
         console.error('[PROFILE SECURITY] Erro no banco de dados:', error);
-        
+
         await logSecurityEvent('data_access', {
           action: 'database_error',
           error: error.message,
@@ -242,7 +242,7 @@ export const useProfileSecurity = () => {
 
     } catch (error) {
       console.error('[PROFILE SECURITY] Erro inesperado:', error);
-      
+
       await logSecurityEvent('data_access', {
         action: 'unexpected_error',
         error: error instanceof Error ? error.message : 'Erro desconhecido'

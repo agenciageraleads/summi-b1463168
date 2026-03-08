@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 interface SecurityAuditEvent {
   event_type: 'login' | 'logout' | 'admin_action' | 'unauthorized_access' | 'data_access' | 
               'profile_update' | 'role_change' | 'rate_limit_exceeded' | 'security_violation';
-  event_details?: Record<string, any>;
+  event_details?: Record<string, unknown>;
   severity?: 'low' | 'medium' | 'high' | 'critical';
   ip_address?: string;
   user_agent?: string;
@@ -24,7 +24,7 @@ export const useEnhancedSecurity = () => {
   // Log security event to database audit table
   const logSecurityEvent = async (
     eventType: SecurityAuditEvent['event_type'],
-    details: Record<string, any> = {},
+    details: Record<string, unknown> = {},
     severity: SecurityAuditEvent['severity'] = 'medium'
   ) => {
     if (!user) return;
@@ -145,8 +145,8 @@ export const useEnhancedSecurity = () => {
       try {
         const { data: verifyData, error: verifyError } = await supabase.functions.invoke('admin-verify');
         if (!verifyError && verifyData && typeof verifyData === 'object') {
-          allowlistConfigured = Boolean((verifyData as any).allowlist_configured);
-          const maybe = (verifyData as any).is_admin;
+          allowlistConfigured = Boolean((verifyData ).allowlist_configured);
+          const maybe = (verifyData ).is_admin;
           allowlistIsAdmin = typeof maybe === 'boolean' ? maybe : null;
         }
       } catch {

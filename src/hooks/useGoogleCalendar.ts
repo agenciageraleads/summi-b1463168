@@ -101,7 +101,7 @@ export const useGoogleCalendar = ({ onRefreshProfile }: UseGoogleCalendarProps =
           }
         }, 1000);
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
         description: error.message || "Erro ao iniciar conexão com Google Calendar.",
@@ -134,7 +134,7 @@ export const useGoogleCalendar = ({ onRefreshProfile }: UseGoogleCalendarProps =
       }
       
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
         description: error.message || "Erro ao desconectar Google Calendar.",
@@ -157,7 +157,7 @@ export const useGoogleCalendar = ({ onRefreshProfile }: UseGoogleCalendarProps =
 
       setCalendars(data.calendars || []);
       return data.calendars || [];
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro na sincronização",
         description: error.message || "Erro ao sincronizar calendários.",
@@ -199,7 +199,7 @@ export const useGoogleCalendar = ({ onRefreshProfile }: UseGoogleCalendarProps =
       ));
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
         description: error.message || "Erro ao atualizar configurações do calendário.",
@@ -222,7 +222,7 @@ export const useGoogleCalendar = ({ onRefreshProfile }: UseGoogleCalendarProps =
 
       setCalendars(data || []);
       return data || [];
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar calendários:', error);
       return [];
     } finally {
