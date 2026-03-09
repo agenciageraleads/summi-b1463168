@@ -5,7 +5,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from .analysis import AnalyzedChat, analyze_single_chat, build_audio_script_with_usage, build_summary_text
-from .cost_tracking import log_chat_cost, log_tts_cost
+from .budget_guard import get_user_budget_state
 from .config import Settings
 from .evolution_client import EvolutionClient
 from .openai_client import OpenAIClient
@@ -379,7 +379,16 @@ def run_daily_summary_job(
                 continue
 
             items = _build_summary_items(chats)
-            summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
+            
+            # Identificar status de trial para rodapé
+            is_trial = True
+            try:
+                state = get_user_budget_state(settings, supabase, user_id=user_id)
+                is_trial = state.plan_kind == "trial"
+            except Exception:
+                pass
+
+            summary_text = build_summary_text(openai, settings.openai_model_summary, items=items, is_trial=is_trial)
             evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
             sent += 1
 
@@ -595,7 +604,15 @@ def run_user_summi_now(
         )
         items = _build_summary_items(chats)
 
-        summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
+        # Identificar status de trial para rodapé
+        is_trial = True
+        try:
+            state = get_user_budget_state(settings, supabase, user_id=user_id)
+            is_trial = state.plan_kind == "trial"
+        except Exception:
+            pass
+
+        summary_text = build_summary_text(openai, settings.openai_model_summary, items=items, is_trial=is_trial)
         evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
         base_response["summary_sent"] = True
         base_response["fallback_sent"] = not bool(items)
@@ -754,7 +771,15 @@ def run_hourly_job(
             skipped_no_priority_items += 1
             continue
 
-        summary_text = build_summary_text(openai, settings.openai_model_summary, items=items)
+        # Identificar status de trial para rodapé
+        is_trial = True
+        try:
+            state = get_user_budget_state(settings, supabase, user_id=user_id)
+            is_trial = state.plan_kind == "trial"
+        except Exception:
+            pass
+
+        summary_text = build_summary_text(openai, settings.openai_model_summary, items=items, is_trial=is_trial)
         evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
         sent += 1
 

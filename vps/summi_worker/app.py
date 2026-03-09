@@ -23,6 +23,7 @@ from .evolution_webhook import normalize_message_event
 from .growth_tracking import record_trial_budget_events
 from .openai_client import OpenAIClient, OpenAIError, OpenAIUsage, TranscriptionResult
 from .prompt_builders import (
+    build_footer,
     build_transcription_hint_terms,
     build_transcription_prompt,
     build_transcription_summary_prompt,
@@ -724,6 +725,7 @@ def _send_aux_message(
     instance_name: str,
     remote_jid_digits: str,
     text: str,
+    is_trial: bool = True,
     quoted_message_id: Optional[str] = None,
     quoted_text: Optional[str] = None,
     source_author_name: Optional[str] = None,
@@ -744,7 +746,7 @@ def _send_aux_message(
     if not text.strip() or not target_number:
         return {"sent": False, "destination": destination}
 
-    outbound_text = f"{text.rstrip()}\n\n_⚡️ Summi - Secretária Invisível_"
+    outbound_text = f"{text.rstrip()}\n\n{build_footer(is_trial)}"
     if send_private_only:
         author_label = (source_author_name or "").strip()
         outbound_text = f"{author_label} disse:\n{text.rstrip()}" if author_label else text.rstrip()
@@ -1176,6 +1178,13 @@ async def _handle_evolution_webhook(
     profile = profiles[0]
     user_id = str(profile["id"])
 
+    # Determinar status de trial para customização do rodapé
+    try:
+        budget_state = get_user_budget_state(settings, supabase, user_id=user_id)
+        is_trial = budget_state.plan_kind == "trial"
+    except Exception:
+        is_trial = True  # Fallback seguro para trial se houver erro
+
     if is_group:
         monitored = supabase.select(
             "monitored_whatsapp_groups",
@@ -1457,6 +1466,7 @@ async def _handle_evolution_webhook(
                         instance_name=instance_name,
                         remote_jid_digits=remote_jid_digits,
                         text=text_for_chat,
+                        is_trial=is_trial,
                         quoted_message_id=message_id or None,
                         quoted_text="Áudio",
                         source_author_name=author_name,
@@ -1587,6 +1597,7 @@ async def _handle_evolution_webhook(
                                     instance_name=instance_name,
                                     remote_jid_digits=remote_jid_digits,
                                     text=final_text.strip(),
+                                    is_trial=is_trial,
                                     quoted_message_id=target_id,
                                     quoted_text="Áudio",
                                     source_author_name=author_name,

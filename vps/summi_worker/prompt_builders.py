@@ -242,3 +242,15 @@ def build_transcription_summary_prompt(
         f"Transcrição:\n{transcription}"
     )
     return system, user
+
+
+def build_footer(is_trial: bool = True) -> str:
+    """
+    Constrói a assinatura final da mensagem.
+    Se for trial, inclui o link da Summi.
+    Se for pago, remove o link.
+    """
+    base = "_👩🏻 Summi - Secretária Invisível_"
+    if is_trial:
+        return f"{base}\n\n_🔗 summi.gera-leads.com_"
+    return base

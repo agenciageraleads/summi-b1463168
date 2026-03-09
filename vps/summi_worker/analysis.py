@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .openai_client import OpenAIClient, OpenAIUsage
 from .prompt_builders import (
     SUMMI_HOUR_FALLBACK_TEXT,
+    build_footer,
     build_summi_audio_prompt,
     render_summi_hour_audio_fallback,
 )
@@ -135,6 +136,7 @@ def build_summary_text(
     model: str,
     *,
     items: List[AnalyzedChat],
+    is_trial: bool = True,
 ) -> str:
     """
     Monta o Summi da Hora em layout Premium simplificado.
@@ -173,7 +175,7 @@ def build_summary_text(
 
     # Rodapé discreto
     corpo = "\n\n".join(partes)
-    corpo += "\n\n_⚡️ Summi - Secretária Invisível_"
+    corpo += f"\n\n{build_footer(is_trial)}"
     return corpo
 
 

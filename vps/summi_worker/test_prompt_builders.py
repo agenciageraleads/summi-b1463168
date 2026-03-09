@@ -24,6 +24,7 @@ from summi_worker.analysis import build_audio_script, build_summary_text
 from summi_worker.prompt_builders import (
     SUMMI_HOUR_FALLBACK_AUDIO_SCRIPT,
     SUMMI_HOUR_FALLBACK_TEXT,
+    build_footer,
     build_transcription_prompt,
     build_transcription_summary_prompt,
     choose_transcription_fallback_reason,
@@ -160,6 +161,17 @@ class PromptBuildersTest(unittest.TestCase):
     def test_internal_summi_thread_detection_uses_only_digits(self) -> None:
         self.assertTrue(is_internal_summi_thread("556293984600@s.whatsapp.net", "556293984600"))
         self.assertFalse(is_internal_summi_thread("5562982574301", "556293984600"))
+
+    def test_build_footer_handles_trial_correctly(self) -> None:
+        # Test Trial
+        footer_trial = build_footer(is_trial=True)
+        self.assertIn("summi.gera-leads.com", footer_trial)
+        self.assertIn("Secretária Invisível", footer_trial)
+        
+        # Test Paid
+        footer_paid = build_footer(is_trial=False)
+        self.assertNotIn("summi.gera-leads.com", footer_paid)
+        self.assertIn("Secretária Invisível", footer_paid)
 
 
 if __name__ == "__main__":
