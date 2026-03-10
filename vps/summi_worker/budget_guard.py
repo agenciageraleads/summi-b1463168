@@ -112,13 +112,3 @@ def get_user_budget_state(
         soft_cap_brl=soft_cap,
         hard_cap_brl=hard_cap,
     )
-
-
-def should_skip_audio_summary(
-    settings: Settings,
-    supabase: SupabaseRest,
-    *,
-    user_id: str,
-    now_utc: dt.datetime | None = None,
-) -> bool:
-    return get_user_budget_state(settings, supabase, user_id=user_id, now_utc=now_utc).soft_cap_reached

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from summi_worker.budget_guard import get_user_budget_state, should_skip_audio_summary
+from summi_worker.budget_guard import get_user_budget_state
 
 
 class _SupabaseFake:
@@ -58,14 +58,6 @@ class BudgetGuardTest(unittest.TestCase):
         self.assertEqual(float(state.current_cost_brl), 1.16)
         self.assertTrue(state.soft_cap_reached)
         self.assertFalse(state.hard_cap_reached)
-        self.assertTrue(
-            should_skip_audio_summary(
-                self.settings,
-                supabase,
-                user_id="user-1",
-                now_utc=dt.datetime(2099, 3, 5, tzinfo=dt.timezone.utc),
-            )
-        )
 
     def test_paid_users_use_paid_caps(self) -> None:
         supabase = _SupabaseFake(
