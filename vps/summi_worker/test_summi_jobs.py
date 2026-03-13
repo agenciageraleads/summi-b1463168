@@ -21,6 +21,7 @@ try:
         _chat_has_new_event_since_analysis,
         _summary_chat_filters,
         _summary_is_due,
+        _within_business_hours,
         _unique_active_user_ids,
         run_hourly_job,
         run_user_summi_now,
@@ -31,6 +32,7 @@ except ImportError:
         _chat_has_new_event_since_analysis,
         _summary_chat_filters,
         _summary_is_due,
+        _within_business_hours,
         _unique_active_user_ids,
         run_hourly_job,
         run_user_summi_now,
@@ -39,7 +41,10 @@ except ImportError:
 
 class SummiJobsTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.settings = SimpleNamespace(ignore_remote_jid="556293984600")
+        self.settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            business_hours_timezone="America/Sao_Paulo",
+        )
 
     def test_summary_chat_filters_use_last_summi_timestamp_when_available(self) -> None:
         filters = _summary_chat_filters(
@@ -143,11 +148,35 @@ class SummiJobsTest(unittest.TestCase):
             )
         )
 
+    def test_within_business_hours_uses_configured_timezone(self) -> None:
+        settings = SimpleNamespace(
+            business_hours_start=8,
+            business_hours_end=18,
+            business_hours_timezone="America/Sao_Paulo",
+        )
+        profile = {"apenas_horario_comercial": True}
+
+        self.assertTrue(
+            _within_business_hours(
+                settings,
+                profile,
+                now_utc=datetime.datetime(2026, 3, 13, 18, 37, tzinfo=datetime.timezone.utc),
+            )
+        )
+        self.assertFalse(
+            _within_business_hours(
+                settings,
+                profile,
+                now_utc=datetime.datetime(2026, 3, 13, 21, 37, tzinfo=datetime.timezone.utc),
+            )
+        )
+
     def test_run_hourly_job_skips_send_when_no_priority_items(self) -> None:
         settings = SimpleNamespace(
             ignore_remote_jid="556293984600",
             business_hours_start=8,
             business_hours_end=18,
+            business_hours_timezone="America/Sao_Paulo",
             summi_sender_instance="Summi",
         )
         profile = {

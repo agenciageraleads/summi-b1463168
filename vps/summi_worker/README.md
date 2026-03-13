@@ -44,6 +44,7 @@ SUMMI_SENDER_INSTANCE="Summi"
 # Horario comercial (fallback global; por usuario respeita profiles.apenas_horario_comercial)
 BUSINESS_HOURS_START="8"
 BUSINESS_HOURS_END="18"
+BUSINESS_HOURS_TIMEZONE="America/Sao_Paulo"
 
 # Numero/remote_jid para ignorar (no n8n: 556293984600)
 IGNORE_REMOTE_JID="556293984600"

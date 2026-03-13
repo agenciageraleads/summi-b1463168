@@ -67,6 +67,7 @@ class Settings:
 
     business_hours_start: int
     business_hours_end: int
+    business_hours_timezone: str
     ignore_remote_jid: str
 
     enable_hourly_job: bool
@@ -125,6 +126,7 @@ def load_settings() -> Settings:
         summi_sender_instance=os.getenv("SUMMI_SENDER_INSTANCE", "Summi"),
         business_hours_start=_int("BUSINESS_HOURS_START", 8),
         business_hours_end=_int("BUSINESS_HOURS_END", 18),
+        business_hours_timezone=os.getenv("BUSINESS_HOURS_TIMEZONE", "America/Sao_Paulo"),
         ignore_remote_jid=os.getenv("IGNORE_REMOTE_JID", "556293984600"),
         enable_hourly_job=_bool("ENABLE_HOURLY_JOB", True),
         enable_daily_job=_bool("ENABLE_DAILY_JOB", False),

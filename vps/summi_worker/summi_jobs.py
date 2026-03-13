@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .analysis import AnalyzedChat, analyze_single_chat, build_audio_script_with_usage, build_summary_text
 from .budget_guard import get_user_budget_state
@@ -26,9 +27,19 @@ def _now_utc_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
-def _within_business_hours(settings: Settings, profile: Dict[str, Any], now_local: dt.datetime) -> bool:
+def _resolve_business_timezone(settings: Settings) -> dt.tzinfo:
+    timezone_name = str(getattr(settings, "business_hours_timezone", "") or "America/Sao_Paulo").strip()
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        logger.warning("business_hours.invalid_timezone timezone=%s fallback=UTC", timezone_name)
+        return dt.timezone.utc
+
+
+def _within_business_hours(settings: Settings, profile: Dict[str, Any], now_utc: dt.datetime) -> bool:
     only_business = profile.get("apenas_horario_comercial")
     if only_business is True:
+        now_local = now_utc.astimezone(_resolve_business_timezone(settings))
         h = now_local.hour
         return settings.business_hours_start <= h < settings.business_hours_end
     return True
@@ -690,7 +701,6 @@ def run_hourly_job(
     openai: OpenAIClient,
     evolution: EvolutionClient,
 ) -> Dict[str, Any]:
-    now_local = dt.datetime.now()
     now_utc = dt.datetime.now(dt.timezone.utc)
 
     # Assinantes ativos
@@ -719,7 +729,7 @@ def run_hourly_job(
             continue
         profile = profiles[0]
 
-        if not _within_business_hours(settings, profile, now_local):
+        if not _within_business_hours(settings, profile, now_utc):
             skipped_hours += 1
             continue
 
