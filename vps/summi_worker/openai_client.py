@@ -19,6 +19,10 @@ class OpenAIError(RuntimeError):
 # Whisper-1 usa endpoint legado e ignora/rejeita parâmetros extras.
 _TRANSCRIPTION_MODELS_WITHOUT_LOGPROBS: frozenset[str] = frozenset({"whisper-1"})
 
+# Modelos que NÃO suportam chunking_strategy na API de transcrição.
+# Whisper-1 rejeita se for enviado.
+_TRANSCRIPTION_MODELS_WITHOUT_CHUNKING: frozenset[str] = frozenset({"whisper-1"})
+
 
 @dataclass(frozen=True)
 class TranscriptionResult:
@@ -255,6 +259,7 @@ class OpenAIClient:
             auto_chunking_min_seconds is not None
             and estimated_duration is not None
             and estimated_duration >= auto_chunking_min_seconds
+            and model not in _TRANSCRIPTION_MODELS_WITHOUT_CHUNKING
         ):
             data.append(("chunking_strategy", "auto"))
         resp = requests.post(url, headers=headers, data=data, files=files, timeout=180)

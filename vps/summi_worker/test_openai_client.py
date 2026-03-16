@@ -101,6 +101,27 @@ class OpenAIClientTranscriptionTest(unittest.TestCase):
         self.assertEqual(result.duration_seconds, 8.0)
         self.assertIsNone(result.average_confidence)
 
+    def test_transcribe_audio_omits_chunking_for_whisper_even_when_audio_is_long(self) -> None:
+        client = OpenAIClient("key")
+
+        with patch.object(client, "_probe_audio_duration_seconds", return_value=42.0):
+            with patch(
+                REQUESTS_POST_TARGET,
+                return_value=_FakeResponse({"text": "audio longo"}),
+            ) as post:
+                result = client.transcribe_audio(
+                    b"fake-audio",
+                    model="whisper-1",
+                    include_logprobs=False,
+                    auto_chunking_min_seconds=20,
+                )
+
+        sent_pairs = post.call_args.kwargs["data"]
+        self.assertNotIn(("chunking_strategy", "auto"), sent_pairs)
+        self.assertNotIn(("include[]", "logprobs"), sent_pairs)
+        self.assertEqual(result.text, "audio longo")
+        self.assertEqual(result.duration_seconds, 42.0)
+
     def test_chat_text_response_exposes_usage(self) -> None:
         client = OpenAIClient("key")
 
