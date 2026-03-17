@@ -11,6 +11,7 @@ from .config import Settings
 from .cost_tracking import log_chat_cost, log_tts_cost
 from .evolution_client import EvolutionClient
 from .openai_client import OpenAIClient
+from .redis_dedupe import RedisDedupe
 from .supabase_rest import (
     SupabaseRest,
     to_postgrest_filter_eq,
@@ -22,6 +23,7 @@ from .supabase_rest import (
 
 
 logger = logging.getLogger("summi_worker.summi_jobs")
+HOURLY_SUMMARY_SEND_LOCK_TTL_SECONDS = 5 * 60
 
 
 def _now_utc_iso() -> str:
@@ -92,6 +94,10 @@ def _unique_active_user_ids(subscribers: List[Dict[str, Any]]) -> List[str]:
 
 def _extract_phone_digits(value: Any) -> str:
     return "".join(c for c in str(value or "") if c.isdigit())
+
+
+def _hourly_summary_send_lock_key(user_id: str) -> str:
+    return f"summi:hourly:send-lock:{user_id}"
 
 
 def _has_active_subscription(supabase: SupabaseRest, *, user_id: str) -> bool:
@@ -703,6 +709,7 @@ def run_hourly_job(
     evolution: EvolutionClient,
 ) -> Dict[str, Any]:
     now_utc = dt.datetime.now(dt.timezone.utc)
+    summary_send_dedupe = RedisDedupe(getattr(settings, "redis_url", None))
 
     # Assinantes ativos
     subs = supabase.select(
@@ -721,6 +728,7 @@ def run_hourly_job(
     analyze_errors = 0
     low_priority_deleted = 0
     skipped_no_priority_items = 0
+    skipped_locked_users = 0
     user_ids = _unique_active_user_ids(subs)
     deduplicated_rows = len(subs) - len(user_ids)
     for user_id in user_ids:
@@ -760,86 +768,98 @@ def run_hourly_job(
             skipped_hours += 1
             continue
 
-        # Paridade com n8n: analisa conversas novas/editadas antes de montar o Summi da Hora.
-        try:
-            analyze_user_chats(settings, supabase, openai, user_id=user_id)
-            analyzed_users += 1
-        except Exception:
-            # Nao aborta o job inteiro por erro em um usuario.
-            analyze_errors += 1
-
-        # O Summi da Hora deve considerar apenas o lote recem-analisado desde o ultimo envio.
-        chats = supabase.select(
-            "chats",
-            select="id,nome,remote_jid,prioridade,contexto,criado_em,modificado_em,analisado_em",
-            filters=_summary_chat_filters(settings, user_id=user_id, ultimo_summi=ultimo_summi),
-            order="analisado_em.desc",
-            limit=50,
-        )
-
-        items = _build_summary_items(chats)
-        if not items:
-            skipped_no_priority_items += 1
+        lock_key = _hourly_summary_send_lock_key(user_id)
+        if summary_send_dedupe.seen_or_mark(lock_key, HOURLY_SUMMARY_SEND_LOCK_TTL_SECONDS):
+            skipped_locked_users += 1
+            logger.info("hourly_summary.locked user_id=%s", user_id)
             continue
+        keep_lock = False
 
-        # Identificar status de trial para rodapé
-        is_trial = True
         try:
-            state = get_user_budget_state(settings, supabase, user_id=user_id)
-            is_trial = state.plan_kind == "trial"
-        except Exception:
-            pass
+            # Paridade com n8n: analisa conversas novas/editadas antes de montar o Summi da Hora.
+            try:
+                analyze_user_chats(settings, supabase, openai, user_id=user_id)
+                analyzed_users += 1
+            except Exception:
+                # Nao aborta o job inteiro por erro em um usuario.
+                analyze_errors += 1
 
-        summary_text = build_summary_text(openai, settings.openai_model_summary, items=items, is_trial=is_trial)
-        evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
-        sent += 1
-
-        # Atualizar timestamp do último envio
-        try:
-            supabase.patch(
-                "profiles",
-                data={"ultimo_summi_em": _now_utc_iso()},
-                filters=[to_postgrest_filter_eq("id", user_id)],
+            # O Summi da Hora deve considerar apenas o lote recem-analisado desde o ultimo envio.
+            chats = supabase.select(
+                "chats",
+                select="id,nome,remote_jid,prioridade,contexto,criado_em,modificado_em,analisado_em",
+                filters=_summary_chat_filters(settings, user_id=user_id, ultimo_summi=ultimo_summi),
+                order="analisado_em.desc",
+                limit=50,
             )
-        except Exception:
-            pass  # Não aborta o fluxo por falha em timestamp
 
-        if _should_send_summi_audio(settings, profile):
-            try:
-                audio_script, script_usage = build_audio_script_with_usage(
-                    openai,
-                    settings.openai_model_summary,
-                    summary_text=summary_text,
-                )
-                if script_usage is not None:
-                    log_chat_cost(
-                        supabase,
-                        user_id,
-                        operation="summary",
-                        model=settings.openai_model_summary,
-                        input_tokens=script_usage.prompt_tokens,
-                        output_tokens=script_usage.completion_tokens,
-                    )
-                tts_result = openai.tts_mp3_response(
-                    settings.openai_tts_model,
-                    settings.openai_tts_voice,
-                    audio_script,
-                )
-                log_tts_cost(
-                    supabase,
-                    user_id,
-                    model=settings.openai_tts_model,
-                    char_count=tts_result.char_count,
-                )
-                evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, tts_result.audio_bytes)
-            except Exception as exc:
-                print(f"Audio summary failed for user {user_id}: {exc}")
+            items = _build_summary_items(chats)
+            if not items:
+                skipped_no_priority_items += 1
+                continue
 
-        if _should_auto_delete_low_priority(profile):
+            # Identificar status de trial para rodapé
+            is_trial = True
             try:
-                low_priority_deleted += _delete_low_priority_chats(supabase, user_id=user_id)
+                state = get_user_budget_state(settings, supabase, user_id=user_id)
+                is_trial = state.plan_kind == "trial"
             except Exception:
                 pass
+
+            summary_text = build_summary_text(openai, settings.openai_model_summary, items=items, is_trial=is_trial)
+            evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
+            sent += 1
+            keep_lock = True
+
+            # Atualizar timestamp do último envio
+            try:
+                supabase.patch(
+                    "profiles",
+                    data={"ultimo_summi_em": _now_utc_iso()},
+                    filters=[to_postgrest_filter_eq("id", user_id)],
+                )
+            except Exception:
+                pass  # Não aborta o fluxo por falha em timestamp
+
+            if _should_send_summi_audio(settings, profile):
+                try:
+                    audio_script, script_usage = build_audio_script_with_usage(
+                        openai,
+                        settings.openai_model_summary,
+                        summary_text=summary_text,
+                    )
+                    if script_usage is not None:
+                        log_chat_cost(
+                            supabase,
+                            user_id,
+                            operation="summary",
+                            model=settings.openai_model_summary,
+                            input_tokens=script_usage.prompt_tokens,
+                            output_tokens=script_usage.completion_tokens,
+                        )
+                    tts_result = openai.tts_mp3_response(
+                        settings.openai_tts_model,
+                        settings.openai_tts_voice,
+                        audio_script,
+                    )
+                    log_tts_cost(
+                        supabase,
+                        user_id,
+                        model=settings.openai_tts_model,
+                        char_count=tts_result.char_count,
+                    )
+                    evolution.send_audio_mp3(settings.summi_sender_instance, numero_usuario, tts_result.audio_bytes)
+                except Exception as exc:
+                    print(f"Audio summary failed for user {user_id}: {exc}")
+
+            if _should_auto_delete_low_priority(profile):
+                try:
+                    low_priority_deleted += _delete_low_priority_chats(supabase, user_id=user_id)
+                except Exception:
+                    pass
+        finally:
+            if not keep_lock:
+                summary_send_dedupe.release(lock_key)
 
     return {
         "success": True,
@@ -852,4 +872,5 @@ def run_hourly_job(
         "analyze_errors": analyze_errors,
         "low_priority_deleted": low_priority_deleted,
         "skipped_no_priority_items": skipped_no_priority_items,
+        "skipped_locked_users": skipped_locked_users,
     }

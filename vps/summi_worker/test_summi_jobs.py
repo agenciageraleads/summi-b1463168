@@ -259,6 +259,7 @@ class SummiJobsTest(unittest.TestCase):
             business_hours_end=18,
             business_hours_timezone="America/Sao_Paulo",
             summi_sender_instance="Summi",
+            redis_url="redis://example",
         )
         profile = {
             "id": "user-1",
@@ -312,17 +313,187 @@ class SummiJobsTest(unittest.TestCase):
 
         supabase = _SupabaseFake()
         evolution = _EvolutionFake()
+        dedupe = SimpleNamespace(marked=[], released=[])
 
         with patch.dict(
             run_hourly_job.__globals__,
-            {"analyze_user_chats": lambda *args, **kwargs: {"success": True, "analyzed_count": 0}},
+            {
+                "analyze_user_chats": lambda *args, **kwargs: {"success": True, "analyzed_count": 0},
+                "RedisDedupe": lambda _url: SimpleNamespace(
+                    seen_or_mark=lambda key, ttl_seconds: dedupe.marked.append((key, ttl_seconds)) or False,
+                    release=lambda key: dedupe.released.append(key),
+                ),
+            },
         ):
             result = run_hourly_job(settings, supabase, openai=object(), evolution=evolution)
 
         self.assertEqual(result["sent"], 0)
         self.assertEqual(result["skipped_no_priority_items"], 1)
+        self.assertEqual(result["skipped_locked_users"], 0)
         self.assertEqual(evolution.sent_text, 0)
+        self.assertEqual(dedupe.marked, [("summi:hourly:send-lock:user-1", 300)])
+        self.assertEqual(dedupe.released, ["summi:hourly:send-lock:user-1"])
         self.assertFalse(
+            any(
+                table == "profiles" and "ultimo_summi_em" in data
+                for table, data, _filters in supabase.patch_calls
+            )
+        )
+
+    def test_run_hourly_job_skips_user_when_send_lock_is_already_held(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            business_hours_start=8,
+            business_hours_end=18,
+            business_hours_timezone="America/Sao_Paulo",
+            summi_sender_instance="Summi",
+            redis_url="redis://example",
+        )
+        profile = {
+            "id": "user-1",
+            "numero": "5562999999999",
+            "summi_frequencia": "1h",
+            "ultimo_summi_em": "2026-03-05T09:00:00+00:00",
+            "onboarding_completed": True,
+            "Summi em Audio?": False,
+        }
+
+        class _SupabaseFake:
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "subscribers":
+                    return [{"user_id": "user-1", "subscription_end": "2099-01-01T00:00:00+00:00", "subscribed": True}]
+                if table == "profiles":
+                    return [profile]
+                if table == "chats":
+                    return []
+                return []
+
+            def patch(self, table, data, filters=None):
+                return None
+
+            def delete(self, table, filters=None):
+                return None
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        class _EvolutionFake:
+            def __init__(self) -> None:
+                self.sent_text = 0
+
+            def send_text(self, *args, **kwargs):
+                self.sent_text += 1
+
+        analyze_calls = []
+        released = []
+        supabase = _SupabaseFake()
+        evolution = _EvolutionFake()
+
+        with patch.dict(
+            run_hourly_job.__globals__,
+            {
+                "analyze_user_chats": lambda *args, **kwargs: analyze_calls.append(True),
+                "RedisDedupe": lambda _url: SimpleNamespace(
+                    seen_or_mark=lambda key, ttl_seconds: True,
+                    release=lambda key: released.append(key),
+                ),
+            },
+        ):
+            result = run_hourly_job(settings, supabase, openai=object(), evolution=evolution)
+
+        self.assertEqual(result["sent"], 0)
+        self.assertEqual(result["skipped_locked_users"], 1)
+        self.assertEqual(result["analyzed_users_before_summary"], 0)
+        self.assertEqual(analyze_calls, [])
+        self.assertEqual(evolution.sent_text, 0)
+        self.assertEqual(released, [])
+
+    def test_run_hourly_job_keeps_lock_after_summary_send(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            business_hours_start=8,
+            business_hours_end=18,
+            business_hours_timezone="America/Sao_Paulo",
+            summi_sender_instance="Summi",
+            openai_model_summary="gpt-4o-mini",
+            redis_url="redis://example",
+        )
+        profile = {
+            "id": "user-1",
+            "numero": "5562999999999",
+            "summi_frequencia": "1h",
+            "ultimo_summi_em": "2026-03-05T09:00:00+00:00",
+            "onboarding_completed": True,
+            "Summi em Audio?": False,
+            "Apaga Mensagens Não Importantes Automaticamente?": "nao",
+        }
+        summary_chats = [
+            {
+                "id": "chat-1",
+                "nome": "Contato",
+                "remote_jid": "5562911111111",
+                "prioridade": "3",
+                "contexto": "Precisa responder hoje",
+                "criado_em": "2026-03-05T09:10:00+00:00",
+                "modificado_em": "2026-03-05T09:10:00+00:00",
+                "analisado_em": "2026-03-05T09:10:00+00:00",
+            }
+        ]
+
+        class _SupabaseFake:
+            def __init__(self) -> None:
+                self.patch_calls = []
+
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "subscribers":
+                    return [{"user_id": "user-1", "subscription_end": "2099-01-01T00:00:00+00:00", "subscribed": True}]
+                if table == "profiles":
+                    return [profile]
+                if table == "chats":
+                    return summary_chats
+                return []
+
+            def patch(self, table, data, filters=None):
+                self.patch_calls.append((table, data, filters))
+                return None
+
+            def delete(self, table, filters=None):
+                return None
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        class _EvolutionFake:
+            def __init__(self) -> None:
+                self.sent_messages = []
+
+            def send_text(self, _instance, _numero, message):
+                self.sent_messages.append(message)
+
+        dedupe = SimpleNamespace(marked=[], released=[])
+        supabase = _SupabaseFake()
+        evolution = _EvolutionFake()
+
+        with patch.dict(
+            run_hourly_job.__globals__,
+            {
+                "analyze_user_chats": lambda *args, **kwargs: {"success": True, "analyzed_count": 1},
+                "get_user_budget_state": lambda *args, **kwargs: SimpleNamespace(plan_kind="trial"),
+                "build_summary_text": lambda *args, **kwargs: "Resumo teste",
+                "RedisDedupe": lambda _url: SimpleNamespace(
+                    seen_or_mark=lambda key, ttl_seconds: dedupe.marked.append((key, ttl_seconds)) or False,
+                    release=lambda key: dedupe.released.append(key),
+                ),
+            },
+        ):
+            result = run_hourly_job(settings, supabase, openai=object(), evolution=evolution)
+
+        self.assertEqual(result["sent"], 1)
+        self.assertEqual(result["skipped_locked_users"], 0)
+        self.assertEqual(evolution.sent_messages, ["Resumo teste"])
+        self.assertEqual(dedupe.marked, [("summi:hourly:send-lock:user-1", 300)])
+        self.assertEqual(dedupe.released, [])
+        self.assertTrue(
             any(
                 table == "profiles" and "ultimo_summi_em" in data
                 for table, data, _filters in supabase.patch_calls

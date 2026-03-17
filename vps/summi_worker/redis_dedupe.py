@@ -40,3 +40,10 @@ class RedisDedupe:
             logger.warning("redis.set_failed key=%s error=%s", key, exc)
             return False
 
+    def release(self, key: str) -> None:
+        if not self._client:
+            return
+        try:
+            self._client.delete(key)
+        except Exception as exc:
+            logger.warning("redis.delete_failed key=%s error=%s", key, exc)
