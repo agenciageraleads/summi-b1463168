@@ -17,6 +17,7 @@ if "mutagen" not in sys.modules:
 
 try:
     from .summi_jobs import (
+        analyze_user_chats,
         _build_summary_items,
         _chat_has_new_event_since_analysis,
         _summary_chat_filters,
@@ -28,6 +29,7 @@ try:
     )
 except ImportError:
     from summi_jobs import (
+        analyze_user_chats,
         _build_summary_items,
         _chat_has_new_event_since_analysis,
         _summary_chat_filters,
@@ -147,6 +149,85 @@ class SummiJobsTest(unittest.TestCase):
                 }
             )
         )
+
+    def test_analyze_user_chats_updates_chat_after_cost_logging(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            openai_model_analysis="gpt-4o-mini",
+        )
+        profile = {
+            "id": "user-1",
+            "temas_urgentes": "urgente",
+            "temas_importantes": "importante",
+        }
+        chat = {
+            "id": "chat-1",
+            "id_usuario": "user-1",
+            "remote_jid": "5562911111111",
+            "nome": "Contato",
+            "criado_em": "2026-03-05T09:10:00+00:00",
+            "modificado_em": "2026-03-05T09:10:00+00:00",
+            "ultimo_evento_em": "2026-03-05T09:10:00+00:00",
+            "contexto": None,
+            "analisado_em": None,
+            "conversa": [{"text": "preciso falar com voce hoje"}],
+            "prioridade": "0",
+        }
+
+        class _SupabaseFake:
+            def __init__(self) -> None:
+                self.patch_calls = []
+                self.insert_calls = []
+
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "profiles":
+                    return [profile]
+                if table == "chats":
+                    if ("analisado_em", "is.null") in (filters or []):
+                        return [chat]
+                    return []
+                return []
+
+            def patch(self, table, data, filters=None):
+                self.patch_calls.append((table, data, filters))
+                return None
+
+            def insert(self, table, rows):
+                self.insert_calls.append((table, rows))
+                return rows
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        analyzed_chat = SimpleNamespace(
+            chat_id="chat-1",
+            prioridade="2",
+            nome="Contato",
+            telefone="5562911111111",
+            contexto="Precisa responder ainda hoje",
+            horario="2026-03-05T09:10:00+00:00",
+        )
+        usage = SimpleNamespace(prompt_tokens=12, completion_tokens=7)
+        supabase = _SupabaseFake()
+
+        with patch.dict(
+            analyze_user_chats.__globals__,
+            {"analyze_single_chat": lambda *args, **kwargs: (analyzed_chat, usage)},
+        ):
+            result = analyze_user_chats(settings, supabase, openai=object(), user_id="user-1")
+
+        self.assertEqual(result["success"], True)
+        self.assertEqual(result["analyzed_count"], 1)
+        self.assertTrue(
+            any(
+                table == "chats"
+                and data["prioridade"] == "2"
+                and data["contexto"] == "Precisa responder ainda hoje"
+                and data["analisado_em"]
+                for table, data, _filters in supabase.patch_calls
+            )
+        )
+        self.assertTrue(any(table == "cost_logs" for table, _rows in supabase.insert_calls))
 
     def test_within_business_hours_uses_configured_timezone(self) -> None:
         settings = SimpleNamespace(

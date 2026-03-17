@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .analysis import AnalyzedChat, analyze_single_chat, build_audio_script_with_usage, build_summary_text
 from .budget_guard import get_user_budget_state
 from .config import Settings
+from .cost_tracking import log_chat_cost, log_tts_cost
 from .evolution_client import EvolutionClient
 from .openai_client import OpenAIClient
 from .supabase_rest import (
