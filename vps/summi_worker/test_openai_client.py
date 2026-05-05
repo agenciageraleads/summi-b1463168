@@ -15,14 +15,14 @@ if "mutagen" not in sys.modules:
     sys.modules["mutagen"] = mutagen_stub
 
 try:
-    from .openai_client import OpenAIClient
+    from .openai_client import GeminiTranscriptionClient, OpenAIClient
 except ImportError:
     from pathlib import Path
 
     ROOT = Path(__file__).resolve().parents[1]
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from summi_worker.openai_client import OpenAIClient
+    from summi_worker.openai_client import GeminiTranscriptionClient, OpenAIClient
 
 
 REQUESTS_POST_TARGET = f"{OpenAIClient.__module__}.requests.post"
@@ -156,6 +156,42 @@ class OpenAIClientTranscriptionTest(unittest.TestCase):
 
         self.assertEqual(result.audio_bytes, b"fake-mp3")
         self.assertEqual(result.char_count, len("Resumo em audio"))
+
+
+class GeminiTranscriptionClientTest(unittest.TestCase):
+    def test_transcribe_audio_posts_inline_audio_and_extracts_text(self) -> None:
+        client = GeminiTranscriptionClient("google-key")
+
+        with patch(
+            REQUESTS_POST_TARGET,
+            return_value=_FakeResponse(
+                {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [
+                                    {"text": "Me passa o CNPJ 12.345.678/0001-90."},
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ),
+        ) as post:
+            result = client.transcribe_audio(
+                b"ID3fake-audio",
+                model="gemini-2.5-flash-lite",
+                language="pt",
+                prompt="Preserve CNPJ e marcas.",
+            )
+
+        self.assertEqual(result.text, "Me passa o CNPJ 12.345.678/0001-90.")
+        self.assertEqual(result.model, "gemini-2.5-flash-lite")
+        self.assertEqual(post.call_args.kwargs["params"], {"key": "google-key"})
+        payload = post.call_args.kwargs["json"]
+        parts = payload["contents"][0]["parts"]
+        self.assertIn("Transcreva este áudio", parts[0]["text"])
+        self.assertEqual(parts[1]["inline_data"]["mime_type"], "audio/mp3")
 
 
 if __name__ == "__main__":

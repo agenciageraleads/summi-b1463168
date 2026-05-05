@@ -8,6 +8,8 @@ o fluxo principal de transcrição/análise.
 Pricing sources (2025):
   - Whisper-1:              $0.006/min
   - gpt-4o-transcribe:      $0.006/min (input)
+  - Gemini 2.5 Flash-Lite:  $0.30/1M audio input tokens; audio = 32 tokens/sec
+  - Gemini 2.5 Flash:       $1.00/1M audio input tokens; audio = 32 tokens/sec
   - gpt-4o-mini (input):    $0.00015/1K tokens
   - gpt-4o-mini (output):   $0.0006/1K tokens
   - gpt-4o-mini-tts:        $0.000015/char
@@ -28,6 +30,8 @@ logger = logging.getLogger("summi_worker.cost_tracking")
 # Transcrição: por minuto de áudio
 WHISPER_1_COST_PER_MINUTE = Decimal("0.006")
 GPT4O_TRANSCRIBE_COST_PER_MINUTE = Decimal("0.006")  # mesmo preço que whisper
+GEMINI_FLASH_LITE_AUDIO_COST_PER_MINUTE = Decimal("0.000576")
+GEMINI_FLASH_AUDIO_COST_PER_MINUTE = Decimal("0.00192")
 
 # Chat/Análise: por 1K tokens
 GPT4O_MINI_INPUT_PER_1K = Decimal("0.00015")
@@ -40,6 +44,9 @@ _TRANSCRIPTION_COST_MAP: Dict[str, Decimal] = {
     "whisper-1": WHISPER_1_COST_PER_MINUTE,
     "gpt-4o-transcribe": GPT4O_TRANSCRIBE_COST_PER_MINUTE,
     "gpt-4o-mini-transcribe": GPT4O_TRANSCRIBE_COST_PER_MINUTE,
+    "gemini-2.5-flash-lite": GEMINI_FLASH_LITE_AUDIO_COST_PER_MINUTE,
+    "gemini-2.5-flash-lite-preview-09-2025": GEMINI_FLASH_LITE_AUDIO_COST_PER_MINUTE,
+    "gemini-2.5-flash": GEMINI_FLASH_AUDIO_COST_PER_MINUTE,
 }
 
 _QUANTIZE = Decimal("0.00000001")  # 8 casas decimais

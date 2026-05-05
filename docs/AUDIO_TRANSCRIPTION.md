@@ -22,6 +22,11 @@ Save to public.chats.conversa
 
 **Env Vars:**
 ```bash
+# Provider: `openai` (padrao) ou `google` (Gemini API)
+TRANSCRIPTION_PROVIDER=openai
+GOOGLE_API_KEY=AIza...
+GOOGLE_TRANSCRIPTION_MODEL=gemini-2.5-flash-lite
+
 # Primary model
 OPENAI_TRANSCRIPTION_MODEL=whisper-1
 

@@ -60,6 +60,9 @@ class Settings:
     openai_transcription_confidence_threshold: float
     openai_transcription_critical_confidence_threshold: float
     openai_transcription_chunking_min_seconds: int
+    transcription_provider: str
+    google_api_key: str | None
+    google_transcription_model: str
 
     evolution_api_url: str
     evolution_api_key: str
@@ -121,6 +124,9 @@ def load_settings() -> Settings:
             0.80,
         ),
         openai_transcription_chunking_min_seconds=_int("OPENAI_TRANSCRIPTION_CHUNKING_MIN_SECONDS", 20),
+        transcription_provider=os.getenv("TRANSCRIPTION_PROVIDER", "openai").strip().lower(),
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
+        google_transcription_model=os.getenv("GOOGLE_TRANSCRIPTION_MODEL", "gemini-2.5-flash-lite"),
         evolution_api_url=_must("EVOLUTION_API_URL").rstrip("/"),
         evolution_api_key=_must("EVOLUTION_API_KEY"),
         summi_sender_instance=os.getenv("SUMMI_SENDER_INSTANCE", "Summi"),
@@ -161,5 +167,11 @@ def load_settings() -> Settings:
 
     if (settings.enable_analysis_queue or settings.enable_summary_queue) and not settings.redis_url:
         raise RuntimeError("REDIS_URL is required when queue support is enabled")
+
+    if settings.transcription_provider not in {"openai", "google"}:
+        raise RuntimeError("TRANSCRIPTION_PROVIDER must be 'openai' or 'google'")
+
+    if settings.transcription_provider == "google" and not settings.google_api_key:
+        raise RuntimeError("GOOGLE_API_KEY is required when TRANSCRIPTION_PROVIDER=google")
 
     return settings

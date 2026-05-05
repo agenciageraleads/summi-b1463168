@@ -15,6 +15,9 @@ class OpenAIError(RuntimeError):
     pass
 
 
+GEMINI_TRANSCRIPTION_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+
 # Modelos que NÃO suportam include[]=logprobs na API de transcrição.
 # Whisper-1 usa endpoint legado e ignora/rejeita parâmetros extras.
 _TRANSCRIPTION_MODELS_WITHOUT_LOGPROBS: frozenset[str] = frozenset({"whisper-1"})
@@ -115,6 +118,108 @@ def _extract_usage(payload: Dict[str, Any]) -> Optional[OpenAIUsage]:
     )
 
 
+def _detect_audio_upload_meta(audio_bytes: bytes, default_filename: str = "audio.mp3") -> Tuple[str, str]:
+    head = audio_bytes[:32]
+    if head.startswith(b"OggS"):
+        return "audio.ogg", "audio/ogg"
+    if head.startswith(b"ID3") or (len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0):
+        return "audio.mp3", "audio/mpeg"
+    if head.startswith(b"RIFF") and b"WAVE" in head:
+        return "audio.wav", "audio/wav"
+    if head.startswith(b"fLaC"):
+        return "audio.flac", "audio/flac"
+    if len(head) >= 12 and head[4:8] == b"ftyp":
+        return "audio.m4a", "audio/mp4"
+    return default_filename, "application/octet-stream"
+
+
+def _probe_audio_duration_seconds(audio_bytes: bytes) -> Optional[float]:
+    try:
+        audio_file = MutagenFile(BytesIO(audio_bytes))
+    except Exception:
+        return None
+    if audio_file is None:
+        return None
+    info = getattr(audio_file, "info", None)
+    length = getattr(info, "length", None)
+    if length is None:
+        return None
+    try:
+        duration = float(length)
+    except Exception:
+        return None
+    return duration if duration > 0 else None
+
+
+def _extract_gemini_text(payload: Dict[str, Any]) -> str:
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        raise OpenAIError(f"gemini transcription returned no candidates: {json.dumps(payload)[:500]}")
+    content = candidates[0].get("content") if isinstance(candidates[0], dict) else None
+    parts = content.get("parts") if isinstance(content, dict) else None
+    if not isinstance(parts, list):
+        raise OpenAIError(f"gemini transcription returned no parts: {json.dumps(payload)[:500]}")
+    text_parts = [str(part.get("text") or "") for part in parts if isinstance(part, dict)]
+    return "\n".join(part.strip() for part in text_parts if part.strip()).strip()
+
+
+class GeminiTranscriptionClient:
+    def __init__(self, api_key: str):
+        self._api_key = api_key
+
+    def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        *,
+        model: str = "gemini-2.5-flash-lite",
+        filename: str = "audio.mp3",
+        language: str | None = None,
+        prompt: str | None = None,
+    ) -> TranscriptionResult:
+        _, mime_type = _detect_audio_upload_meta(audio_bytes, default_filename=filename)
+        if mime_type == "audio/mpeg":
+            mime_type = "audio/mp3"
+        language_hint = f"Idioma esperado: {language}." if language else ""
+        prompt_text = "\n".join(
+            part
+            for part in (
+                "Transcreva este áudio para texto. Responda somente com a transcrição, sem comentários.",
+                language_hint,
+                prompt or "",
+            )
+            if part
+        )
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt_text},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": base64.b64encode(audio_bytes).decode("ascii"),
+                            }
+                        },
+                    ],
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.0,
+                "responseMimeType": "text/plain",
+            },
+        }
+        url = GEMINI_TRANSCRIPTION_ENDPOINT.format(model=model)
+        resp = requests.post(url, params={"key": self._api_key}, json=payload, timeout=180)
+        if not resp.ok:
+            raise OpenAIError(f"gemini transcribe failed: {resp.status_code} {resp.text}")
+        return TranscriptionResult(
+            text=_extract_gemini_text(resp.json()),
+            duration_seconds=_probe_audio_duration_seconds(audio_bytes),
+            model=model,
+        )
+
+
 class OpenAIClient:
     def __init__(self, api_key: str):
         self._api_key = api_key
@@ -182,18 +287,7 @@ class OpenAIClient:
         """
         Detecta formato por magic bytes para enviar o MIME/filename corretos ao endpoint de transcricao.
         """
-        head = audio_bytes[:32]
-        if head.startswith(b"OggS"):
-            return "audio.ogg", "audio/ogg"
-        if head.startswith(b"ID3") or (len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0):
-            return "audio.mp3", "audio/mpeg"
-        if head.startswith(b"RIFF") and b"WAVE" in head:
-            return "audio.wav", "audio/wav"
-        if head.startswith(b"fLaC"):
-            return "audio.flac", "audio/flac"
-        if len(head) >= 12 and head[4:8] == b"ftyp":
-            return "audio.m4a", "audio/mp4"
-        return default_filename, "application/octet-stream"
+        return _detect_audio_upload_meta(audio_bytes, default_filename=default_filename)
 
     def _detect_image_mime(self, image_bytes: bytes, default_mime: str = "image/jpeg") -> str:
         head = image_bytes[:32]
@@ -208,21 +302,7 @@ class OpenAIClient:
         return default_mime
 
     def _probe_audio_duration_seconds(self, audio_bytes: bytes) -> Optional[float]:
-        try:
-            audio_file = MutagenFile(BytesIO(audio_bytes))
-        except Exception:
-            return None
-        if audio_file is None:
-            return None
-        info = getattr(audio_file, "info", None)
-        length = getattr(info, "length", None)
-        if length is None:
-            return None
-        try:
-            duration = float(length)
-        except Exception:
-            return None
-        return duration if duration > 0 else None
+        return _probe_audio_duration_seconds(audio_bytes)
 
     def transcribe_audio(
         self,
