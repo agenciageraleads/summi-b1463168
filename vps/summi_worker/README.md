@@ -26,6 +26,9 @@ OPENAI_MODEL_ANALYSIS="gpt-4o-mini"
 OPENAI_MODEL_SUMMARY="gpt-4o-mini"
 OPENAI_TTS_MODEL="gpt-4o-mini-tts"
 OPENAI_TTS_VOICE="alloy"
+TRANSCRIPTION_PROVIDER="openai"
+GOOGLE_API_KEY=""
+GOOGLE_TRANSCRIPTION_MODEL="gemini-2.5-flash-lite"
 OPENAI_TRANSCRIPTION_MODEL="whisper-1"
 OPENAI_TRANSCRIPTION_FALLBACK_MODEL="gpt-4o-transcribe"
 OPENAI_TRANSCRIPTION_LANGUAGE="pt"
@@ -80,6 +83,9 @@ USD_BRL_EXCHANGE_RATE="5.8"
 
 ### Transcricao de audio
 
+- `TRANSCRIPTION_PROVIDER`: `openai` por padrao; use `google` para transcrever via Gemini API.
+- `GOOGLE_API_KEY`: obrigatoria quando `TRANSCRIPTION_PROVIDER=google`.
+- `GOOGLE_TRANSCRIPTION_MODEL`: recomendado `gemini-2.5-flash-lite` para menor custo.
 - `OPENAI_TRANSCRIPTION_MODEL`: modelo padrao barato. Recomendado `whisper-1`.
 - `OPENAI_TRANSCRIPTION_FALLBACK_MODEL`: usado apenas quando a heuristica detectar transcricao vazia, baixa confianca, repeticao suspeita ou conteudo critico com confianca borderline.
 - `OPENAI_TRANSCRIPTION_LANGUAGE`: fixe em `pt` para reduzir erro e latencia.

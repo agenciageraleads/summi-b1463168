@@ -21,7 +21,7 @@ from .cost_tracking import log_chat_cost, log_transcription_cost
 from .evolution_client import EvolutionClient, EvolutionError
 from .evolution_webhook import normalize_message_event
 from .growth_tracking import record_trial_budget_events
-from .openai_client import OpenAIClient, OpenAIError, OpenAIUsage, TranscriptionResult
+from .openai_client import GeminiTranscriptionClient, OpenAIClient, OpenAIError, OpenAIUsage, TranscriptionResult
 from .prompt_builders import (
     build_footer,
     build_transcription_hint_terms,
@@ -516,6 +516,24 @@ def _transcribe_audio_with_fallback(
     prompt_extra = settings.openai_transcription_prompt_extra
     transcription_prompt = build_transcription_prompt(profile, extra_context=prompt_extra)
     hint_terms = build_transcription_hint_terms(profile, extra_context=prompt_extra)
+
+    if settings.transcription_provider == "google":
+        google = GeminiTranscriptionClient(settings.google_api_key or "")
+        result = google.transcribe_audio(
+            audio_bytes,
+            model=settings.google_transcription_model,
+            filename=filename,
+            language=settings.openai_transcription_language,
+            prompt=transcription_prompt,
+        )
+        metadata: Dict[str, Any] = {
+            "audio_transcription_provider": "google",
+            "audio_transcription_model": result.model,
+            "audio_transcription_confidence": result.average_confidence,
+            "audio_transcription_used_fallback": False,
+        }
+        return result, metadata
+
     base_result = openai.transcribe_audio(
         audio_bytes,
         model=settings.openai_transcription_model,
@@ -526,6 +544,7 @@ def _transcribe_audio_with_fallback(
         auto_chunking_min_seconds=settings.openai_transcription_chunking_min_seconds,
     )
     metadata: Dict[str, Any] = {
+        "audio_transcription_provider": "openai",
         "audio_transcription_model": base_result.model,
         "audio_transcription_confidence": base_result.average_confidence,
         "audio_transcription_used_fallback": False,
@@ -1775,5 +1794,4 @@ async def social_blog_preview(slug: str, request: Request):
 </html>
 """
     return html
-
 

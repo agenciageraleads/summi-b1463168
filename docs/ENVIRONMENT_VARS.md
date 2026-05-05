@@ -88,6 +88,11 @@ OPENAI_TTS_VOICE=alloy                     # Options: alloy, echo, fable, onyx, 
 ### Whisper (Transcrição de Áudio)
 
 ```bash
+# Provider: openai (padrao) ou google (Gemini API)
+TRANSCRIPTION_PROVIDER=openai
+GOOGLE_API_KEY=AIza...                         # obrigatório se TRANSCRIPTION_PROVIDER=google
+GOOGLE_TRANSCRIPTION_MODEL=gemini-2.5-flash-lite
+
 # Modelo padrão (barato)
 OPENAI_TRANSCRIPTION_MODEL=whisper-1       # ou gpt-4o-mini-transcribe
 
