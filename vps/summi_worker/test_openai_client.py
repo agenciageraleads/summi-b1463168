@@ -15,14 +15,14 @@ if "mutagen" not in sys.modules:
     sys.modules["mutagen"] = mutagen_stub
 
 try:
-    from .openai_client import GeminiTranscriptionClient, OpenAIClient
+    from .openai_client import GeminiTranscriptionClient, OpenAIClient, strip_transcription_timestamps
 except ImportError:
     from pathlib import Path
 
     ROOT = Path(__file__).resolve().parents[1]
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from summi_worker.openai_client import GeminiTranscriptionClient, OpenAIClient
+    from summi_worker.openai_client import GeminiTranscriptionClient, OpenAIClient, strip_transcription_timestamps
 
 
 REQUESTS_POST_TARGET = f"{OpenAIClient.__module__}.requests.post"
@@ -41,6 +41,47 @@ class _FakeResponse:
 
 
 class OpenAIClientTranscriptionTest(unittest.TestCase):
+    def test_strip_transcription_timestamps_removes_ranges_but_preserves_clock_times(self) -> None:
+        text = (
+            "00:01 - 00:05\n"
+            "Lucas, se apressa, eu já preciso ter uma ideia do que é.\n\n"
+            "00:06 - 00:11\n"
+            "Entrega às 10:00 amanhã."
+        )
+
+        self.assertEqual(
+            strip_transcription_timestamps(text),
+            "Lucas, se apressa, eu já preciso ter uma ideia do que é.\nEntrega às 10:00 amanhã.",
+        )
+
+    def test_transcribe_audio_strips_timestamp_ranges_from_response_text(self) -> None:
+        client = OpenAIClient("key")
+
+        with patch.object(client, "_probe_audio_duration_seconds", return_value=13.0):
+            with patch(
+                REQUESTS_POST_TARGET,
+                return_value=_FakeResponse(
+                    {
+                        "text": (
+                            "00:01 - 00:05\n"
+                            "Lucas, se apressa, eu já preciso ter uma ideia do que é.\n\n"
+                            "00:06 - 00:11\n"
+                            "Vocês aí com 6 metros inteira."
+                        )
+                    }
+                ),
+            ):
+                result = client.transcribe_audio(
+                    b"fake-audio",
+                    model="whisper-1",
+                    include_logprobs=False,
+                )
+
+        self.assertEqual(
+            result.text,
+            "Lucas, se apressa, eu já preciso ter uma ideia do que é.\nVocês aí com 6 metros inteira.",
+        )
+
     def test_transcribe_audio_sends_language_prompt_logprobs_and_chunking(self) -> None:
         client = OpenAIClient("key")
 
@@ -170,7 +211,7 @@ class GeminiTranscriptionClientTest(unittest.TestCase):
                         {
                             "content": {
                                 "parts": [
-                                    {"text": "Me passa o CNPJ 12.345.678/0001-90."},
+                                    {"text": "00:00 - 00:05\nMe passa o CNPJ 12.345.678/0001-90."},
                                 ]
                             }
                         }

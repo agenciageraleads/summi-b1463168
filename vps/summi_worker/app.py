@@ -21,7 +21,14 @@ from .cost_tracking import log_chat_cost, log_transcription_cost
 from .evolution_client import EvolutionClient, EvolutionError
 from .evolution_webhook import normalize_message_event
 from .growth_tracking import record_trial_budget_events
-from .openai_client import GeminiTranscriptionClient, OpenAIClient, OpenAIError, OpenAIUsage, TranscriptionResult
+from .openai_client import (
+    GeminiTranscriptionClient,
+    OpenAIClient,
+    OpenAIError,
+    OpenAIUsage,
+    TranscriptionResult,
+    strip_transcription_timestamps,
+)
 from .prompt_builders import (
     build_footer,
     build_transcription_hint_terms,
@@ -1341,7 +1348,7 @@ async def _handle_evolution_webhook(
                             if isinstance(event, dict) and event.get("message_id") == message_id:
                                 existing_text = event.get("text")
                                 if existing_text:
-                                    transcript = existing_text
+                                    transcript = strip_transcription_timestamps(str(existing_text))
                                     # Reuse audio metadata from existing event
                                     for key, value in event.items():
                                         if key.startswith("audio_"):
@@ -1372,7 +1379,7 @@ async def _handle_evolution_webhook(
                             profile=profile,
                             audio_bytes=mp3_bytes,
                         )
-                        transcript = transcription.text
+                        transcript = strip_transcription_timestamps(transcription.text)
                         duration_seconds = transcription.duration_seconds
                         logger.info(
                             "evolution_webhook.audio_transcribed instance=%s message_id=%s elapsed_ms=%s transcript_chars=%s model=%s fallback=%s confidence=%s",
@@ -1416,7 +1423,7 @@ async def _handle_evolution_webhook(
                     "evolution_webhook.audio_duration instance=%s message_id=%s seconds_payload=%s duration_openai=%s audio_seconds=%s should_summarize=%s",
                     instance_name, message_id, seconds_from_payload, duration_seconds, audio_seconds, should_summarize,
                 )
-                final_audio_text = transcript or ""
+                final_audio_text = strip_transcription_timestamps(transcript or "")
                 processed_audio_seconds = audio_seconds
                 if should_summarize and transcript and transcript.strip():
                     skip_summary, skip_reason = _should_skip_audio_summary_for_budget(
@@ -1534,7 +1541,7 @@ async def _handle_evolution_webhook(
                                 profile=profile,
                                 audio_bytes=mp3_bytes,
                             )
-                            transcript = transcription.text
+                            transcript = strip_transcription_timestamps(transcription.text)
                             duration_seconds = transcription.duration_seconds
                             logger.info(
                                 "evolution_webhook.reaction_audio_transcribed instance=%s target_id=%s elapsed_ms=%s transcript_chars=%s model=%s fallback=%s confidence=%s",
@@ -1552,7 +1559,7 @@ async def _handle_evolution_webhook(
                                 model=transcription.model,
                                 duration_seconds=duration_seconds,
                             )
-                            final_text = transcript
+                            final_text = strip_transcription_timestamps(transcript)
                             audio_seconds = _safe_positive_int(duration_seconds)
                             resume_audio = _profile_bool(profile, "resume_audio", False)
                             segundos_para_resumir = _profile_int(
@@ -1794,4 +1801,3 @@ async def social_blog_preview(slug: str, request: Request):
 </html>
 """
     return html
-

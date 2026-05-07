@@ -96,6 +96,19 @@ def _extract_phone_digits(value: Any) -> str:
     return "".join(c for c in str(value or "") if c.isdigit())
 
 
+def _summarize_exception(exc: Exception, *, max_chars: int = 500) -> str:
+    text = " ".join(str(exc).split())
+    if len(text) > max_chars:
+        text = f"{text[:max_chars]}..."
+    return f"{type(exc).__name__}: {text}"
+
+
+def _track_error_reason(bucket: Dict[str, int], exc: Exception) -> str:
+    reason = _summarize_exception(exc)
+    bucket[reason] = bucket.get(reason, 0) + 1
+    return reason
+
+
 def _hourly_summary_send_lock_key(user_id: str) -> str:
     return f"summi:hourly:send-lock:{user_id}"
 
@@ -726,6 +739,9 @@ def run_hourly_job(
     skipped_hours = 0
     analyzed_users = 0
     analyze_errors = 0
+    analyze_error_reasons: Dict[str, int] = {}
+    summary_errors = 0
+    summary_error_reasons: Dict[str, int] = {}
     low_priority_deleted = 0
     skipped_no_priority_items = 0
     skipped_locked_users = 0
@@ -780,9 +796,11 @@ def run_hourly_job(
             try:
                 analyze_user_chats(settings, supabase, openai, user_id=user_id)
                 analyzed_users += 1
-            except Exception:
+            except Exception as exc:
                 # Nao aborta o job inteiro por erro em um usuario.
                 analyze_errors += 1
+                reason = _track_error_reason(analyze_error_reasons, exc)
+                logger.exception("hourly_summary.analyze_failed user_id=%s error=%s", user_id, reason)
 
             # O Summi da Hora deve considerar apenas o lote recem-analisado desde o ultimo envio.
             chats = supabase.select(
@@ -857,6 +875,10 @@ def run_hourly_job(
                     low_priority_deleted += _delete_low_priority_chats(supabase, user_id=user_id)
                 except Exception:
                     pass
+        except Exception as exc:
+            summary_errors += 1
+            reason = _track_error_reason(summary_error_reasons, exc)
+            logger.exception("hourly_summary.user_failed user_id=%s error=%s", user_id, reason)
         finally:
             if not keep_lock:
                 summary_send_dedupe.release(lock_key)
@@ -870,6 +892,9 @@ def run_hourly_job(
         "skipped_outside_business_hours": skipped_hours,
         "analyzed_users_before_summary": analyzed_users,
         "analyze_errors": analyze_errors,
+        "analyze_error_reasons": analyze_error_reasons,
+        "summary_errors": summary_errors,
+        "summary_error_reasons": summary_error_reasons,
         "low_priority_deleted": low_priority_deleted,
         "skipped_no_priority_items": skipped_no_priority_items,
         "skipped_locked_users": skipped_locked_users,

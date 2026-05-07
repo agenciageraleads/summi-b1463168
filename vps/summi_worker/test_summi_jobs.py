@@ -408,6 +408,65 @@ class SummiJobsTest(unittest.TestCase):
         self.assertEqual(evolution.sent_text, 0)
         self.assertEqual(released, [])
 
+    def test_run_hourly_job_records_analyze_error_reason_and_releases_lock(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            business_hours_start=8,
+            business_hours_end=18,
+            business_hours_timezone="America/Sao_Paulo",
+            summi_sender_instance="Summi",
+            redis_url="redis://example",
+        )
+        profile = {
+            "id": "user-1",
+            "numero": "5562999999999",
+            "summi_frequencia": "1h",
+            "ultimo_summi_em": "2026-03-05T09:00:00+00:00",
+            "onboarding_completed": True,
+            "Summi em Audio?": False,
+        }
+
+        class _SupabaseFake:
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "subscribers":
+                    return [{"user_id": "user-1", "subscription_end": "2099-01-01T00:00:00+00:00", "subscribed": True}]
+                if table == "profiles":
+                    return [profile]
+                if table == "chats":
+                    return []
+                return []
+
+            def patch(self, table, data, filters=None):
+                return None
+
+            def delete(self, table, filters=None):
+                return None
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        dedupe = SimpleNamespace(released=[])
+
+        def _raise_quota(*args, **kwargs):
+            raise RuntimeError("chat failed: 429 insufficient_quota")
+
+        with patch.dict(
+            run_hourly_job.__globals__,
+            {
+                "analyze_user_chats": _raise_quota,
+                "RedisDedupe": lambda _url: SimpleNamespace(
+                    seen_or_mark=lambda key, ttl_seconds: False,
+                    release=lambda key: dedupe.released.append(key),
+                ),
+            },
+        ):
+            result = run_hourly_job(settings, _SupabaseFake(), openai=object(), evolution=object())
+
+        self.assertEqual(result["analyze_errors"], 1)
+        self.assertEqual(result["summary_errors"], 0)
+        self.assertTrue(any("insufficient_quota" in reason for reason in result["analyze_error_reasons"]))
+        self.assertEqual(dedupe.released, ["summi:hourly:send-lock:user-1"])
+
     def test_run_hourly_job_keeps_lock_after_summary_send(self) -> None:
         settings = SimpleNamespace(
             ignore_remote_jid="556293984600",
@@ -494,6 +553,92 @@ class SummiJobsTest(unittest.TestCase):
         self.assertEqual(dedupe.marked, [("summi:hourly:send-lock:user-1", 300)])
         self.assertEqual(dedupe.released, [])
         self.assertTrue(
+            any(
+                table == "profiles" and "ultimo_summi_em" in data
+                for table, data, _filters in supabase.patch_calls
+            )
+        )
+
+    def test_run_hourly_job_records_summary_error_and_releases_lock(self) -> None:
+        settings = SimpleNamespace(
+            ignore_remote_jid="556293984600",
+            business_hours_start=8,
+            business_hours_end=18,
+            business_hours_timezone="America/Sao_Paulo",
+            summi_sender_instance="Summi",
+            openai_model_summary="gpt-4o-mini",
+            redis_url="redis://example",
+        )
+        profile = {
+            "id": "user-1",
+            "numero": "5562999999999",
+            "summi_frequencia": "1h",
+            "ultimo_summi_em": "2026-03-05T09:00:00+00:00",
+            "onboarding_completed": True,
+            "Summi em Audio?": False,
+            "Apaga Mensagens Não Importantes Automaticamente?": "nao",
+        }
+        summary_chats = [
+            {
+                "id": "chat-1",
+                "nome": "Contato",
+                "remote_jid": "5562911111111",
+                "prioridade": "3",
+                "contexto": "Precisa responder hoje",
+                "criado_em": "2026-03-05T09:10:00+00:00",
+                "modificado_em": "2026-03-05T09:10:00+00:00",
+                "analisado_em": "2026-03-05T09:10:00+00:00",
+            }
+        ]
+
+        class _SupabaseFake:
+            def __init__(self) -> None:
+                self.patch_calls = []
+
+            def select(self, table, select="*", filters=None, order=None, limit=None):
+                if table == "subscribers":
+                    return [{"user_id": "user-1", "subscription_end": "2099-01-01T00:00:00+00:00", "subscribed": True}]
+                if table == "profiles":
+                    return [profile]
+                if table == "chats":
+                    return summary_chats
+                return []
+
+            def patch(self, table, data, filters=None):
+                self.patch_calls.append((table, data, filters))
+                return None
+
+            def delete(self, table, filters=None):
+                return None
+
+            def rpc(self, *args, **kwargs):
+                return None
+
+        dedupe = SimpleNamespace(released=[])
+        supabase = _SupabaseFake()
+
+        def _raise_quota(*args, **kwargs):
+            raise RuntimeError("chat failed: 429 insufficient_quota")
+
+        with patch.dict(
+            run_hourly_job.__globals__,
+            {
+                "analyze_user_chats": lambda *args, **kwargs: {"success": True, "analyzed_count": 1},
+                "get_user_budget_state": lambda *args, **kwargs: SimpleNamespace(plan_kind="trial"),
+                "build_summary_text": _raise_quota,
+                "RedisDedupe": lambda _url: SimpleNamespace(
+                    seen_or_mark=lambda key, ttl_seconds: False,
+                    release=lambda key: dedupe.released.append(key),
+                ),
+            },
+        ):
+            result = run_hourly_job(settings, supabase, openai=object(), evolution=object())
+
+        self.assertEqual(result["sent"], 0)
+        self.assertEqual(result["summary_errors"], 1)
+        self.assertTrue(any("insufficient_quota" in reason for reason in result["summary_error_reasons"]))
+        self.assertEqual(dedupe.released, ["summi:hourly:send-lock:user-1"])
+        self.assertFalse(
             any(
                 table == "profiles" and "ultimo_summi_em" in data
                 for table, data, _filters in supabase.patch_calls

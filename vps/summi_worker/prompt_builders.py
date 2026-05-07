@@ -15,7 +15,8 @@ SUMMI_HOUR_FALLBACK_AUDIO_SCRIPT = "Summi da Hora: não há nada de importante p
 TRANSCRIPTION_STATIC_PROMPT = (
     "Transcreva em português do Brasil com máxima fidelidade ao áudio. "
     "Preserve exatamente nomes próprios, marcas, CPF, CNPJ, CEP, PIX, telefones, e-mails e valores. "
-    "Use pontuação correta e letras maiúsculas em nomes próprios. Não resuma nem invente palavras."
+    "Use pontuação correta e letras maiúsculas em nomes próprios. Não inclua timestamps, minutagem ou intervalos "
+    "de tempo. Não resuma nem invente palavras."
 )
 
 DEFAULT_CRITICAL_TRANSCRIPTION_TERMS = (

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from io import BytesIO
 import json
 import math
+import re
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -25,6 +26,17 @@ _TRANSCRIPTION_MODELS_WITHOUT_LOGPROBS: frozenset[str] = frozenset({"whisper-1"}
 # Modelos que NÃO suportam chunking_strategy na API de transcrição.
 # Whisper-1 rejeita se for enviado.
 _TRANSCRIPTION_MODELS_WITHOUT_CHUNKING: frozenset[str] = frozenset({"whisper-1"})
+
+_TIMESTAMP_PREFIX_RE = re.compile(
+    r"^\s*[\[(]?\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?[\])]?\s*"
+    r"(?:-|–|—|-->|->|\sto\s)\s*"
+    r"[\[(]?\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?[\])]?\s*[:\-–—]?\s*"
+)
+_TIMESTAMP_ONLY_RE = re.compile(
+    r"^\s*[\[(]?\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?[\])]?\s*"
+    r"(?:(?:-|–|—|-->|->|\sto\s)\s*"
+    r"[\[(]?\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?[\])]?)?\s*$"
+)
 
 
 @dataclass(frozen=True)
@@ -65,6 +77,18 @@ class TTSResult:
 class VisionResult:
     text: str
     usage: Optional[OpenAIUsage]
+
+
+def strip_transcription_timestamps(text: str) -> str:
+    cleaned_lines: list[str] = []
+    for line in str(text or "").splitlines():
+        if _TIMESTAMP_ONLY_RE.match(line):
+            continue
+        cleaned_line = _TIMESTAMP_PREFIX_RE.sub("", line).strip()
+        if cleaned_line:
+            cleaned_lines.append(cleaned_line)
+
+    return "\n".join(cleaned_lines).strip()
 
 
 def _extract_json_object(text: str) -> Dict[str, Any]:
@@ -214,7 +238,7 @@ class GeminiTranscriptionClient:
         if not resp.ok:
             raise OpenAIError(f"gemini transcribe failed: {resp.status_code} {resp.text}")
         return TranscriptionResult(
-            text=_extract_gemini_text(resp.json()),
+            text=strip_transcription_timestamps(_extract_gemini_text(resp.json())),
             duration_seconds=_probe_audio_duration_seconds(audio_bytes),
             model=model,
         )
@@ -346,7 +370,7 @@ class OpenAIClient:
         if not resp.ok:
             raise OpenAIError(f"transcribe failed: {resp.status_code} {resp.text}")
         payload = resp.json()
-        text = str(payload.get("text") or "").strip()
+        text = strip_transcription_timestamps(str(payload.get("text") or ""))
         duration_num = _to_float(payload.get("duration"))
         if duration_num is None:
             duration_num = estimated_duration
