@@ -18,7 +18,7 @@ def _base_env() -> dict[str, str]:
     return {
         "SUPABASE_URL": "https://supabase.example.com",
         "SUPABASE_SERVICE_ROLE_KEY": "service-role",
-        "OPENAI_API_KEY": "openai-key",
+        "GOOGLE_API_KEY": "google-key",
         "EVOLUTION_API_URL": "https://evolution.example.com",
         "EVOLUTION_API_KEY": "evolution-key",
     }
@@ -31,6 +31,12 @@ class LoadSettingsTest(unittest.TestCase):
 
         self.assertFalse(settings.enable_daily_job)
         self.assertEqual(settings.default_seconds_to_summarize, 90)
+        self.assertEqual(settings.llm_provider, "google")
+        self.assertEqual(settings.transcription_provider, "google")
+        self.assertIsNone(settings.openai_api_key)
+        self.assertEqual(settings.blog_model, "gemini-2.5-flash-lite")
+        self.assertEqual(settings.blog_post_timezone, "UTC")
+        self.assertTrue(settings.blog_use_pytrends)
 
     def test_webhook_dedupe_ttl_enforces_floor(self) -> None:
         with patch.dict(
@@ -59,6 +65,15 @@ class LoadSettingsTest(unittest.TestCase):
             clear=True,
         ):
             with self.assertRaisesRegex(RuntimeError, "REDIS_URL is required"):
+                load_settings()
+
+    def test_openai_key_is_required_only_when_openai_provider_is_selected(self) -> None:
+        with patch.dict(
+            os.environ,
+            {**_base_env(), "LLM_PROVIDER": "openai", "TRANSCRIPTION_PROVIDER": "google"},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "OPENAI_API_KEY is required"):
                 load_settings()
 
 

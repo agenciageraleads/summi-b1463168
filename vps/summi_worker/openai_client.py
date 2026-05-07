@@ -16,7 +16,8 @@ class OpenAIError(RuntimeError):
     pass
 
 
-GEMINI_TRANSCRIPTION_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GEMINI_GENERATE_CONTENT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GEMINI_TRANSCRIPTION_ENDPOINT = GEMINI_GENERATE_CONTENT_ENDPOINT
 
 
 # Modelos que NÃO suportam include[]=logprobs na API de transcrição.
@@ -142,6 +143,20 @@ def _extract_usage(payload: Dict[str, Any]) -> Optional[OpenAIUsage]:
     )
 
 
+def _extract_gemini_usage(payload: Dict[str, Any]) -> Optional[OpenAIUsage]:
+    usage = payload.get("usageMetadata")
+    if not isinstance(usage, dict):
+        return None
+    prompt_tokens = int(_to_float(usage.get("promptTokenCount")) or 0)
+    completion_tokens = int(_to_float(usage.get("candidatesTokenCount")) or 0)
+    total_tokens = int(_to_float(usage.get("totalTokenCount")) or (prompt_tokens + completion_tokens))
+    return OpenAIUsage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
+    )
+
+
 def _detect_audio_upload_meta(audio_bytes: bytes, default_filename: str = "audio.mp3") -> Tuple[str, str]:
     head = audio_bytes[:32]
     if head.startswith(b"OggS"):
@@ -155,6 +170,19 @@ def _detect_audio_upload_meta(audio_bytes: bytes, default_filename: str = "audio
     if len(head) >= 12 and head[4:8] == b"ftyp":
         return "audio.m4a", "audio/mp4"
     return default_filename, "application/octet-stream"
+
+
+def _detect_image_upload_mime(image_bytes: bytes, default_mime: str = "image/jpeg") -> str:
+    head = image_bytes[:32]
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith(b"GIF87a") or head.startswith(b"GIF89a"):
+        return "image/gif"
+    if head.startswith(b"RIFF") and b"WEBP" in head[:16]:
+        return "image/webp"
+    return default_mime
 
 
 def _probe_audio_duration_seconds(audio_bytes: bytes) -> Optional[float]:
@@ -244,6 +272,105 @@ class GeminiTranscriptionClient:
         )
 
 
+class GeminiClient:
+    def __init__(self, api_key: str):
+        self._api_key = api_key
+
+    def _post_generate_content(
+        self,
+        model: str,
+        payload: Dict[str, Any],
+        *,
+        timeout: int = 120,
+    ) -> Dict[str, Any]:
+        url = GEMINI_GENERATE_CONTENT_ENDPOINT.format(model=model)
+        resp = requests.post(url, params={"key": self._api_key}, json=payload, timeout=timeout)
+        if not resp.ok:
+            raise OpenAIError(f"gemini generate failed: {resp.status_code} {resp.text}")
+        return resp.json()
+
+    def _text_payload(
+        self,
+        *,
+        system: str,
+        user: str,
+        temperature: float,
+        response_mime_type: str,
+    ) -> Dict[str, Any]:
+        prompt = "\n\n".join(part for part in (system.strip(), user.strip()) if part)
+        return {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": temperature,
+                "responseMimeType": response_mime_type,
+            },
+        }
+
+    def chat_json_response(self, model: str, system: str, user: str, temperature: float = 0.2) -> ChatJsonResult:
+        payload = self._text_payload(
+            system=system,
+            user=user,
+            temperature=temperature,
+            response_mime_type="application/json",
+        )
+        data = self._post_generate_content(model, payload, timeout=120)
+        return ChatJsonResult(data=_extract_json_object(_extract_gemini_text(data)), usage=_extract_gemini_usage(data))
+
+    def chat_json(self, model: str, system: str, user: str, temperature: float = 0.2) -> Dict[str, Any]:
+        return self.chat_json_response(model=model, system=system, user=user, temperature=temperature).data
+
+    def chat_text_response(self, model: str, system: str, user: str, temperature: float = 0.4) -> ChatTextResult:
+        payload = self._text_payload(
+            system=system,
+            user=user,
+            temperature=temperature,
+            response_mime_type="text/plain",
+        )
+        data = self._post_generate_content(model, payload, timeout=120)
+        return ChatTextResult(text=_extract_gemini_text(data), usage=_extract_gemini_usage(data))
+
+    def chat_text(self, model: str, system: str, user: str, temperature: float = 0.4) -> str:
+        return self.chat_text_response(model=model, system=system, user=user, temperature=temperature).text
+
+    def describe_image_base64_response(
+        self,
+        model: str,
+        image_bytes: bytes,
+        mime_type: str = "image/jpeg",
+    ) -> VisionResult:
+        mime_type = _detect_image_upload_mime(image_bytes, default_mime=mime_type)
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": (
+                                "Descreva a imagem de forma clara e objetiva, nada alem disso. "
+                                "A descricao sera usada por outra IA para classificar prioridade de conversa."
+                            )
+                        },
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": base64.b64encode(image_bytes).decode("ascii"),
+                            }
+                        },
+                    ],
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.2,
+                "responseMimeType": "text/plain",
+            },
+        }
+        data = self._post_generate_content(model, payload, timeout=120)
+        return VisionResult(text=_extract_gemini_text(data), usage=_extract_gemini_usage(data))
+
+    def describe_image_base64(self, model: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
+        return self.describe_image_base64_response(model=model, image_bytes=image_bytes, mime_type=mime_type).text
+
+
 class OpenAIClient:
     def __init__(self, api_key: str):
         self._api_key = api_key
@@ -314,16 +441,7 @@ class OpenAIClient:
         return _detect_audio_upload_meta(audio_bytes, default_filename=default_filename)
 
     def _detect_image_mime(self, image_bytes: bytes, default_mime: str = "image/jpeg") -> str:
-        head = image_bytes[:32]
-        if head.startswith(b"\x89PNG\r\n\x1a\n"):
-            return "image/png"
-        if head.startswith(b"\xff\xd8\xff"):
-            return "image/jpeg"
-        if head.startswith(b"GIF87a") or head.startswith(b"GIF89a"):
-            return "image/gif"
-        if head.startswith(b"RIFF") and b"WEBP" in head[:16]:
-            return "image/webp"
-        return default_mime
+        return _detect_image_upload_mime(image_bytes, default_mime=default_mime)
 
     def _probe_audio_duration_seconds(self, audio_bytes: bytes) -> Optional[float]:
         return _probe_audio_duration_seconds(audio_bytes)

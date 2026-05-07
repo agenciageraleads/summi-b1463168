@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from .config import load_settings
 from .evolution_client import EvolutionClient
-from .openai_client import OpenAIClient
+from .openai_client import GeminiClient, OpenAIClient
 from .redis_queue import RedisQueueClient, run_now_result_key
 from .summi_jobs import run_hourly_job, run_user_summi_now
 from .supabase_rest import SupabaseRest
@@ -30,7 +30,11 @@ def main() -> None:
 
     queue = RedisQueueClient.from_url(settings.redis_url)
     supabase = SupabaseRest(settings.supabase_url, settings.supabase_service_role_key)
-    openai = OpenAIClient(settings.openai_api_key)
+    openai = (
+        GeminiClient(settings.google_api_key or "")
+        if settings.llm_provider == "google"
+        else OpenAIClient(settings.openai_api_key or "")
+    )
     evolution = EvolutionClient(settings.evolution_api_url, settings.evolution_api_key)
 
     queue_name = settings.queue_analysis_name if queue_kind == "analysis" else settings.queue_summary_name

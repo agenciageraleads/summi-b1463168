@@ -16,13 +16,14 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from .budget_guard import get_user_budget_state
-from .config import Settings, load_settings
+from .config import Settings, get_summary_model, get_vision_model, load_settings
 from .cost_tracking import log_chat_cost, log_transcription_cost
 from .evolution_client import EvolutionClient, EvolutionError
 from .evolution_webhook import normalize_message_event
 from .growth_tracking import record_trial_budget_events
 from .openai_client import (
     GeminiTranscriptionClient,
+    GeminiClient,
     OpenAIClient,
     OpenAIError,
     OpenAIUsage,
@@ -75,8 +76,10 @@ def _supabase(settings: Settings) -> SupabaseRest:
     return SupabaseRest(settings.supabase_url, settings.supabase_service_role_key)
 
 
-def _openai(settings: Settings) -> OpenAIClient:
-    return OpenAIClient(settings.openai_api_key)
+def _openai(settings: Settings):
+    if settings.llm_provider == "google":
+        return GeminiClient(settings.google_api_key or "")
+    return OpenAIClient(settings.openai_api_key or "")
 
 
 def _evolution(settings: Settings) -> EvolutionClient:
@@ -1264,12 +1267,12 @@ async def _handle_evolution_webhook(
             if media_b64:
                 if settings.enable_image_description:
                     image_bytes = _decode_b64_media(media_b64)
-                    vision_result = openai.describe_image_base64_response("gpt-4o-mini", image_bytes)
+                    vision_result = openai.describe_image_base64_response(get_vision_model(settings), image_bytes)
                     _maybe_log_chat_usage(
                         supabase,
                         user_id=user_id,
                         operation="vision",
-                        model="gpt-4o-mini",
+                        model=get_vision_model(settings),
                         usage=vision_result.usage,
                     )
                     text_for_chat = _derive_message_content(payload, normalized, image_description=vision_result.text)
@@ -1444,7 +1447,7 @@ async def _handle_evolution_webhook(
                         summarize_started_at = time.perf_counter()
                         final_audio_text, summary_usage = _summarize_transcription(
                             openai,
-                            settings.openai_model_summary,
+                            get_summary_model(settings),
                             transcript,
                             profile,
                             audio_seconds=audio_seconds,
@@ -1453,7 +1456,7 @@ async def _handle_evolution_webhook(
                             supabase,
                             user_id=user_id,
                             operation="summary",
-                            model=settings.openai_model_summary,
+                            model=get_summary_model(settings),
                             usage=summary_usage,
                         )
                         logger.info(
@@ -1589,7 +1592,7 @@ async def _handle_evolution_webhook(
                                     summarize_started_at = time.perf_counter()
                                     final_text, summary_usage = _summarize_transcription(
                                         openai,
-                                        settings.openai_model_summary,
+                                        get_summary_model(settings),
                                         transcript,
                                         profile,
                                         audio_seconds=audio_seconds,
@@ -1598,7 +1601,7 @@ async def _handle_evolution_webhook(
                                         supabase,
                                         user_id=user_id,
                                         operation="summary",
-                                        model=settings.openai_model_summary,
+                                        model=get_summary_model(settings),
                                         usage=summary_usage,
                                     )
                                     extra["reaction_audio_summarized"] = True

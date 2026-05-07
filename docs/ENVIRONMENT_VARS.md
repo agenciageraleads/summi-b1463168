@@ -70,30 +70,40 @@ SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 # Para worker: sempre use SUPABASE_SERVICE_ROLE_KEY
 ```
 
-### OpenAI (Análise + Transcrição + TTS)
+### IA (Gemini padrão, OpenAI opcional)
 
 ```bash
-# API Key (obtenha em https://platform.openai.com/api-keys)
-OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Provider para análise/resumos: google ou openai
+LLM_PROVIDER=google
 
-# Modelos para análise
+# Gemini: padrão de produção para evitar quota da OpenAI
+GOOGLE_API_KEY=AIza...
+GOOGLE_MODEL_ANALYSIS=gemini-2.5-flash-lite
+GOOGLE_MODEL_SUMMARY=gemini-2.5-flash-lite
+GOOGLE_MODEL_VISION=gemini-2.5-flash-lite
+
+# OpenAI: legado opcional, usado somente com LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 OPENAI_MODEL_ANALYSIS=gpt-4o-mini          # Análise de prioridade
 OPENAI_MODEL_SUMMARY=gpt-4o-mini           # Resumo horário
 
-# TTS (text-to-speech) para Summi da Hora em áudio
+# TTS via OpenAI fica desligado por padrão
+TTS_PROVIDER=none                          # none ou openai
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
 OPENAI_TTS_VOICE=alloy                     # Options: alloy, echo, fable, onyx, nova, shimmer
 ```
 
-### Whisper (Transcrição de Áudio)
+### Transcrição de Áudio
 
 ```bash
-# Provider: openai (padrao) ou google (Gemini API)
-TRANSCRIPTION_PROVIDER=openai
+# Provider: google (padrão) ou openai
+TRANSCRIPTION_PROVIDER=google
 GOOGLE_API_KEY=AIza...                         # obrigatório se TRANSCRIPTION_PROVIDER=google
 GOOGLE_TRANSCRIPTION_MODEL=gemini-2.5-flash-lite
+TRANSCRIPTION_LANGUAGE=pt
+TRANSCRIPTION_PROMPT_EXTRA=CNPJ, CPF, orcamento, pedido, nota fiscal, codigo do produto, prazo de entrega, DeWalt, Makita, Bosch, Stanley, Milwaukee
 
-# Modelo padrão (barato)
+# Configuração legada usada somente quando TRANSCRIPTION_PROVIDER=openai
 OPENAI_TRANSCRIPTION_MODEL=whisper-1       # ou gpt-4o-mini-transcribe
 
 # Fallback (melhor, para áudio ruim)
@@ -155,6 +165,18 @@ DAILY_SUMMARY_TIMEZONE=UTC
 LOW_PRIORITY_CLEANUP_DAYS=30   # Delete normal messages > 30 days
 ```
 
+### Blog Auto-Post
+
+```bash
+BLOG_AUTO_POST_ENABLED=true
+BLOG_POST_HOUR=9
+BLOG_POST_TIMEZONE=UTC
+BLOG_MODEL=gemini-2.5-flash-lite
+BLOG_USE_PYTRENDS=true
+UNSPLASH_ACCESS_KEY=
+SITE_URL=https://summi.com.br
+```
+
 ### Deduplicação (Redis)
 
 ```bash
@@ -198,17 +220,29 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # ============ OPENAI ============
-OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+LLM_PROVIDER=google
+TTS_PROVIDER=none
+
+# OpenAI legado opcional; nao precisa preencher quando providers estao em google/none
+OPENAI_API_KEY=
 OPENAI_MODEL_ANALYSIS=gpt-4o-mini
 OPENAI_MODEL_SUMMARY=gpt-4o-mini
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
 OPENAI_TTS_VOICE=alloy
 
+# ============ GOOGLE GEMINI ============
+GOOGLE_API_KEY=AIza...
+GOOGLE_MODEL_ANALYSIS=gemini-2.5-flash-lite
+GOOGLE_MODEL_SUMMARY=gemini-2.5-flash-lite
+GOOGLE_MODEL_VISION=gemini-2.5-flash-lite
+
 # ============ WHISPER/TRANSCRIPTION ============
+TRANSCRIPTION_PROVIDER=google
+GOOGLE_TRANSCRIPTION_MODEL=gemini-2.5-flash-lite
+TRANSCRIPTION_LANGUAGE=pt
+TRANSCRIPTION_PROMPT_EXTRA=CNPJ, CPF, orcamento, pedido
 OPENAI_TRANSCRIPTION_MODEL=whisper-1
 OPENAI_TRANSCRIPTION_FALLBACK_MODEL=whisper-1
-OPENAI_TRANSCRIPTION_LANGUAGE=pt
-OPENAI_TRANSCRIPTION_PROMPT_EXTRA=CNPJ, CPF, orcamento, pedido
 OPENAI_TRANSCRIPTION_CONFIDENCE_THRESHOLD=0.55
 OPENAI_TRANSCRIPTION_CRITICAL_CONFIDENCE_THRESHOLD=0.80
 OPENAI_TRANSCRIPTION_CHUNKING_MIN_SECONDS=20
@@ -230,6 +264,14 @@ ENABLE_DAILY_JOB=true
 DAILY_SUMMARY_HOUR_UTC=22
 DAILY_SUMMARY_TIMEZONE=UTC
 LOW_PRIORITY_CLEANUP_DAYS=30
+
+# ============ BLOG AUTO-POST ============
+BLOG_AUTO_POST_ENABLED=true
+BLOG_POST_HOUR=9
+BLOG_POST_TIMEZONE=UTC
+BLOG_MODEL=gemini-2.5-flash-lite
+BLOG_USE_PYTRENDS=true
+UNSPLASH_ACCESS_KEY=
 
 # ============ REDIS/DEDUPE ============
 WEBHOOK_DEDUPE_TTL_SECONDS=86400
@@ -284,7 +326,8 @@ JWT_SECRET=your-super-secret-key
 |-------|------|-----------|-----------|
 | **VITE_SUPABASE_ANON_KEY** | Pública | Frontend `.env.local` | ✅ OK, RLS protege |
 | **SUPABASE_SERVICE_ROLE_KEY** | Privada | Backend + Worker | 🔒 **NUNCA** em frontend |
-| **OPENAI_API_KEY** | Privada | Backend + Worker | 🔒 **NUNCA** em frontend |
+| **GOOGLE_API_KEY** | Privada | Worker | 🔒 **NUNCA** em frontend |
+| **OPENAI_API_KEY** | Privada | Worker legado opcional | 🔒 **NUNCA** em frontend |
 | **VITE_STRIPE_PUBLIC_KEY** | Pública | Frontend | ✅ OK, design de API |
 | **STRIPE_SECRET_KEY** | Privada | Edge Functions | 🔒 **NUNCA** em frontend |
 
@@ -301,7 +344,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...  # staging key
 
 # Copy do worker .env
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...  # staging key
-OPENAI_API_KEY=sk-proj-xxxxx  # (mesma, ou separada)
+GOOGLE_API_KEY=AIza...  # (mesma, ou separada)
 ```
 
 ### Staging → Production
@@ -350,13 +393,12 @@ curl -X POST http://localhost:54321/auth/v1/token \
   -d '{"email":"test@test.com","password":"123456"}'
 ```
 
-### "OpenAI API error"
+### "Gemini API error"
 ```bash
 # Verifique key
-curl https://api.openai.com/v1/models \
-  -H "Authorization: Bearer $OPENAI_API_KEY"
+curl "https://generativelanguage.googleapis.com/v1beta/models?key=$GOOGLE_API_KEY"
 
-# Cheque balance/quota em https://platform.openai.com/account/billing
+# Cheque billing/quota no Google AI Studio
 ```
 
 ### "Evolution API não conecta"
@@ -373,6 +415,7 @@ curl -X GET $EVOLUTION_API_URL/health \
 | Recurso | Link |
 |---------|------|
 | **Supabase Docs** | https://supabase.com/docs |
+| **Gemini API** | https://ai.google.dev/ |
 | **OpenAI API Keys** | https://platform.openai.com/api-keys |
 | **Stripe Keys** | https://dashboard.stripe.com/apikeys |
 | **Evolution API Docs** | https://doc.evolution.bot/ |

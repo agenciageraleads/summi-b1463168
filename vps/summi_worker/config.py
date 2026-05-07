@@ -47,7 +47,8 @@ class Settings:
     supabase_service_role_key: str
     supabase_anon_key: str | None
 
-    openai_api_key: str
+    llm_provider: str
+    openai_api_key: str | None
     openai_model_analysis: str
     openai_model_summary: str
     openai_tts_model: str
@@ -62,7 +63,11 @@ class Settings:
     openai_transcription_chunking_min_seconds: int
     transcription_provider: str
     google_api_key: str | None
+    google_model_analysis: str
+    google_model_summary: str
+    google_model_vision: str
     google_transcription_model: str
+    tts_provider: str
 
     evolution_api_url: str
     evolution_api_key: str
@@ -99,6 +104,9 @@ class Settings:
     # Blog auto-posting
     blog_auto_post_enabled: bool
     blog_post_hour: int
+    blog_post_timezone: str
+    blog_model: str
+    blog_use_pytrends: bool
     unsplash_access_key: str
     site_url: str
 
@@ -108,15 +116,16 @@ def load_settings() -> Settings:
         supabase_url=_must("SUPABASE_URL").rstrip("/"),
         supabase_service_role_key=_must("SUPABASE_SERVICE_ROLE_KEY"),
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY"),
-        openai_api_key=_must("OPENAI_API_KEY"),
+        llm_provider=os.getenv("LLM_PROVIDER", "google").strip().lower(),
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_model_analysis=os.getenv("OPENAI_MODEL_ANALYSIS", "gpt-4o-mini"),
         openai_model_summary=os.getenv("OPENAI_MODEL_SUMMARY", "gpt-4o-mini"),
         openai_tts_model=os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts"),
         openai_tts_voice=os.getenv("OPENAI_TTS_VOICE", "alloy"),
         openai_transcription_model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),  # era gpt-4o-mini-transcribe (40% mais caro)
         openai_transcription_fallback_model=os.getenv("OPENAI_TRANSCRIPTION_FALLBACK_MODEL", "gpt-4o-transcribe"),
-        openai_transcription_language=os.getenv("OPENAI_TRANSCRIPTION_LANGUAGE", "pt"),
-        openai_transcription_prompt_extra=os.getenv("OPENAI_TRANSCRIPTION_PROMPT_EXTRA"),
+        openai_transcription_language=os.getenv("TRANSCRIPTION_LANGUAGE", os.getenv("OPENAI_TRANSCRIPTION_LANGUAGE", "pt")),
+        openai_transcription_prompt_extra=os.getenv("TRANSCRIPTION_PROMPT_EXTRA", os.getenv("OPENAI_TRANSCRIPTION_PROMPT_EXTRA")),
         openai_transcription_enable_fallback=_bool("OPENAI_TRANSCRIPTION_ENABLE_FALLBACK", True),
         openai_transcription_confidence_threshold=_float("OPENAI_TRANSCRIPTION_CONFIDENCE_THRESHOLD", 0.65),  # era 0.55 — threshold mais agressivo para fallback
         openai_transcription_critical_confidence_threshold=_float(
@@ -124,9 +133,13 @@ def load_settings() -> Settings:
             0.80,
         ),
         openai_transcription_chunking_min_seconds=_int("OPENAI_TRANSCRIPTION_CHUNKING_MIN_SECONDS", 20),
-        transcription_provider=os.getenv("TRANSCRIPTION_PROVIDER", "openai").strip().lower(),
+        transcription_provider=os.getenv("TRANSCRIPTION_PROVIDER", "google").strip().lower(),
         google_api_key=os.getenv("GOOGLE_API_KEY"),
+        google_model_analysis=os.getenv("GOOGLE_MODEL_ANALYSIS", "gemini-2.5-flash-lite"),
+        google_model_summary=os.getenv("GOOGLE_MODEL_SUMMARY", "gemini-2.5-flash-lite"),
+        google_model_vision=os.getenv("GOOGLE_MODEL_VISION", "gemini-2.5-flash-lite"),
         google_transcription_model=os.getenv("GOOGLE_TRANSCRIPTION_MODEL", "gemini-2.5-flash-lite"),
+        tts_provider=os.getenv("TTS_PROVIDER", "none").strip().lower(),
         evolution_api_url=_must("EVOLUTION_API_URL").rstrip("/"),
         evolution_api_key=_must("EVOLUTION_API_KEY"),
         summi_sender_instance=os.getenv("SUMMI_SENDER_INSTANCE", "Summi"),
@@ -158,6 +171,9 @@ def load_settings() -> Settings:
         usd_brl_exchange_rate=_float("USD_BRL_EXCHANGE_RATE", 5.8),
         blog_auto_post_enabled=_bool("BLOG_AUTO_POST_ENABLED", False),
         blog_post_hour=_int("BLOG_POST_HOUR", 9),
+        blog_post_timezone=os.getenv("BLOG_POST_TIMEZONE", "UTC"),
+        blog_model=os.getenv("BLOG_MODEL", os.getenv("GOOGLE_MODEL_SUMMARY", "gemini-2.5-flash-lite")),
+        blog_use_pytrends=_bool("BLOG_USE_PYTRENDS", True),
         unsplash_access_key=os.getenv("UNSPLASH_ACCESS_KEY", ""),
         site_url=os.getenv("SITE_URL", "https://summi.gera-leads.com"),
     )
@@ -168,10 +184,41 @@ def load_settings() -> Settings:
     if (settings.enable_analysis_queue or settings.enable_summary_queue) and not settings.redis_url:
         raise RuntimeError("REDIS_URL is required when queue support is enabled")
 
+    if settings.llm_provider not in {"google", "openai"}:
+        raise RuntimeError("LLM_PROVIDER must be 'google' or 'openai'")
+
     if settings.transcription_provider not in {"openai", "google"}:
         raise RuntimeError("TRANSCRIPTION_PROVIDER must be 'openai' or 'google'")
 
-    if settings.transcription_provider == "google" and not settings.google_api_key:
-        raise RuntimeError("GOOGLE_API_KEY is required when TRANSCRIPTION_PROVIDER=google")
+    if settings.tts_provider not in {"none", "openai"}:
+        raise RuntimeError("TTS_PROVIDER must be 'none' or 'openai'")
+
+    if (settings.llm_provider == "google" or settings.transcription_provider == "google") and not settings.google_api_key:
+        raise RuntimeError("GOOGLE_API_KEY is required when LLM_PROVIDER=google or TRANSCRIPTION_PROVIDER=google")
+
+    if (
+        settings.llm_provider == "openai"
+        or settings.transcription_provider == "openai"
+        or settings.tts_provider == "openai"
+    ) and not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is required when any provider uses OpenAI")
 
     return settings
+
+
+def get_analysis_model(settings: Settings) -> str:
+    if getattr(settings, "llm_provider", "openai") == "google":
+        return getattr(settings, "google_model_analysis", "gemini-2.5-flash-lite")
+    return getattr(settings, "openai_model_analysis", "gpt-4o-mini")
+
+
+def get_summary_model(settings: Settings) -> str:
+    if getattr(settings, "llm_provider", "openai") == "google":
+        return getattr(settings, "google_model_summary", "gemini-2.5-flash-lite")
+    return getattr(settings, "openai_model_summary", "gpt-4o-mini")
+
+
+def get_vision_model(settings: Settings) -> str:
+    if getattr(settings, "llm_provider", "openai") == "google":
+        return getattr(settings, "google_model_vision", "gemini-2.5-flash-lite")
+    return "gpt-4o-mini"

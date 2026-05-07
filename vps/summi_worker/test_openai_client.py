@@ -15,14 +15,14 @@ if "mutagen" not in sys.modules:
     sys.modules["mutagen"] = mutagen_stub
 
 try:
-    from .openai_client import GeminiTranscriptionClient, OpenAIClient, strip_transcription_timestamps
+    from .openai_client import GeminiClient, GeminiTranscriptionClient, OpenAIClient, strip_transcription_timestamps
 except ImportError:
     from pathlib import Path
 
     ROOT = Path(__file__).resolve().parents[1]
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from summi_worker.openai_client import GeminiTranscriptionClient, OpenAIClient, strip_transcription_timestamps
+    from summi_worker.openai_client import GeminiClient, GeminiTranscriptionClient, OpenAIClient, strip_transcription_timestamps
 
 
 REQUESTS_POST_TARGET = f"{OpenAIClient.__module__}.requests.post"
@@ -200,6 +200,59 @@ class OpenAIClientTranscriptionTest(unittest.TestCase):
 
 
 class GeminiTranscriptionClientTest(unittest.TestCase):
+    def test_chat_json_response_extracts_json_and_usage(self) -> None:
+        client = GeminiClient("google-key")
+
+        with patch(
+            REQUESTS_POST_TARGET,
+            return_value=_FakeResponse(
+                {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [
+                                    {"text": '{"Prioridade":"2","Contexto":"Responder hoje"}'},
+                                ]
+                            }
+                        }
+                    ],
+                    "usageMetadata": {
+                        "promptTokenCount": 100,
+                        "candidatesTokenCount": 20,
+                        "totalTokenCount": 120,
+                    },
+                }
+            ),
+        ) as post:
+            result = client.chat_json_response("gemini-2.5-flash-lite", "system", "user", temperature=0.2)
+
+        self.assertEqual(result.data["Prioridade"], "2")
+        self.assertEqual(result.usage.total_tokens if result.usage else None, 120)
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual(payload["generationConfig"]["responseMimeType"], "application/json")
+        self.assertEqual(post.call_args.kwargs["params"], {"key": "google-key"})
+
+    def test_chat_text_response_extracts_text(self) -> None:
+        client = GeminiClient("google-key")
+
+        with patch(
+            REQUESTS_POST_TARGET,
+            return_value=_FakeResponse(
+                {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [{"text": "Resumo pronto"}],
+                            }
+                        }
+                    ]
+                }
+            ),
+        ):
+            result = client.chat_text_response("gemini-2.5-flash-lite", "system", "user")
+
+        self.assertEqual(result.text, "Resumo pronto")
+
     def test_transcribe_audio_posts_inline_audio_and_extracts_text(self) -> None:
         client = GeminiTranscriptionClient("google-key")
 

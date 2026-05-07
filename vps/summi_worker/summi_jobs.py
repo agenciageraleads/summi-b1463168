@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .analysis import AnalyzedChat, analyze_single_chat, build_audio_script_with_usage, build_summary_text
 from .budget_guard import get_user_budget_state
-from .config import Settings
+from .config import Settings, get_analysis_model, get_summary_model
 from .cost_tracking import log_chat_cost, log_tts_cost
 from .evolution_client import EvolutionClient
 from .openai_client import OpenAIClient
@@ -164,7 +164,11 @@ def _summary_frequency_hours(profile: Dict[str, Any]) -> int:
 
 
 def _should_send_summi_audio(settings: Settings, profile: Dict[str, Any]) -> bool:
-    return bool(getattr(settings, "enable_summi_audio", False)) and profile.get("Summi em Audio?") is True
+    return (
+        bool(getattr(settings, "enable_summi_audio", False))
+        and getattr(settings, "tts_provider", "none") == "openai"
+        and profile.get("Summi em Audio?") is True
+    )
 
 
 def _summary_is_due(profile: Dict[str, Any], *, now_utc: dt.datetime) -> bool:
@@ -278,7 +282,7 @@ def analyze_user_chats(
     for chat in unique_chats:
         analyzed_chat, usage = analyze_single_chat(
             openai,
-            settings.openai_model_analysis,
+            get_analysis_model(settings),
             chat_id=chat["id"],
             conversa=chat.get("conversa", []),
             nome=chat.get("nome") or chat.get("Nome") or "",
@@ -294,7 +298,7 @@ def analyze_user_chats(
                 supabase,
                 user_id,
                 operation="analyze",
-                model=settings.openai_model_analysis,
+                model=get_analysis_model(settings),
                 input_tokens=usage.prompt_tokens,
                 output_tokens=usage.completion_tokens,
             )
@@ -419,7 +423,7 @@ def run_daily_summary_job(
             except Exception:
                 pass
 
-            summary_text = build_summary_text(openai, settings.openai_model_summary, items=items, is_trial=is_trial)
+            summary_text = build_summary_text(openai, get_summary_model(settings), items=items, is_trial=is_trial)
             evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
             sent += 1
 
@@ -448,7 +452,7 @@ def run_daily_summary_job(
                 try:
                     audio_script, script_usage = build_audio_script_with_usage(
                         openai,
-                        settings.openai_model_summary,
+                        get_summary_model(settings),
                         summary_text=summary_text,
                     )
                     if script_usage is not None:
@@ -456,7 +460,7 @@ def run_daily_summary_job(
                             supabase,
                             user_id,
                             operation="summary",
-                            model=settings.openai_model_summary,
+                            model=get_summary_model(settings),
                             input_tokens=script_usage.prompt_tokens,
                             output_tokens=script_usage.completion_tokens,
                         )
@@ -643,7 +647,7 @@ def run_user_summi_now(
         except Exception:
             pass
 
-        summary_text = build_summary_text(openai, settings.openai_model_summary, items=items, is_trial=is_trial)
+        summary_text = build_summary_text(openai, get_summary_model(settings), items=items, is_trial=is_trial)
         evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
         base_response["summary_sent"] = True
         base_response["fallback_sent"] = not bool(items)
@@ -661,7 +665,7 @@ def run_user_summi_now(
             try:
                 audio_script, script_usage = build_audio_script_with_usage(
                     openai,
-                    settings.openai_model_summary,
+                    get_summary_model(settings),
                     summary_text=summary_text,
                 )
                 if script_usage is not None:
@@ -669,7 +673,7 @@ def run_user_summi_now(
                         supabase,
                         user_id,
                         operation="summary",
-                        model=settings.openai_model_summary,
+                        model=get_summary_model(settings),
                         input_tokens=script_usage.prompt_tokens,
                         output_tokens=script_usage.completion_tokens,
                     )
@@ -824,7 +828,7 @@ def run_hourly_job(
             except Exception:
                 pass
 
-            summary_text = build_summary_text(openai, settings.openai_model_summary, items=items, is_trial=is_trial)
+            summary_text = build_summary_text(openai, get_summary_model(settings), items=items, is_trial=is_trial)
             evolution.send_text(settings.summi_sender_instance, numero_usuario, summary_text)
             sent += 1
             keep_lock = True
@@ -843,7 +847,7 @@ def run_hourly_job(
                 try:
                     audio_script, script_usage = build_audio_script_with_usage(
                         openai,
-                        settings.openai_model_summary,
+                        get_summary_model(settings),
                         summary_text=summary_text,
                     )
                     if script_usage is not None:
@@ -851,7 +855,7 @@ def run_hourly_job(
                             supabase,
                             user_id,
                             operation="summary",
-                            model=settings.openai_model_summary,
+                            model=get_summary_model(settings),
                             input_tokens=script_usage.prompt_tokens,
                             output_tokens=script_usage.completion_tokens,
                         )

@@ -3,14 +3,13 @@ blog_writer.py — Automated SEO blog post generator for Summi.
 
 Flow:
 1. Pick a keyword: pytrends (Google Trends BR) with fallback to curated seed list
-2. Generate full Markdown post via OpenAI GPT-4o (SEO + AIO optimized)
+2. Generate full Markdown post via Gemini (SEO + AIO optimized)
 3. Fetch a cover photo from Unsplash API
 4. Insert the post into Supabase blog_posts table (published=True)
 """
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import random
@@ -21,6 +20,7 @@ from typing import Optional
 
 import requests
 
+from .openai_client import GeminiClient
 from .supabase_rest import SupabaseRest
 
 logger = logging.getLogger("summi_worker.blog_writer")
@@ -74,7 +74,7 @@ UNSPLASH_QUERIES = [
 ]
 
 # ---------------------------------------------------------------------------
-# GPT-4o blog generation prompt
+# Blog generation prompt
 # ---------------------------------------------------------------------------
 _SYSTEM_PROMPT = """\
 Você é um redator especialista em SEO e AIO (AI Overview Optimization) para o mercado brasileiro de tecnologia.
@@ -164,27 +164,18 @@ def _slug_from_title(title: str) -> str:
     return s[:80]
 
 
-def _generate_post_openai(keyword: str, api_key: str) -> Optional[dict]:
-    """Call OpenAI GPT-4o to generate a blog post JSON."""
-    url = "https://api.openai.com/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": "gpt-4o",
-        "temperature": 0.7,
-        "response_format": {"type": "json_object"},
-        "messages": [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": _USER_PROMPT_TEMPLATE.format(keyword=keyword)},
-        ],
-    }
+def _generate_post_gemini(keyword: str, api_key: str, model: str) -> Optional[dict]:
+    """Call Gemini to generate a blog post JSON."""
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=120)
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-        data = json.loads(content)
-        return data
+        client = GeminiClient(api_key)
+        return client.chat_json_response(
+            model=model,
+            system=_SYSTEM_PROMPT,
+            user=_USER_PROMPT_TEMPLATE.format(keyword=keyword),
+            temperature=0.7,
+        ).data
     except Exception as exc:
-        logger.error("[blog_writer] OpenAI generation failed: %s", exc)
+        logger.error("[blog_writer] Gemini generation failed: %s", exc)
         return None
 
 
@@ -238,7 +229,8 @@ def _make_unique_slug(supabase: SupabaseRest, base_slug: str) -> str:
 
 def run_daily_blog_post(
     supabase: SupabaseRest,
-    openai_api_key: str,
+    google_api_key: str,
+    model: str = "gemini-2.5-flash-lite",
     unsplash_access_key: str = "",
     use_pytrends: bool = True,
 ) -> bool:
@@ -253,7 +245,7 @@ def run_daily_blog_post(
     logger.info("[blog_writer] Using keyword: %s", keyword)
 
     # 2. Generate content
-    post_data = _generate_post_openai(keyword, openai_api_key)
+    post_data = _generate_post_gemini(keyword, google_api_key, model)
     if not post_data:
         logger.error("[blog_writer] Failed to generate post — aborting")
         return False

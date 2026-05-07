@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from .config import load_settings
 from .evolution_client import EvolutionClient
-from .openai_client import OpenAIClient
+from .openai_client import GeminiClient, OpenAIClient
 from .redis_queue import RedisQueueClient
 from .blog_writer import run_daily_blog_post
 from .summi_jobs import run_daily_summary_job, run_hourly_job
@@ -24,7 +24,11 @@ def main() -> None:
         return
 
     supabase = SupabaseRest(settings.supabase_url, settings.supabase_service_role_key)
-    openai = OpenAIClient(settings.openai_api_key)
+    openai = (
+        GeminiClient(settings.google_api_key or "")
+        if settings.llm_provider == "google"
+        else OpenAIClient(settings.openai_api_key or "")
+    )
     evolution = EvolutionClient(settings.evolution_api_url, settings.evolution_api_key)
     queue = RedisQueueClient.from_url(settings.redis_url) if (settings.enable_summary_queue and settings.redis_url) else None
 
@@ -52,20 +56,28 @@ def main() -> None:
         def _run_blog_post() -> None:
             run_daily_blog_post(
                 supabase=supabase,
-                openai_api_key=settings.openai_api_key,
+                google_api_key=settings.google_api_key or "",
+                model=settings.blog_model,
                 unsplash_access_key=settings.unsplash_access_key,
+                use_pytrends=settings.blog_use_pytrends,
             )
 
         scheduler.add_job(
             _run_blog_post,
-            "cron",
-            hour=settings.blog_post_hour,
-            minute=0,
+            CronTrigger(
+                hour=settings.blog_post_hour,
+                minute=0,
+                timezone=settings.blog_post_timezone,
+            ),
             max_instances=1,
             coalesce=True,
             misfire_grace_time=3600,
         )
-        print(f"Blog auto-post scheduled daily at {settings.blog_post_hour:02d}:00")
+        print(
+            "Blog auto-post scheduled daily at "
+            f"{settings.blog_post_hour:02d}:00 ({settings.blog_post_timezone}) "
+            f"using {settings.blog_model}"
+        )
 
     # Job diário: resumo de conversas pendentes + Inbox Zero no horário configurado.
     if settings.enable_daily_job:

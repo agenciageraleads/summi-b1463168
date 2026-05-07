@@ -1,7 +1,7 @@
 """
-cost_tracking.py — Rastreamento de custos OpenAI por usuário.
+cost_tracking.py — Rastreamento de custos de IA por usuário.
 
-Calcula e registra custos em tempo real após cada chamada à OpenAI.
+Calcula e registra custos em tempo real após cada chamada a provedores de IA.
 Logging é assíncrono (fire-and-forget): erros de logging nunca bloqueiam
 o fluxo principal de transcrição/análise.
 
@@ -10,6 +10,8 @@ Pricing sources (2025):
   - gpt-4o-transcribe:      $0.006/min (input)
   - Gemini 2.5 Flash-Lite:  $0.30/1M audio input tokens; audio = 32 tokens/sec
   - Gemini 2.5 Flash:       $1.00/1M audio input tokens; audio = 32 tokens/sec
+  - Gemini 2.5 Flash-Lite text input:  $0.10/1M tokens
+  - Gemini 2.5 Flash-Lite text output: $0.40/1M tokens
   - gpt-4o-mini (input):    $0.00015/1K tokens
   - gpt-4o-mini (output):   $0.0006/1K tokens
   - gpt-4o-mini-tts:        $0.000015/char
@@ -24,7 +26,7 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger("summi_worker.cost_tracking")
 
 # ---------------------------------------------------------------------------
-# Tabela de preços OpenAI (USD)
+# Tabela de preços de provedores de IA (USD)
 # ---------------------------------------------------------------------------
 
 # Transcrição: por minuto de áudio
@@ -36,6 +38,10 @@ GEMINI_FLASH_AUDIO_COST_PER_MINUTE = Decimal("0.00192")
 # Chat/Análise: por 1K tokens
 GPT4O_MINI_INPUT_PER_1K = Decimal("0.00015")
 GPT4O_MINI_OUTPUT_PER_1K = Decimal("0.0006")
+GEMINI_FLASH_LITE_INPUT_PER_1K = Decimal("0.0001")
+GEMINI_FLASH_LITE_OUTPUT_PER_1K = Decimal("0.0004")
+GEMINI_FLASH_INPUT_PER_1K = Decimal("0.0003")
+GEMINI_FLASH_OUTPUT_PER_1K = Decimal("0.0025")
 
 # TTS: por caractere
 GPT4O_MINI_TTS_COST_PER_CHAR = Decimal("0.000015")
@@ -47,6 +53,13 @@ _TRANSCRIPTION_COST_MAP: Dict[str, Decimal] = {
     "gemini-2.5-flash-lite": GEMINI_FLASH_LITE_AUDIO_COST_PER_MINUTE,
     "gemini-2.5-flash-lite-preview-09-2025": GEMINI_FLASH_LITE_AUDIO_COST_PER_MINUTE,
     "gemini-2.5-flash": GEMINI_FLASH_AUDIO_COST_PER_MINUTE,
+}
+
+_CHAT_COST_MAP: Dict[str, tuple[Decimal, Decimal]] = {
+    "gpt-4o-mini": (GPT4O_MINI_INPUT_PER_1K, GPT4O_MINI_OUTPUT_PER_1K),
+    "gemini-2.5-flash-lite": (GEMINI_FLASH_LITE_INPUT_PER_1K, GEMINI_FLASH_LITE_OUTPUT_PER_1K),
+    "gemini-2.5-flash-lite-preview-09-2025": (GEMINI_FLASH_LITE_INPUT_PER_1K, GEMINI_FLASH_LITE_OUTPUT_PER_1K),
+    "gemini-2.5-flash": (GEMINI_FLASH_INPUT_PER_1K, GEMINI_FLASH_OUTPUT_PER_1K),
 }
 
 _QUANTIZE = Decimal("0.00000001")  # 8 casas decimais
@@ -75,8 +88,9 @@ def calculate_chat_cost(
     model: str = "gpt-4o-mini",
 ) -> Decimal:
     """Custo de chamada chat/completions (input + output tokens)."""
-    input_cost = Decimal(input_tokens) * GPT4O_MINI_INPUT_PER_1K / Decimal("1000")
-    output_cost = Decimal(output_tokens) * GPT4O_MINI_OUTPUT_PER_1K / Decimal("1000")
+    input_rate, output_rate = _CHAT_COST_MAP.get(model, (GPT4O_MINI_INPUT_PER_1K, GPT4O_MINI_OUTPUT_PER_1K))
+    input_cost = Decimal(input_tokens) * input_rate / Decimal("1000")
+    output_cost = Decimal(output_tokens) * output_rate / Decimal("1000")
     return (input_cost + output_cost).quantize(_QUANTIZE, rounding=ROUND_HALF_UP)
 
 
