@@ -253,6 +253,31 @@ class GeminiTranscriptionClientTest(unittest.TestCase):
 
         self.assertEqual(result.text, "Resumo pronto")
 
+    def test_chat_text_response_retries_transient_gemini_errors(self) -> None:
+        client = GeminiClient("google-key", max_retries=1, retry_backoff_seconds=0)
+
+        with patch(
+            REQUESTS_POST_TARGET,
+            side_effect=[
+                _FakeResponse({"error": {"message": "high demand"}}, status_code=503),
+                _FakeResponse(
+                    {
+                        "candidates": [
+                            {
+                                "content": {
+                                    "parts": [{"text": "Resumo pronto"}],
+                                }
+                            }
+                        ]
+                    }
+                ),
+            ],
+        ) as post:
+            result = client.chat_text_response("gemini-2.5-flash-lite", "system", "user")
+
+        self.assertEqual(result.text, "Resumo pronto")
+        self.assertEqual(post.call_count, 2)
+
     def test_transcribe_audio_posts_inline_audio_and_extracts_text(self) -> None:
         client = GeminiTranscriptionClient("google-key")
 

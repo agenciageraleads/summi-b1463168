@@ -6,18 +6,23 @@ from io import BytesIO
 import json
 import math
 import re
+import time
 from typing import Any, Dict, Optional, Tuple
 
 import requests
 from mutagen import File as MutagenFile
 
 
-class OpenAIError(RuntimeError):
+class AIProviderError(RuntimeError):
     pass
+
+
+OpenAIError = AIProviderError
 
 
 GEMINI_GENERATE_CONTENT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GEMINI_TRANSCRIPTION_ENDPOINT = GEMINI_GENERATE_CONTENT_ENDPOINT
+_GEMINI_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 # Modelos que NÃO suportam include[]=logprobs na API de transcrição.
@@ -273,8 +278,10 @@ class GeminiTranscriptionClient:
 
 
 class GeminiClient:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, *, max_retries: int = 3, retry_backoff_seconds: float = 1.0):
         self._api_key = api_key
+        self._max_retries = max(0, max_retries)
+        self._retry_backoff_seconds = max(0.0, retry_backoff_seconds)
 
     def _post_generate_content(
         self,
@@ -284,10 +291,24 @@ class GeminiClient:
         timeout: int = 120,
     ) -> Dict[str, Any]:
         url = GEMINI_GENERATE_CONTENT_ENDPOINT.format(model=model)
-        resp = requests.post(url, params={"key": self._api_key}, json=payload, timeout=timeout)
-        if not resp.ok:
-            raise OpenAIError(f"gemini generate failed: {resp.status_code} {resp.text}")
-        return resp.json()
+        last_error: Exception | None = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                resp = requests.post(url, params={"key": self._api_key}, json=payload, timeout=timeout)
+            except requests.RequestException as exc:
+                last_error = exc
+                should_retry = attempt < self._max_retries
+            else:
+                if resp.ok:
+                    return resp.json()
+                last_error = OpenAIError(f"gemini generate failed: {resp.status_code} {resp.text}")
+                should_retry = resp.status_code in _GEMINI_TRANSIENT_STATUS_CODES and attempt < self._max_retries
+
+            if not should_retry:
+                break
+            time.sleep(self._retry_backoff_seconds * (2**attempt))
+
+        raise OpenAIError(str(last_error or "gemini generate failed"))
 
     def _text_payload(
         self,
